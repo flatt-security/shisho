@@ -1,0 +1,33 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'shisho'",
+      "cargo": {
+        "args": ["build", "--bin=shisho", "--package=shisho"],
+        "filter": {
+          "name": "shisho",
+          "kind": "bin"
+        }
+      },
+      "args": ["open"],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'shisho'",
+      "cargo": {
+        "args": ["test", "--no-run", "--bin=shisho", "--package=shisho"],
+        "filter": {
+          "name": "shisho",
+          "kind": "bin"
+        }
+      },
+      "args": ["open"],
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}
