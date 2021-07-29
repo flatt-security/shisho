@@ -1,0 +1,3 @@
+[submodule "third_party/tree-sitter-hcl"]
+	path = third_party/tree-sitter-hcl
+	url = git@github.com:mitchellh/tree-sitter-hcl.git
