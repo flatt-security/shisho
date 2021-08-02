@@ -1,16 +1,20 @@
 //! This module defines `scan` subcommand.
 
+use crate::{
+    cli::CommonOpts,
+    query::Query,
+    tree::{QueryCursor, Tree},
+};
+use std::convert::TryFrom;
 use structopt::StructOpt;
-
-use crate::cli::CommonOpts;
 
 /// `Opts` defines possible options for the `scan` subcommand.
 #[derive(StructOpt, Debug)]
 pub struct Opts {
     target_path: String,
 }
-const CODE: &str = r#"
-resource "google_container_cluster" "test" {
+
+const CODE: &str = r#"resource "google_container_cluster" "test" {
     name     = "challenges"
     location = var.location
   
@@ -59,25 +63,42 @@ resource "google_container_cluster" "test" {
   
     # Disable Basic Authentication to k8s API by setting empty value to `username`.
     master_auth {
-      username = ""
+      username = "a"
       password = ""
     }
   }
 "#;
 
+const QUERY: &str = r#"resource "google_container_cluster" "test" {
+  ...
+  master_auth {
+    ...
+    username = $X
+    ...
+  }
+  ...
+}
+"#;
+
 pub fn run(_common_opts: CommonOpts, _opts: Opts) -> i32 {
-    let code = CODE;
+    // handle code
+    let raw_code = CODE;
+    let tree = Tree::try_from(raw_code).expect("failed to load code");
 
-    let mut parser = tree_sitter::Parser::new();
-    let language = tree_sitter_hcl::language();
-    parser
-        .set_language(language)
-        .expect("Error loading hcl grammar");
-    let tree = parser.parse(code, None).unwrap();
+    // handle query
+    let raw_query = QUERY;
+    let query = Query::try_from(raw_query).expect("failed to load query.");
 
-    // tree_sitter::Query::new(language, source);
-    println!("{}", tree.root_node().to_sexp());
+    let cursor = &mut QueryCursor::new();
+    for matched in tree.matches(&query, cursor) {
+        // matched.
+        println!("matched: {}", matched.pattern_index);
 
-    todo!("not implemented yet");
+        for capture in matched.captures {
+            println!("\t- {}: {:?}", capture.index, capture.node);
+        }
+    }
+
+    // todo!("not implemented yet");
     return 0;
 }

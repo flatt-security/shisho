@@ -21,3 +21,6 @@ tree-sitter = "0.19.5"
 
 [dependencies.tree-sitter-hcl]
 path = "./third_party/tree-sitter-hcl"
+
+[dependencies.tree-sitter-hcl-query]
+path = "./third_party/tree-sitter-hcl-query"

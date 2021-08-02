@@ -245,6 +245,7 @@ dependencies = [
  "thiserror",
  "tree-sitter",
  "tree-sitter-hcl",
+ "tree-sitter-hcl-query",
 ]
 
 [[package]]
@@ -340,6 +341,14 @@ dependencies = [
 
 [[package]]
 name = "tree-sitter-hcl"
+version = "0.0.1"
+dependencies = [
+ "cc",
+ "tree-sitter",
+]
+
+[[package]]
+name = "tree-sitter-hcl-query"
 version = "0.0.1"
 dependencies = [
  "cc",
