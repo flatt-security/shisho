@@ -1,3 +1,6 @@
 [submodule "third_party/tree-sitter-hcl"]
 	path = third_party/tree-sitter-hcl
 	url = git@github.com:lmt-swallow/tree-sitter-hcl.git
+[submodule "third_party/tree-sitter-hcl-query"]
+	path = third_party/tree-sitter-hcl-query
+	url = git@github.com:flatt-jp/tree-sitter-hcl-query.git
