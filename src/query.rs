@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use std::{convert::TryFrom, marker::PhantomData};
 use thiserror::Error;
 
-use crate::language::Queryable;
+use crate::{language::Queryable, tree::Tree};
 
 #[derive(Debug, PartialEq)]
 pub struct Metavariable {
@@ -74,6 +74,15 @@ where
     _marker: PhantomData<T>,
 }
 
+impl<'a, T> From<&'a str> for RawQuery<'a, T>
+where
+    T: Queryable,
+{
+    fn from(value: &'a str) -> Self {
+        RawQuery::new(value)
+    }
+}
+
 impl<'a, T> RawQuery<'a, T>
 where
     T: Queryable,
@@ -84,7 +93,12 @@ where
             _marker: PhantomData,
         }
     }
+}
 
+impl<'a, T> RawQuery<'a, T>
+where
+    T: Queryable,
+{
     // public functions
     ////
 
@@ -193,11 +207,38 @@ where
     }
 }
 
-impl<'a, T> From<&'a str> for RawQuery<'a, T>
+pub struct QuerySession<'tree, 'query, T>
 where
     T: Queryable,
+    'tree: 'query,
 {
-    fn from(value: &'a str) -> Self {
-        RawQuery::new(value)
+    cursor: tree_sitter::QueryCursor,
+    query: &'query Query<T>,
+    tree: &'tree Tree<'tree, T>,
+}
+
+impl<'tree, 'query, T> QuerySession<'tree, 'query, T>
+where
+    T: Queryable,
+    'tree: 'query,
+{
+    pub fn new(tree: &'tree Tree<'tree, T>, query: &'query Query<T>) -> Self {
+        let cursor = tree_sitter::QueryCursor::new();
+        QuerySession {
+            tree,
+            cursor,
+            query,
+        }
+    }
+
+    pub fn to_iter(&'query mut self) -> impl Iterator<Item = MatchedItem<'query>> + 'query {
+        let raw = self.tree.raw;
+        self.cursor.matches(
+            self.query.ts_query(),
+            self.tree.ts_tree().root_node(),
+            move |x| x.utf8_text(raw).unwrap(),
+        )
     }
 }
+
+pub type MatchedItem<'a> = tree_sitter::QueryMatch<'a>;

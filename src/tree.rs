@@ -1,43 +1,10 @@
-use crate::{language::Queryable, query::Query};
+use crate::{
+    language::Queryable,
+    query::{Query, QuerySession},
+};
+use anyhow::Result;
 use std::{convert::TryFrom, marker::PhantomData};
 use thiserror::Error;
-
-pub struct Tree<'a, T> {
-    tree: tree_sitter::Tree,
-    raw: &'a str,
-
-    _marker: PhantomData<T>,
-}
-
-pub type QueryCursor = tree_sitter::QueryCursor;
-pub type QueryMatch<'a> = tree_sitter::QueryMatch<'a>;
-
-impl<'a, T> Tree<'a, T>
-where
-    T: Queryable,
-{
-    pub fn new(tree: tree_sitter::Tree, raw: &'a str) -> Tree<'a, T> {
-        Tree {
-            tree,
-            raw,
-            _marker: PhantomData,
-        }
-    }
-
-    pub fn matches<'b>(
-        &'a self,
-        query: &'b Query<T>,
-        cursor: &'b mut QueryCursor,
-    ) -> impl Iterator<Item = QueryMatch<'b>> + 'b
-    where
-        'a: 'b,
-    {
-        let raw_bytes = self.raw.as_bytes();
-        cursor.matches(query.ts_query(), self.tree.root_node(), move |x| {
-            x.utf8_text(raw_bytes).unwrap()
-        })
-    }
-}
 
 #[derive(Debug, Error)]
 pub enum TreeError {
@@ -48,18 +15,91 @@ pub enum TreeError {
     ConvertError(tree_sitter::QueryError),
 }
 
-impl<'a, T> TryFrom<&'a str> for Tree<'a, T>
+pub struct Tree<'a, T> {
+    pub raw: &'a [u8],
+    tstree: tree_sitter::Tree,
+
+    _marker: PhantomData<T>,
+}
+
+impl<'tree, T> Tree<'tree, T>
 where
     T: Queryable,
 {
-    type Error = TreeError;
+    pub fn new(tree: tree_sitter::Tree, raw: &'tree [u8]) -> Tree<'tree, T> {
+        Tree {
+            tstree: tree,
+            raw,
+            _marker: PhantomData,
+        }
+    }
 
-    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+    pub fn ts_tree<'a>(&'a self) -> &'a tree_sitter::Tree {
+        &self.tstree
+    }
+
+    pub fn matches<'query>(&'tree self, query: &'query Query<T>) -> QuerySession<'query, 'tree, T>
+    where
+        'tree: 'query,
+    {
+        QuerySession::new(self, query)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct RawTree<'a, T>
+where
+    T: Queryable,
+{
+    raw_bytes: &'a [u8],
+    _marker: PhantomData<T>,
+}
+
+impl<'a, T> From<&'a str> for RawTree<'a, T>
+where
+    T: Queryable,
+{
+    fn from(value: &'a str) -> Self {
+        RawTree::new(value)
+    }
+}
+
+impl<'a, T> RawTree<'a, T>
+where
+    T: Queryable,
+{
+    pub fn new(raw_str: &'a str) -> Self {
+        RawTree {
+            raw_bytes: raw_str.as_bytes(),
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<'a, T> RawTree<'a, T>
+where
+    T: Queryable,
+{
+    pub fn into_tree<'b>(self) -> Result<Tree<'a, T>> {
         let mut parser = tree_sitter::Parser::new();
         parser
             .set_language(T::target_language())
             .expect("Error loading hcl grammar");
 
-        Ok(Tree::new(parser.parse(value, None).unwrap(), value))
+        Ok(Tree::new(
+            parser.parse(self.raw_bytes, None).unwrap(),
+            self.raw_bytes,
+        ))
+    }
+}
+
+impl<'a, T> TryFrom<&'a str> for Tree<'a, T>
+where
+    T: Queryable,
+{
+    type Error = anyhow::Error;
+
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        RawTree::new(value).into_tree()
     }
 }
