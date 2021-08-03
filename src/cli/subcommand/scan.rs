@@ -19,7 +19,7 @@ pub fn run(_common_opts: CommonOpts, _opts: Opts) -> i32 {
     let raw_query = "todo";
     let query = Query::try_from(raw_query).expect("failed to load query.");
 
-    for matched in tree.matches(&query).to_iter() {
+    for matched in tree.matches(&query).iter() {
         // matched.
         println!("matched: {}", matched.pattern_index);
 

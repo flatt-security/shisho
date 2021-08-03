@@ -231,7 +231,7 @@ where
         }
     }
 
-    pub fn to_iter(&'query mut self) -> impl Iterator<Item = MatchedItem<'query>> + 'query {
+    pub fn iter(&'query mut self) -> impl Iterator<Item = MatchedItem<'query>> + 'query {
         let raw = self.tree.raw;
         self.cursor.matches(
             self.query.ts_query(),
