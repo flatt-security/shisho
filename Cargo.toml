@@ -24,3 +24,9 @@ path = "./third_party/tree-sitter-hcl"
 
 [dependencies.tree-sitter-hcl-query]
 path = "./third_party/tree-sitter-hcl-query"
+
+[dependencies.tree-sitter-go]
+path = "./third_party/tree-sitter-go"
+
+[dependencies.tree-sitter-go-query]
+path = "./third_party/tree-sitter-go-query"

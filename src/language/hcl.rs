@@ -43,16 +43,16 @@ mod tests {
         );
 
         // with ellipsis operators
-        assert!(
-            RawQuery::<HCL>::new(r#"resource "rtype" "rname" { ... attr = "value" ... }"#)
-                .to_query_string()
-                .is_ok()
-        );
+        assert!(RawQuery::<HCL>::new(
+            r#"resource "rtype" "rname" { :[[...]] attr = "value" :[[...]] }"#
+        )
+        .to_query_string()
+        .is_ok());
 
         // with metavariables
         {
-            let rq =
-                RawQuery::<HCL>::new(r#"resource "rtype" "rname" { attr = $X }"#).to_query_string();
+            let rq = RawQuery::<HCL>::new(r#"resource "rtype" "rname" { attr = :[[X]] }"#)
+                .to_query_string();
             assert!(rq.is_ok());
             let TSQueryString { metavariables, .. } = rq.unwrap();
             assert_eq!(metavariables.len(), 1);
@@ -69,15 +69,16 @@ mod tests {
         );
 
         // with ellipsis operators
-        assert!(
-            RawQuery::<HCL>::new(r#"resource "rtype" "rname" { ... attr = "value" ... }"#)
-                .to_query_string()
-                .is_ok()
-        );
+        assert!(RawQuery::<HCL>::new(
+            r#"resource "rtype" "rname" { :[[...]] attr = "value" :[[...]] }"#
+        )
+        .to_query_string()
+        .is_ok());
 
         // with metavariables
         {
-            let rq = RawQuery::<HCL>::new(r#"resource "rtype" "rname" { attr = $X }"#).to_query();
+            let rq =
+                RawQuery::<HCL>::new(r#"resource "rtype" "rname" { attr = :[[X]] }"#).to_query();
             assert!(rq.is_ok());
             assert_eq!(rq.unwrap().metavariables.len(), 1);
         }
@@ -98,7 +99,7 @@ mod tests {
         }
 
         {
-            let query = RawQuery::<HCL>::new(r#"resource "rtype" "rname" { attr = $X }"#)
+            let query = RawQuery::<HCL>::new(r#"resource "rtype" "rname" { attr = :[[X]] }"#)
                 .to_query()
                 .unwrap();
             let tree = RawTree::<HCL>::new(r#"resource "rtype" "rname" { attr = "value" }"#)
@@ -113,7 +114,7 @@ mod tests {
     #[test]
     fn test_query_with_simple_metavariable() {
         {
-            let query = RawQuery::<HCL>::new(r#"attr = $X"#).to_query().unwrap();
+            let query = RawQuery::<HCL>::new(r#"attr = :[[X]]"#).to_query().unwrap();
             let tree = RawTree::<HCL>::new(
                 r#"resource "rtype" "rname" { 
                 attr = "value"
@@ -135,8 +136,8 @@ mod tests {
         {
             let query = RawQuery::<HCL>::new(
                 r#"
-                one_attr = $X
-                another_attr = $Y
+                one_attr = :[[X]]
+                another_attr = :[[Y]]
             "#,
             )
             .to_query()
@@ -184,9 +185,9 @@ mod tests {
         {
             let query = RawQuery::<HCL>::new(
                 r#"
-                one_attr = $X
-                ...
-                another_attr = $Y
+                one_attr = :[[X]]
+                :[[...]]
+                another_attr = :[[Y]]
             "#,
             )
             .to_query()
@@ -234,8 +235,9 @@ mod tests {
         {
             let query = RawQuery::<HCL>::new(
                 r#"
-                one_attr = $X
-                another_attr = $X
+                one_attr = :[[X]]
+                another_attr = :[[X]]
+                yetanother_attr = :[[X]]
             "#,
             )
             .to_query()
@@ -247,6 +249,7 @@ mod tests {
                 resource "rtype" "rname1" { 
                     one_attr = "value"
                     another_attr = "value"
+                    yetanother_attr = "value"
                 }
 
                 # should NOT match

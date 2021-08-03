@@ -1,4 +1,6 @@
+mod go;
 mod hcl;
+pub use self::go::Go;
 pub use self::hcl::HCL;
 
 pub trait Queryable {
