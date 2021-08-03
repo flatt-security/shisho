@@ -1,7 +1,4 @@
-use crate::{
-    language::Queryable,
-    query::{Query, QuerySession},
-};
+use crate::{language::Queryable, matcher::QueryMatcher, query::Query};
 use anyhow::Result;
 use std::{convert::TryFrom, marker::PhantomData};
 use thiserror::Error;
@@ -17,8 +14,8 @@ pub enum TreeError {
 
 pub struct Tree<'a, T> {
     pub raw: &'a [u8],
-    tstree: tree_sitter::Tree,
 
+    tstree: tree_sitter::Tree,
     _marker: PhantomData<T>,
 }
 
@@ -38,11 +35,11 @@ where
         &self.tstree
     }
 
-    pub fn matches<'query>(&'tree self, query: &'query Query<T>) -> QuerySession<'query, 'tree, T>
+    pub fn matches<'query>(&'tree self, query: &'query Query<T>) -> QueryMatcher<'query, 'tree, T>
     where
         'tree: 'query,
     {
-        QuerySession::new(self, query)
+        QueryMatcher::new(self, query)
     }
 }
 

@@ -1,18 +1,18 @@
+use crate::language::Queryable;
 use anyhow::{anyhow, Result};
 use std::{convert::TryFrom, marker::PhantomData};
 use thiserror::Error;
 
-use crate::{language::Queryable, tree::Tree};
+#[derive(Debug, Error, PartialEq)]
+pub enum QueryError {
+    #[error("ParseError: failed to parse query")]
+    ParseError,
 
-#[derive(Debug, PartialEq)]
-pub struct Metavariable {
-    pub id: String,
-}
+    #[error("ParseError: {0}")]
+    ConvertError(tree_sitter::QueryError),
 
-impl Metavariable {
-    pub fn new(id: impl Into<String>) -> Metavariable {
-        Metavariable { id: id.into() }
-    }
+    #[error("ParseError: {0}")]
+    SyntaxError(String),
 }
 
 #[derive(Debug, PartialEq)]
@@ -20,9 +20,9 @@ pub struct Query<T>
 where
     T: Queryable,
 {
-    query: tree_sitter::Query,
     pub metavariables: Vec<Metavariable>,
 
+    query: tree_sitter::Query,
     _marker: PhantomData<T>,
 }
 
@@ -43,26 +43,15 @@ where
     }
 }
 
-impl<T> TryFrom<&str> for Query<T>
-where
-    T: Queryable,
-{
-    type Error = anyhow::Error;
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        RawQuery::new(value).to_query()
-    }
+#[derive(Debug, PartialEq)]
+pub struct Metavariable {
+    pub id: String,
 }
 
-#[derive(Debug, Error, PartialEq)]
-pub enum QueryError {
-    #[error("ParseError: failed to parse query")]
-    ParseError,
-
-    #[error("ParseError: {0}")]
-    ConvertError(tree_sitter::QueryError),
-
-    #[error("ParseError: {0}")]
-    SyntaxError(String),
+impl Metavariable {
+    pub fn new(id: impl Into<String>) -> Metavariable {
+        Metavariable { id: id.into() }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -99,40 +88,35 @@ impl<'a, T> RawQuery<'a, T>
 where
     T: Queryable,
 {
-    // public functions
-    ////
-
     pub fn to_query(&self) -> Result<Query<T>> {
-        let (qs, mvs) = self.to_query_string()?;
-        let tsquery = tree_sitter::Query::new(T::target_language(), &qs)?;
-        Ok(Query::new(tsquery, mvs))
+        let TSQueryString {
+            query_string,
+            metavariables,
+            ..
+        } = self.to_query_string()?;
+        let tsquery = tree_sitter::Query::new(T::target_language(), &query_string)?;
+        Ok(Query::new(tsquery, metavariables))
     }
 
-    pub fn to_query_string(&self) -> Result<(String, Vec<Metavariable>)> {
+    pub fn to_query_string(&self) -> Result<TSQueryString<T>> {
         let mut parser = tree_sitter::Parser::new();
         parser
             .set_language(T::query_language())
             .expect("Error loading hcl-query grammar");
 
-        let q = parser
+        let query_tree = parser
             .parse(self.raw_bytes, None)
             .ok_or(anyhow!("failed to parse query string"))?;
 
-        self.node_to_query_string(&q.root_node())
+        self.nodes_to_query_string(None, T::extract_query_nodes(&query_tree))
     }
 
-    // internal functions
-    ////
-
-    fn node_to_query_string<'b>(
-        &self,
-        node: &'b tree_sitter::Node,
-    ) -> Result<(String, Vec<Metavariable>)>
+    fn node_to_query_string<'b>(&self, node: tree_sitter::Node<'b>) -> Result<TSQueryString<T>>
     where
         'a: 'b,
     {
         match node.kind() {
-            "shisho_ellipsis" => Ok(("(_)+".into(), vec![])),
+            "shisho_ellipsis" => Ok(TSQueryString::new("(_)*".into(), vec![])),
             "shisho_metavariable" => {
                 // ensure shisho_metavariable has only one child
                 let children: Vec<tree_sitter::Node> = {
@@ -152,7 +136,10 @@ where
 
                 // convert to the tsquery representation with a capture
                 let metavariable = Metavariable::new(variable_name.clone());
-                Ok((format!("(_) @{}", variable_name), vec![metavariable]))
+                Ok(TSQueryString::new(
+                    format!("(_) @{}", variable_name),
+                    vec![metavariable],
+                ))
             }
             _ => {
                 let children: Vec<tree_sitter::Node> = {
@@ -161,40 +148,65 @@ where
                 };
 
                 if children.len() > 0 {
-                    let mut child_queries = vec![];
-                    let mut child_metavariables = vec![];
-
-                    for child in children {
-                        match self.node_to_query_string(&child) {
-                            Ok((s, mv)) => {
-                                child_queries.push(s);
-                                child_metavariables.extend(mv);
-                            }
-                            Err(e) => return Err(e),
-                        }
-                    }
-
-                    Ok((
-                        format!(
-                            r#"({} . {} .)"#,
-                            node.kind(),
-                            child_queries.into_iter().collect::<Vec<String>>().join("."),
-                        ),
-                        child_metavariables,
-                    ))
+                    self.nodes_to_query_string(Some(node), children)
                 } else {
-                    Ok((
+                    Ok(TSQueryString::new(
                         format!(
                             r#"(({}) @{} (#eq? @{} "{}"))"#,
                             node.kind(),
                             node.id(),
                             node.id(),
-                            self.node_as_value(node).replace("\"", "\\\"")
+                            self.node_as_value(&node).replace("\"", "\\\"")
                         ),
                         vec![],
                     ))
                 }
             }
+        }
+    }
+
+    fn nodes_to_query_string<'b>(
+        &self,
+        parent: Option<tree_sitter::Node<'b>>,
+        nodes: Vec<tree_sitter::Node<'b>>,
+    ) -> Result<TSQueryString<T>>
+    where
+        'a: 'b,
+    {
+        let mut child_queries = vec![];
+        let mut child_metavariables = vec![];
+
+        for node in nodes {
+            match self.node_to_query_string(node) {
+                Ok(TSQueryString {
+                    query_string,
+                    metavariables,
+                    ..
+                }) => {
+                    child_queries.push(query_string);
+                    child_metavariables.extend(metavariables);
+                }
+                Err(e) => return Err(e),
+            }
+        }
+
+        if let Some(node) = parent {
+            Ok(TSQueryString::new(
+                format!(
+                    r#"({} . {} .)"#,
+                    node.kind(),
+                    child_queries.into_iter().collect::<Vec<String>>().join("."),
+                ),
+                child_metavariables,
+            ))
+        } else {
+            Ok(TSQueryString::new(
+                format!(
+                    r#"({} .)"#,
+                    child_queries.into_iter().collect::<Vec<String>>().join("."),
+                ),
+                child_metavariables,
+            ))
         }
     }
 
@@ -207,38 +219,36 @@ where
     }
 }
 
-pub struct QuerySession<'tree, 'query, T>
+#[derive(Debug, PartialEq)]
+pub struct TSQueryString<T>
 where
     T: Queryable,
-    'tree: 'query,
 {
-    cursor: tree_sitter::QueryCursor,
-    query: &'query Query<T>,
-    tree: &'tree Tree<'tree, T>,
+    pub metavariables: Vec<Metavariable>,
+    pub query_string: String,
+
+    _marker: PhantomData<T>,
 }
 
-impl<'tree, 'query, T> QuerySession<'tree, 'query, T>
+impl<T> TSQueryString<T>
 where
     T: Queryable,
-    'tree: 'query,
 {
-    pub fn new(tree: &'tree Tree<'tree, T>, query: &'query Query<T>) -> Self {
-        let cursor = tree_sitter::QueryCursor::new();
-        QuerySession {
-            tree,
-            cursor,
-            query,
+    pub fn new(query_string: String, metavariables: Vec<Metavariable>) -> Self {
+        TSQueryString {
+            query_string,
+            metavariables,
+            _marker: PhantomData,
         }
     }
-
-    pub fn iter(&'query mut self) -> impl Iterator<Item = MatchedItem<'query>> + 'query {
-        let raw = self.tree.raw;
-        self.cursor.matches(
-            self.query.ts_query(),
-            self.tree.ts_tree().root_node(),
-            move |x| x.utf8_text(raw).unwrap(),
-        )
-    }
 }
 
-pub type MatchedItem<'a> = tree_sitter::QueryMatch<'a>;
+impl<T> TryFrom<&str> for Query<T>
+where
+    T: Queryable,
+{
+    type Error = anyhow::Error;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        RawQuery::new(value).to_query()
+    }
+}
