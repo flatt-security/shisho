@@ -1,7 +1,6 @@
+use crate::query::Query;
 use std::convert::TryFrom;
 use thiserror::Error;
-
-use crate::query::Query;
 
 pub struct Tree<'a> {
     tree: tree_sitter::Tree,
@@ -16,13 +15,16 @@ impl<'a> Tree<'a> {
         Tree { tree, raw }
     }
 
-    pub fn matches(
+    pub fn matches<'b>(
         &'a self,
-        query: &'a Query,
-        cursor: &'a mut QueryCursor,
-    ) -> impl Iterator<Item = QueryMatch<'a>> {
+        query: &'b Query,
+        cursor: &'b mut QueryCursor,
+    ) -> impl Iterator<Item = QueryMatch<'b>> + 'b
+    where
+        'a: 'b,
+    {
         let raw_bytes = self.raw.as_bytes();
-        cursor.matches(query.get_raw(), self.tree.root_node(), move |x| {
+        cursor.matches(query.ts_query(), self.tree.root_node(), move |x| {
             x.utf8_text(raw_bytes).unwrap()
         })
     }
