@@ -84,7 +84,7 @@ mod tests {
     }
 
     #[test]
-    fn test_query_for_tree() {
+    fn test_basic_query() {
         {
             let query = RawQuery::<HCL>::new(r#"resource "rtype" "rname" { attr = "value" }"#)
                 .to_query()
@@ -108,19 +108,163 @@ mod tests {
             let mut session = tree.matches(&query);
             assert_eq!(session.as_iter().collect::<Vec<MatchedItem>>().len(), 1);
         }
+    }
+
+    #[test]
+    fn test_query_with_simple_metavariable() {
+        {
+            let query = RawQuery::<HCL>::new(r#"attr = $X"#).to_query().unwrap();
+            let tree = RawTree::<HCL>::new(
+                r#"resource "rtype" "rname" { 
+                attr = "value"
+            }
+            resource "rtype" "rname2" { 
+                another = "value"
+            }
+            resource "rtype" "rname3" { 
+                attr = "value"
+            }"#,
+            )
+            .into_tree()
+            .unwrap();
+
+            let mut session = tree.matches(&query);
+            assert_eq!(session.as_iter().collect::<Vec<MatchedItem>>().len(), 2);
+        }
 
         {
-            println!(
-                "{}",
-                RawQuery::<HCL>::new(r#"attr = $X"#)
-                    .to_query_string()
-                    .unwrap()
-                    .query_string
-            );
-            let query = RawQuery::<HCL>::new(r#"attr = $X"#).to_query().unwrap();
-            let tree = RawTree::<HCL>::new(r#"resource "rtype" "rname" { attr = "value" }"#)
-                .into_tree()
-                .unwrap();
+            let query = RawQuery::<HCL>::new(
+                r#"
+                one_attr = $X
+                another_attr = $Y
+            "#,
+            )
+            .to_query()
+            .unwrap();
+
+            let tree = RawTree::<HCL>::new(
+                r#"
+                # should match
+                resource "rtype" "rname1" { 
+                    one_attr = "value"
+                    another_attr = 2
+                }
+
+                # should NOT match
+                resource "rtype" "rname2" { 
+                    another_attr = 2
+                }
+
+                # should match
+                resource "rtype" "rname3" { 
+                    test = ""
+                    one_attr = "value"
+                    another_attr = 3
+                    test = ""
+                }
+
+                # should NOT match
+                resource "rtype" "rname4" { 
+                    one_attr = "value"
+                    test = ""
+                    another_attr = 3
+                }
+            "#,
+            )
+            .into_tree()
+            .unwrap();
+
+            let mut session = tree.matches(&query);
+            assert_eq!(session.as_iter().collect::<Vec<MatchedItem>>().len(), 2);
+        }
+    }
+
+    #[test]
+    fn test_query_with_ellipsis_opearator() {
+        {
+            let query = RawQuery::<HCL>::new(
+                r#"
+                one_attr = $X
+                ...
+                another_attr = $Y
+            "#,
+            )
+            .to_query()
+            .unwrap();
+
+            let tree = RawTree::<HCL>::new(
+                r#"
+                # should match
+                resource "rtype" "rname1" { 
+                    one_attr = "value"
+                    another_attr = 2
+                }
+
+                # should NOT match
+                resource "rtype" "rname2" { 
+                    another_attr = 2
+                }
+
+                # should match
+                resource "rtype" "rname3" { 
+                    test = ""
+                    one_attr = "value"
+                    another_attr = 3
+                    test = ""
+                }
+
+                # should match
+                resource "rtype" "rname4" { 
+                    one_attr = "value"
+                    test = ""
+                    another_attr = 3
+                }
+            "#,
+            )
+            .into_tree()
+            .unwrap();
+
+            let mut session = tree.matches(&query);
+            assert_eq!(session.as_iter().collect::<Vec<MatchedItem>>().len(), 3);
+        }
+    }
+
+    #[test]
+    fn test_query_with_simple_equivalence() {
+        {
+            let query = RawQuery::<HCL>::new(
+                r#"
+                one_attr = $X
+                another_attr = $X
+            "#,
+            )
+            .to_query()
+            .unwrap();
+
+            let tree = RawTree::<HCL>::new(
+                r#"
+                # should match
+                resource "rtype" "rname1" { 
+                    one_attr = "value"
+                    another_attr = "value"
+                }
+
+                # should NOT match
+                resource "rtype" "rname2" { 
+                    another_attr = 2
+                }
+
+                # should NOT match
+                resource "rtype" "rname3" { 
+                    test = ""
+                    one_attr = "value"
+                    another_attr = 3
+                    test = ""
+                }
+            "#,
+            )
+            .into_tree()
+            .unwrap();
 
             let mut session = tree.matches(&query);
             assert_eq!(session.as_iter().collect::<Vec<MatchedItem>>().len(), 1);

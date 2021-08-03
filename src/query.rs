@@ -94,7 +94,9 @@ where
             metavariables,
             ..
         } = self.to_query_string()?;
+
         let tsquery = tree_sitter::Query::new(T::target_language(), &query_string)?;
+
         Ok(Query::new(tsquery, metavariables))
     }
 
@@ -108,7 +110,12 @@ where
             .parse(self.raw_bytes, None)
             .ok_or(anyhow!("failed to parse query string"))?;
 
-        self.nodes_to_query_string(None, T::extract_query_nodes(&query_tree))
+        let query_nodes = T::extract_query_nodes(&query_tree);
+        if query_nodes.len() == 1 {
+            self.node_to_query_string(query_nodes[0])
+        } else {
+            self.nodes_to_query_string(None, query_nodes)
+        }
     }
 
     fn node_to_query_string<'b>(&self, node: tree_sitter::Node<'b>) -> Result<TSQueryString<T>>
@@ -202,7 +209,7 @@ where
         } else {
             Ok(TSQueryString::new(
                 format!(
-                    r#"({} .)"#,
+                    r#"({})"#,
                     child_queries.into_iter().collect::<Vec<String>>().join("."),
                 ),
                 child_metavariables,
