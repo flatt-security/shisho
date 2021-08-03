@@ -12,6 +12,8 @@ impl Queryable for HCL {
     }
 
     fn extract_query_nodes<'tree>(root: &'tree tree_sitter::Tree) -> Vec<tree_sitter::Node<'tree>> {
+        // TODO (y0n3uchy): this should be done more strictly.
+
         // see `//third_party/tree-sitter-hcl-query/grammar.js`
         let source_file = root.root_node();
         let body = source_file.child(0).unwrap();

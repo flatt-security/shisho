@@ -65,7 +65,7 @@ mod tests {
             let rq = RawQuery::<Go>::new(
                 r#"for _, :[[X]] := range iter { 
                     :[[...]] 
-                    fmt.Printf("%s", :[[X]])
+                    fmt.Printf("%s", :[[Y]])
                     :[[...]]
             }"#,
             )
@@ -118,7 +118,7 @@ mod tests {
             .to_query();
             assert!(rq.is_ok());
             let Query { metavariables, .. } = rq.unwrap();
-            assert_eq!(metavariables.len(), 2);
+            assert_eq!(metavariables.len(), 1);
         }
     }
 

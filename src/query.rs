@@ -1,6 +1,6 @@
 use crate::language::Queryable;
 use anyhow::{anyhow, Result};
-use std::{convert::TryFrom, marker::PhantomData};
+use std::{array::IntoIter, collections::HashMap, convert::TryFrom, marker::PhantomData};
 use thiserror::Error;
 
 #[derive(Debug, Error, PartialEq)]
@@ -20,7 +20,7 @@ pub struct Query<T>
 where
     T: Queryable,
 {
-    pub metavariables: Vec<Metavariable>,
+    pub metavariables: MetavariableTable,
 
     query: tree_sitter::Query,
     _marker: PhantomData<T>,
@@ -30,7 +30,7 @@ impl<T> Query<T>
 where
     T: Queryable,
 {
-    pub fn new(query: tree_sitter::Query, metavariables: Vec<Metavariable>) -> Self {
+    pub fn new(query: tree_sitter::Query, metavariables: MetavariableTable) -> Self {
         Query {
             query,
             metavariables,
@@ -43,14 +43,61 @@ where
     }
 }
 
+pub trait ToQueryConstraintString {
+    fn to_query_constraints(&self) -> Vec<String>;
+}
+
+pub type CaptureId = String;
+pub type MetavariableTable = HashMap<String, Vec<MetavariableField>>;
+
+impl ToQueryConstraintString for MetavariableTable {
+    fn to_query_constraints(&self) -> Vec<String> {
+        self.into_iter()
+            .filter_map(|(_k, mvs)| {
+                let ids: Vec<String> = mvs
+                    .into_iter()
+                    .map(|field| field.capture_id.clone())
+                    .collect();
+                if ids.len() <= 1 {
+                    None
+                } else {
+                    let first_capture_id = ids[0].clone();
+                    Some(
+                        ids.into_iter()
+                            .skip(1)
+                            .map(|id| format!("(#eq? @{} @{})", first_capture_id, id))
+                            .collect::<Vec<String>>()
+                            .join(" "),
+                    )
+                }
+            })
+            .collect()
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct MetavariableField {
+    pub capture_id: CaptureId,
+}
+
+impl MetavariableField {
+    pub fn new(capture_id: CaptureId) -> Self {
+        MetavariableField { capture_id }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct Metavariable {
     pub id: String,
+    pub field: MetavariableField,
 }
 
 impl Metavariable {
-    pub fn new(id: impl Into<String>) -> Metavariable {
-        Metavariable { id: id.into() }
+    pub fn new(id: impl Into<String>, field: MetavariableField) -> Self {
+        Metavariable {
+            id: id.into(),
+            field,
+        }
     }
 }
 
@@ -110,20 +157,58 @@ where
             .parse(self.raw_bytes, None)
             .ok_or(anyhow!("failed to parse query string"))?;
 
-        let query_nodes = T::extract_query_nodes(&query_tree);
-        if query_nodes.len() == 1 {
-            self.node_to_query_string(query_nodes[0])
-        } else {
-            self.nodes_to_query_string(None, query_nodes)
+        let processor = RawQueryProcessor::<T>::new(self.raw_bytes);
+        let (child_query_strings, metavariables) =
+            processor.handle_nodes(T::extract_query_nodes(&query_tree))?;
+
+        let query = format!(
+            "({} {})",
+            child_query_strings
+                .into_iter()
+                .collect::<Vec<String>>()
+                .join("."),
+            metavariables
+                .to_query_constraints()
+                .into_iter()
+                .collect::<Vec<String>>()
+                .join(" ")
+        );
+
+        Ok(TSQueryString::new(query, metavariables))
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct RawQueryProcessor<'a, T>
+where
+    T: Queryable,
+{
+    raw_bytes: &'a [u8],
+    _marker: PhantomData<T>,
+}
+
+impl<'a, T> RawQueryProcessor<'a, T>
+where
+    T: Queryable,
+{
+    pub fn new(raw_bytes: &'a [u8]) -> Self {
+        RawQueryProcessor {
+            raw_bytes,
+            _marker: PhantomData,
         }
     }
+}
 
-    fn node_to_query_string<'b>(&self, node: tree_sitter::Node<'b>) -> Result<TSQueryString<T>>
+impl<'a, T> RawQueryProcessor<'a, T>
+where
+    T: Queryable,
+{
+    fn handle_single_node<'b>(&self, node: tree_sitter::Node<'b>) -> Result<TSQueryString<T>>
     where
         'a: 'b,
     {
         match node.kind() {
-            "shisho_ellipsis" => Ok(TSQueryString::new("(_)*".into(), vec![])),
+            "shisho_ellipsis" => Ok(TSQueryString::new("(_)*".into(), MetavariableTable::new())),
             "shisho_metavariable" => {
                 // ensure shisho_metavariable has only one child
                 let children: Vec<tree_sitter::Node> = {
@@ -142,10 +227,17 @@ where
                 let variable_name = self.node_as_value(&child).to_string();
 
                 // convert to the tsquery representation with a capture
-                let metavariable = Metavariable::new(variable_name.clone());
+                let capture_id = format!("{}-{}", variable_name.clone(), node.id());
+                // NOTE: into_iter() can't be used here https://github.com/rust-lang/rust/pull/84147
+                let metavariables = IntoIter::new([(
+                    variable_name,
+                    vec![MetavariableField::new(capture_id.clone())],
+                )])
+                .collect::<MetavariableTable>();
+
                 Ok(TSQueryString::new(
-                    format!("(_) @{}", variable_name),
-                    vec![metavariable],
+                    format!("(_) @{}", capture_id),
+                    metavariables,
                 ))
             }
             _ => {
@@ -155,7 +247,18 @@ where
                 };
 
                 if children.len() > 0 {
-                    self.nodes_to_query_string(Some(node), children)
+                    let (child_query_strings, metavariables) = self.handle_nodes(children)?;
+                    Ok(TSQueryString::new(
+                        format!(
+                            r#"({} . {} .)"#,
+                            node.kind(),
+                            child_query_strings
+                                .into_iter()
+                                .collect::<Vec<String>>()
+                                .join("."),
+                        ),
+                        metavariables,
+                    ))
                 } else {
                     Ok(TSQueryString::new(
                         format!(
@@ -165,56 +268,44 @@ where
                             node.id(),
                             self.node_as_value(&node).replace("\"", "\\\"")
                         ),
-                        vec![],
+                        MetavariableTable::new(),
                     ))
                 }
             }
         }
     }
 
-    fn nodes_to_query_string<'b>(
+    fn handle_nodes<'b>(
         &self,
-        parent: Option<tree_sitter::Node<'b>>,
         nodes: Vec<tree_sitter::Node<'b>>,
-    ) -> Result<TSQueryString<T>>
+    ) -> Result<(Vec<String>, MetavariableTable)>
     where
         'a: 'b,
     {
         let mut child_queries = vec![];
-        let mut child_metavariables = vec![];
+        let mut metavariables: MetavariableTable = MetavariableTable::new();
 
         for node in nodes {
-            match self.node_to_query_string(node) {
+            match self.handle_single_node(node) {
                 Ok(TSQueryString {
                     query_string,
-                    metavariables,
+                    metavariables: child_metavariables,
                     ..
                 }) => {
                     child_queries.push(query_string);
-                    child_metavariables.extend(metavariables);
+                    for (key, value) in child_metavariables {
+                        if let Some(mv) = metavariables.get_mut(&key) {
+                            mv.extend(value);
+                        } else {
+                            metavariables.insert(key, value);
+                        }
+                    }
                 }
                 Err(e) => return Err(e),
             }
         }
 
-        if let Some(node) = parent {
-            Ok(TSQueryString::new(
-                format!(
-                    r#"({} . {} .)"#,
-                    node.kind(),
-                    child_queries.into_iter().collect::<Vec<String>>().join("."),
-                ),
-                child_metavariables,
-            ))
-        } else {
-            Ok(TSQueryString::new(
-                format!(
-                    r#"({})"#,
-                    child_queries.into_iter().collect::<Vec<String>>().join("."),
-                ),
-                child_metavariables,
-            ))
-        }
+        Ok((child_queries, metavariables))
     }
 
     fn node_as_value<'b>(&self, node: &'b tree_sitter::Node) -> &'a str
@@ -231,7 +322,7 @@ pub struct TSQueryString<T>
 where
     T: Queryable,
 {
-    pub metavariables: Vec<Metavariable>,
+    pub metavariables: MetavariableTable,
     pub query_string: String,
 
     _marker: PhantomData<T>,
@@ -241,7 +332,7 @@ impl<T> TSQueryString<T>
 where
     T: Queryable,
 {
-    pub fn new(query_string: String, metavariables: Vec<Metavariable>) -> Self {
+    pub fn new(query_string: String, metavariables: MetavariableTable) -> Self {
         TSQueryString {
             query_string,
             metavariables,
