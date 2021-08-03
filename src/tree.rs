@@ -1,23 +1,32 @@
-use crate::query::Query;
-use std::convert::TryFrom;
+use crate::{language::Queryable, query::Query};
+use std::{convert::TryFrom, marker::PhantomData};
 use thiserror::Error;
 
-pub struct Tree<'a> {
+pub struct Tree<'a, T> {
     tree: tree_sitter::Tree,
     raw: &'a str,
+
+    _marker: PhantomData<T>,
 }
 
 pub type QueryCursor = tree_sitter::QueryCursor;
 pub type QueryMatch<'a> = tree_sitter::QueryMatch<'a>;
 
-impl<'a> Tree<'a> {
-    pub fn new(tree: tree_sitter::Tree, raw: &'a str) -> Tree<'a> {
-        Tree { tree, raw }
+impl<'a, T> Tree<'a, T>
+where
+    T: Queryable,
+{
+    pub fn new(tree: tree_sitter::Tree, raw: &'a str) -> Tree<'a, T> {
+        Tree {
+            tree,
+            raw,
+            _marker: PhantomData,
+        }
     }
 
     pub fn matches<'b>(
         &'a self,
-        query: &'b Query,
+        query: &'b Query<T>,
         cursor: &'b mut QueryCursor,
     ) -> impl Iterator<Item = QueryMatch<'b>> + 'b
     where
@@ -39,13 +48,16 @@ pub enum TreeError {
     ConvertError(tree_sitter::QueryError),
 }
 
-impl<'a> TryFrom<&'a str> for Tree<'a> {
+impl<'a, T> TryFrom<&'a str> for Tree<'a, T>
+where
+    T: Queryable,
+{
     type Error = TreeError;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
         let mut parser = tree_sitter::Parser::new();
         parser
-            .set_language(tree_sitter_hcl::language())
+            .set_language(T::target_language())
             .expect("Error loading hcl grammar");
 
         Ok(Tree::new(parser.parse(value, None).unwrap(), value))

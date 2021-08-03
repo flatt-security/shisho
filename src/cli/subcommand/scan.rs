@@ -2,6 +2,7 @@
 
 use crate::{
     cli::CommonOpts,
+    language::HCL,
     query::Query,
     tree::{QueryCursor, Tree},
 };
@@ -83,7 +84,7 @@ const QUERY: &str = r#"resource "google_container_cluster" "test" {
 pub fn run(_common_opts: CommonOpts, _opts: Opts) -> i32 {
     // handle code
     let raw_code = CODE;
-    let tree = Tree::try_from(raw_code).expect("failed to load code");
+    let tree: Tree<HCL> = Tree::try_from(raw_code).expect("failed to load code");
 
     // handle query
     let raw_query = QUERY;

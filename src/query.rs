@@ -1,6 +1,8 @@
 use anyhow::{anyhow, Result};
-use std::convert::TryFrom;
+use std::{convert::TryFrom, marker::PhantomData};
 use thiserror::Error;
+
+use crate::language::Queryable;
 
 #[derive(Debug, PartialEq)]
 pub struct Metavariable {
@@ -14,16 +16,25 @@ impl Metavariable {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Query {
+pub struct Query<T>
+where
+    T: Queryable,
+{
     query: tree_sitter::Query,
     pub metavariables: Vec<Metavariable>,
+
+    _marker: PhantomData<T>,
 }
 
-impl Query {
+impl<T> Query<T>
+where
+    T: Queryable,
+{
     pub fn new(query: tree_sitter::Query, metavariables: Vec<Metavariable>) -> Self {
         Query {
             query,
             metavariables,
+            _marker: PhantomData,
         }
     }
 
@@ -32,7 +43,10 @@ impl Query {
     }
 }
 
-impl TryFrom<&str> for Query {
+impl<T> TryFrom<&str> for Query<T>
+where
+    T: Queryable,
+{
     type Error = anyhow::Error;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         RawQuery::new(value).to_query()
@@ -52,30 +66,38 @@ pub enum QueryError {
 }
 
 #[derive(Debug, PartialEq)]
-struct RawQuery<'a> {
+pub struct RawQuery<'a, T>
+where
+    T: Queryable,
+{
     raw_bytes: &'a [u8],
+    _marker: PhantomData<T>,
 }
 
-impl<'a> RawQuery<'a> {
+impl<'a, T> RawQuery<'a, T>
+where
+    T: Queryable,
+{
     pub fn new(raw_str: &'a str) -> Self {
         RawQuery {
             raw_bytes: raw_str.as_bytes(),
+            _marker: PhantomData,
         }
     }
 
     // public functions
     ////
 
-    pub fn to_query(&self) -> Result<Query> {
+    pub fn to_query(&self) -> Result<Query<T>> {
         let (qs, mvs) = self.to_query_string()?;
-        let tsquery = tree_sitter::Query::new(tree_sitter_hcl::language(), &qs)?;
+        let tsquery = tree_sitter::Query::new(T::target_language(), &qs)?;
         Ok(Query::new(tsquery, mvs))
     }
 
     pub fn to_query_string(&self) -> Result<(String, Vec<Metavariable>)> {
         let mut parser = tree_sitter::Parser::new();
         parser
-            .set_language(tree_sitter_hcl_query::language())
+            .set_language(T::query_language())
             .expect("Error loading hcl-query grammar");
 
         let q = parser
@@ -171,62 +193,11 @@ impl<'a> RawQuery<'a> {
     }
 }
 
-impl<'a> From<&'a str> for RawQuery<'a> {
+impl<'a, T> From<&'a str> for RawQuery<'a, T>
+where
+    T: Queryable,
+{
     fn from(value: &'a str) -> Self {
         RawQuery::new(value)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_rawquery_conversion() {
-        assert!(RawQuery::new(r#"test = "hoge""#).to_query_string().is_ok());
-        assert!(
-            RawQuery::new(r#"resource "rtype" "rname" { attr = "value" }"#)
-                .to_query_string()
-                .is_ok()
-        );
-
-        // with ellipsis operators
-        assert!(
-            RawQuery::new(r#"resource "rtype" "rname" { ... attr = "value" ... }"#)
-                .to_query_string()
-                .is_ok()
-        );
-
-        // with metavariables
-        {
-            let rq = RawQuery::new(r#"resource "rtype" "rname" { attr = $X }"#).to_query_string();
-            assert!(rq.is_ok());
-            let (_, metavariables) = rq.unwrap();
-            assert_eq!(metavariables.len(), 1);
-        }
-    }
-
-    #[test]
-    fn test_query_conversion() {
-        assert!(RawQuery::new(r#"test = "hoge""#).to_query().is_ok());
-        assert!(
-            RawQuery::new(r#"resource "rtype" "rname" { attr = "value" }"#)
-                .to_query()
-                .is_ok()
-        );
-
-        // with ellipsis operators
-        assert!(
-            RawQuery::new(r#"resource "rtype" "rname" { ... attr = "value" ... }"#)
-                .to_query_string()
-                .is_ok()
-        );
-
-        // with metavariables
-        {
-            let rq = RawQuery::new(r#"resource "rtype" "rname" { attr = $X }"#).to_query();
-            assert!(rq.is_ok());
-            assert_eq!(rq.unwrap().metavariables.len(), 1);
-        }
     }
 }
