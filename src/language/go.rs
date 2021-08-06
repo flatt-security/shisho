@@ -24,7 +24,7 @@ impl Queryable for Go {
 #[cfg(test)]
 mod tests {
     use crate::{
-        query::{Pattern, Query, TSQueryString},
+        pattern::{Pattern, Query, TSQueryString},
         tree::RawTree,
     };
 

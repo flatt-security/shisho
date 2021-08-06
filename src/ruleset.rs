@@ -42,6 +42,7 @@ mod tests {
     fn test_load() {
         let raw = include_str!("./tests/ruleset/basic.yaml");
         let ruleset = from_str(raw);
-        println!("{:?}", ruleset);
+
+        assert!(ruleset.is_ok());
     }
 }

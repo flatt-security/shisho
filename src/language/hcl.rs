@@ -29,7 +29,7 @@ mod tests {
     use crate::transform::Transformable;
     use crate::{
         code::Code,
-        query::{Pattern, Query, TSQueryString},
+        pattern::{Pattern, Query, TSQueryString},
         tree::RawTree,
     };
 
@@ -338,10 +338,12 @@ mod tests {
             .to_query()
             .unwrap();
 
-        let session = tree.matches(&query);
-        let mut items = session.collect();
-        assert_eq!(items.len(), 1);
-        let item = items.pop().unwrap();
+        let item = {
+            let session = tree.matches(&query);
+            let mut items = session.collect();
+            assert_eq!(items.len(), 1);
+            items.pop().unwrap()
+        };
 
         let new_code = code.transform(r#"resource "rtype" "rname" { attr = "changed" }"#, item);
         assert!(new_code.is_ok());

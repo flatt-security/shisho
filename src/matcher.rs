@@ -1,6 +1,6 @@
 use crate::{
     language::Queryable,
-    query::{CaptureId, MetavariableId, Query},
+    pattern::{CaptureId, MetavariableId, Query},
     tree::Tree,
 };
 use std::collections::HashMap;

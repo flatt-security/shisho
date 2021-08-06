@@ -1,4 +1,4 @@
-use crate::{language::Queryable, matcher::QueryMatcher, query::Query};
+use crate::{language::Queryable, matcher::QueryMatcher, pattern::Query};
 use anyhow::Result;
 use std::{convert::TryFrom, marker::PhantomData};
 use thiserror::Error;

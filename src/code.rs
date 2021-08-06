@@ -1,10 +1,4 @@
-use anyhow::Result;
-
-use crate::{
-    language::Queryable,
-    matcher::MatchedItem,
-    transform::{AutofixQuery, Transformable},
-};
+use crate::language::Queryable;
 use std::marker::PhantomData;
 
 #[derive(Clone)]
@@ -39,15 +33,5 @@ where
 {
     fn from(code: T) -> Self {
         Code::new(code)
-    }
-}
-
-impl<T> Transformable<T> for Code<T>
-where
-    T: Queryable,
-{
-    fn transform_with_query(self, _query: AutofixQuery<T>, _item: MatchedItem) -> Result<Self> {
-        // TODO
-        Ok(self)
     }
 }
