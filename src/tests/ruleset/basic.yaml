@@ -2,6 +2,5 @@ rules:
   - id: aaa
     language: go
     message: test
-    patterns:
-      - match: |
-          len(:[X])
+    pattern: |
+      len(:[X])

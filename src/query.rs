@@ -103,7 +103,7 @@ impl MetavariableField {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct RawQuery<'a, T>
+pub struct Pattern<'a, T>
 where
     T: Queryable,
 {
@@ -111,28 +111,28 @@ where
     _marker: PhantomData<T>,
 }
 
-impl<'a, T> From<&'a str> for RawQuery<'a, T>
+impl<'a, T> From<&'a str> for Pattern<'a, T>
 where
     T: Queryable,
 {
     fn from(value: &'a str) -> Self {
-        RawQuery::new(value)
+        Pattern::new(value)
     }
 }
 
-impl<'a, T> RawQuery<'a, T>
+impl<'a, T> Pattern<'a, T>
 where
     T: Queryable,
 {
     pub fn new(raw_str: &'a str) -> Self {
-        RawQuery {
+        Pattern {
             raw_bytes: raw_str.as_bytes(),
             _marker: PhantomData,
         }
     }
 }
 
-impl<'a, T> RawQuery<'a, T>
+impl<'a, T> Pattern<'a, T>
 where
     T: Queryable,
 {
@@ -367,6 +367,6 @@ where
 {
     type Error = anyhow::Error;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        RawQuery::new(value).to_query()
+        Pattern::new(value).to_query()
     }
 }

@@ -6,7 +6,8 @@ use crate::{
     cli::CommonOpts,
     language::{Go, Queryable, HCL},
     matcher::MatchedItem,
-    ruleset::{self, QueryPattern, Rule},
+    query::Pattern,
+    ruleset::{self, Rule},
     tree::{RawTree, Tree},
 };
 use anyhow::{anyhow, Result};
@@ -40,22 +41,9 @@ where
     T: Queryable,
     'tree: 'item,
 {
-    let queries = rule
-        .patterns
-        .iter()
-        .map(|x| x.to_query::<T>())
-        .collect::<Result<Vec<QueryPattern<T>>>>()?;
-
-    // TODO: use all queries here
-    assert_eq!(queries.len(), 1);
-    let query = queries.get(0).unwrap();
-    let mitems = match query {
-        QueryPattern::Match(q) => {
-            let session = tree.matches(q);
-            session.collect()
-        }
-    };
-    Ok(mitems)
+    let query = Pattern::<T>::new(&rule.pattern).to_query()?;
+    let session = tree.matches(&query);
+    Ok(session.collect())
 }
 
 // TODO (y0n3uchy): this is just a sample implementation! we need to improve this
@@ -76,7 +64,6 @@ fn intl(_common_opts: CommonOpts, opts: Opts) -> Result<()> {
         match rule.language {
             ruleset::Language::HCL => {
                 let tree = RawTree::<HCL>::new(file).into_tree().unwrap();
-
                 let items = execute_rule::<HCL>(&tree, &rule)?;
                 for mitem in items {
                     println!("- item:");
