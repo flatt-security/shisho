@@ -151,16 +151,14 @@ where
     pub fn to_query_string(&self) -> Result<TSQueryString<T>> {
         let mut parser = tree_sitter::Parser::new();
         parser
-            .set_language(T::query_language())
-            .expect("Error loading hcl-query grammar");
+            .set_language(T::query_language())?;            
 
         let query_tree = parser
-            .parse(self.raw_bytes, None)
-            .ok_or(anyhow!("failed to parse query string"))?;
+            .parse(self.raw_bytes, None).ok_or(anyhow!("failed to parse query"))?;
 
         let processor = RawQueryProcessor::<T>::new(self.raw_bytes);
         let (child_query_strings, metavariables) =
-            processor.handle_nodes(T::extract_query_nodes(&query_tree))?;
+            processor.convert_nodes(T::extract_query_nodes(&query_tree))?;
 
         let query = format!(
             "({} {})",
@@ -180,7 +178,7 @@ where
 }
 
 #[derive(Debug, PartialEq)]
-pub struct RawQueryProcessor<'a, T>
+struct RawQueryProcessor<'a, T>
 where
     T: Queryable,
 {
@@ -204,7 +202,7 @@ impl<'a, T> RawQueryProcessor<'a, T>
 where
     T: Queryable,
 {
-    fn handle_single_node<'b>(&self, node: tree_sitter::Node<'b>) -> Result<TSQueryString<T>>
+    fn convert_node<'b>(&self, node: tree_sitter::Node<'b>) -> Result<TSQueryString<T>>
     where
         'a: 'b,
     {
@@ -221,6 +219,7 @@ where
                 }
 
                 // extract child and get shisho_metavariable_name
+                // TODO (y0n3uchy): refactor these lines by introducing appropriate abstraction?
                 let child = children[0];
                 match child.kind() {
                     "shisho_metavariable_name" => {
@@ -268,7 +267,7 @@ where
                 };
 
                 if children.len() > 0 {
-                    let (child_query_strings, metavariables) = self.handle_nodes(children)?;
+                    let (child_query_strings, metavariables) = self.convert_nodes(children)?;
                     Ok(TSQueryString::new(
                         format!(
                             r#"({} . {} .)"#,
@@ -296,7 +295,7 @@ where
         }
     }
 
-    fn handle_nodes<'b>(
+    fn convert_nodes<'b>(
         &self,
         nodes: Vec<tree_sitter::Node<'b>>,
     ) -> Result<(Vec<String>, MetavariableTable)>
@@ -307,7 +306,7 @@ where
         let mut metavariables: MetavariableTable = MetavariableTable::new();
 
         for node in nodes {
-            match self.handle_single_node(node) {
+            match self.convert_node(node) {
                 Ok(TSQueryString {
                     query_string,
                     metavariables: child_metavariables,
