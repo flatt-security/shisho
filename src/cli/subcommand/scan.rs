@@ -71,6 +71,7 @@ fn intl(_common_opts: CommonOpts, opts: Opts) -> Result<()> {
                         println!("\t- {}: {}", id.0, c.node.utf8_text(tree.raw).unwrap());
                     }
                 }
+                unimplemented!("should be implemented before the first release")
             }
             ruleset::Language::Go => {
                 let tree = RawTree::<Go>::new(file).into_tree().unwrap();
@@ -81,6 +82,7 @@ fn intl(_common_opts: CommonOpts, opts: Opts) -> Result<()> {
                         println!("\t- {}: {}", id.0, c.node.utf8_text(tree.raw).unwrap());
                     }
                 }
+                unimplemented!("should be implemented before the first release")
             }
         };
     }
