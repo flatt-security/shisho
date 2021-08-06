@@ -7,24 +7,28 @@ use anyhow::Result;
 
 use crate::{code::Code, language::Queryable, matcher::MatchedItem, pattern::Pattern};
 
-pub struct AutofixPattern<T>
+pub struct AutofixPattern<'a, T>
 where
     T: Queryable,
 {
+    pub raw: &'a [u8],
     tree: tree_sitter::Tree,
     _marker: PhantomData<T>,
 }
 
-impl<T> TryFrom<&str> for AutofixPattern<T>
+impl<'a, T> AutofixPattern<'a, T> where T: Queryable {}
+
+impl<'a, T> TryFrom<&'a str> for AutofixPattern<'a, T>
 where
     T: Queryable,
 {
     type Error = anyhow::Error;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
         let tree = Pattern::<T>::new(value).to_tstree()?;
         Ok(AutofixPattern {
-            tree: tree,
+            tree,
+            raw: value.as_bytes(),
             _marker: PhantomData,
         })
     }
@@ -35,9 +39,10 @@ where
     T: Queryable,
     Self: Sized,
 {
-    fn transform<P>(self, p: P, item: MatchedItem) -> Result<Self>
+    fn transform<'a, P>(self, p: P, item: MatchedItem) -> Result<Self>
     where
-        P: TryInto<AutofixPattern<T>, Error = anyhow::Error>,
+        P: TryInto<AutofixPattern<'a, T>, Error = anyhow::Error>,
+        P: 'a,
     {
         let query = p.try_into()?;
         self.transform_with_query(query, item)

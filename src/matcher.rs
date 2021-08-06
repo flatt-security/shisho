@@ -1,5 +1,3 @@
-use anyhow::{anyhow, Result};
-
 use crate::{
     language::Queryable,
     query::{CaptureId, MetavariableId, Query, GLOBAL_CAPTURE_ID},
@@ -92,9 +90,7 @@ impl<'tree> MatchedItem<'tree> {
                 global: g,
                 captures: captures_map,
             },
-            None => panic!(
-                "internal error: no capture for global matching found"
-            ),
+            None => panic!("internal error: no capture for global matching found"),
         }
     }
 }
