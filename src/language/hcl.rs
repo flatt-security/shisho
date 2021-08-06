@@ -29,7 +29,8 @@ mod tests {
     use crate::transform::Transformable;
     use crate::{
         code::Code,
-        pattern::{Pattern, Query, TSQueryString},
+        pattern::Pattern,
+        query::{Query, TSQueryString},
         tree::RawTree,
     };
 

@@ -2,6 +2,8 @@ use crate::{language::Queryable, pattern::Pattern};
 use std::{collections::HashMap, convert::TryFrom, marker::PhantomData};
 use thiserror::Error;
 
+pub const GLOBAL_CAPTURE_ID: &str = "GLOBAL";
+
 #[derive(Debug, Error, PartialEq)]
 pub enum QueryError {
     #[error("ParseError: failed to parse query")]

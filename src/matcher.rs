@@ -1,6 +1,8 @@
+use anyhow::{anyhow, Result};
+
 use crate::{
     language::Queryable,
-    pattern::{CaptureId, MetavariableId, Query},
+    query::{CaptureId, MetavariableId, Query, GLOBAL_CAPTURE_ID},
     tree::Tree,
 };
 use std::collections::HashMap;
@@ -43,13 +45,14 @@ where
             .matches(tsquery, self.tree.ts_tree().root_node(), move |x| {
                 x.utf8_text(raw).unwrap()
             })
-            .map(|m| MatchedItem::from(m, cidx_cid_map, &cid_mvid_map))
+            .map(|m| MatchedItem::try_from(m, cidx_cid_map, &cid_mvid_map))
             .collect::<Vec<MatchedItem>>()
     }
 }
 
 #[derive(Debug)]
 pub struct MatchedItem<'tree> {
+    pub global: CaptureItem<'tree>,
     pub captures: HashMap<MetavariableId, CaptureItem<'tree>>,
 }
 
@@ -59,25 +62,39 @@ pub struct CaptureItem<'tree> {
 }
 
 impl<'tree> MatchedItem<'tree> {
-    fn from<'query>(
+    fn try_from<'query>(
         x: tree_sitter::QueryMatch<'tree>,
         cidx_cid_map: &'query [String],
         cid_mvid_map: &'query HashMap<CaptureId, MetavariableId>,
     ) -> MatchedItem<'tree> {
-        MatchedItem {
-            captures: x
-                .captures
-                .into_iter()
-                .filter_map(|y: &'tree tree_sitter::QueryCapture| {
-                    cidx_cid_map
-                        .get(y.index as usize)
-                        .and_then(|capture_id| Some(CaptureId(capture_id.clone())))
-                        .and_then(|capture_id| cid_mvid_map.get(&capture_id))
-                        .and_then(|metavariable| {
-                            Some((metavariable.clone(), CaptureItem { node: y.node }))
-                        })
-                })
-                .collect::<HashMap<MetavariableId, CaptureItem>>(),
+        let mut captures_map = HashMap::<MetavariableId, CaptureItem>::new();
+
+        let mut global = None;
+        for y in x.captures {
+            let capture_id = cidx_cid_map
+                .get(y.index as usize)
+                .and_then(|capture_id| Some(capture_id.clone()));
+            match capture_id {
+                Some(s) if s.as_str() == GLOBAL_CAPTURE_ID => {
+                    global = Some(CaptureItem { node: y.node });
+                }
+                Some(s) => {
+                    if let Some(metavariable_id) = cid_mvid_map.get(&CaptureId(s)) {
+                        captures_map.insert(metavariable_id.clone(), CaptureItem { node: y.node });
+                    }
+                }
+                None => (),
+            }
+        }
+
+        match global {
+            Some(g) => MatchedItem {
+                global: g,
+                captures: captures_map,
+            },
+            None => panic!(
+                "internal error: no capture for global matching found"
+            ),
         }
     }
 }
