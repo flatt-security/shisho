@@ -331,7 +331,7 @@ mod tests {
 
     #[test]
     fn basic_transform() {
-        let code: Code<HCL> = r#"resource "rtype" "rname" { attr = "value" }"#.into();
+        let code: Code<HCL> = "resource \"rtype\" \"rname\" { attr = \"notchanged\" }\nresource \"rtype\" \"another\" { attr = \"notchanged\" }".into();
 
         let tree_base = code.clone();
         let tree = RawTree::<HCL>::new(tree_base.as_str()).into_tree().unwrap();
@@ -351,7 +351,7 @@ mod tests {
 
         assert_eq!(
             new_code.unwrap().as_str(),
-            r#"resource "rtype" "rname" { attr = "changed" }"#
+            "resource \"rtype\" \"rname\" { attr = \"changed\" }\nresource \"rtype\" \"another\" { attr = \"notchanged\" }",
         );
     }
 }

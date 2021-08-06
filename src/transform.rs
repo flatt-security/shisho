@@ -4,6 +4,7 @@ use std::{
 };
 
 use anyhow::Result;
+use serde_yaml::to_string;
 
 use crate::{code::Code, language::Queryable, matcher::MatchedItem, pattern::Pattern};
 
@@ -16,7 +17,14 @@ where
     _marker: PhantomData<T>,
 }
 
-impl<'a, T> AutofixPattern<'a, T> where T: Queryable {}
+impl<'a, T> AutofixPattern<'a, T>
+where
+    T: Queryable,
+{
+    pub fn to_patched_snippet(&self, item: &MatchedItem) -> String {
+        "".to_string()
+    }
+}
 
 impl<'a, T> TryFrom<&'a str> for AutofixPattern<'a, T>
 where
@@ -56,6 +64,15 @@ where
     T: Queryable,
 {
     fn transform_with_query(self, query: AutofixPattern<T>, item: MatchedItem) -> Result<Self> {
-        Ok(self)
+        let snippet = query.to_patched_snippet(&item);
+
+        let start = item.global.node.start_byte();
+        let end = item.global.node.end_byte();
+
+        let raw_code = self.as_str().as_bytes();
+        let before = String::from_utf8(raw_code[0..start].to_vec())?;
+        let after = String::from_utf8(raw_code[end..raw_code.len()].to_vec())?;
+
+        Ok(Code::new(format!("{}{}{}", before, snippet, after)))
     }
 }
