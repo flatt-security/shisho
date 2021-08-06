@@ -1,5 +1,6 @@
 use super::Queryable;
 
+#[derive(Debug)]
 pub struct HCL;
 
 impl Queryable for HCL {
@@ -26,8 +27,7 @@ impl Queryable for HCL {
 #[cfg(test)]
 mod tests {
     use crate::{
-        matcher::MatchedItem,
-        query::{RawQuery, TSQueryString},
+        query::{Query, RawQuery, TSQueryString},
         tree::RawTree,
     };
 
@@ -46,18 +46,29 @@ mod tests {
 
         // with ellipsis operators
         assert!(RawQuery::<HCL>::new(
-            r#"resource "rtype" "rname" { :[[...]] attr = "value" :[[...]] }"#
+            r#"resource "rtype" "rname" { :[...] attr = "value" :[...] }"#
         )
         .to_query_string()
         .is_ok());
 
         // with metavariables
         {
-            let rq = RawQuery::<HCL>::new(r#"resource "rtype" "rname" { attr = :[[X]] }"#)
+            let rq = RawQuery::<HCL>::new(r#"resource "rtype" "rname" { attr = :[X] }"#)
                 .to_query_string();
             assert!(rq.is_ok());
             let TSQueryString { metavariables, .. } = rq.unwrap();
             assert_eq!(metavariables.len(), 1);
+
+            let rq = RawQuery::<HCL>::new(
+                r#"resource "rtype" "rname" { 
+                attr = :[X]
+                :[...Y]
+            }"#,
+            )
+            .to_query_string();
+            assert!(rq.is_ok());
+            let TSQueryString { metavariables, .. } = rq.unwrap();
+            assert_eq!(metavariables.len(), 2);
         }
     }
 
@@ -72,17 +83,31 @@ mod tests {
 
         // with ellipsis operators
         assert!(RawQuery::<HCL>::new(
-            r#"resource "rtype" "rname" { :[[...]] attr = "value" :[[...]] }"#
+            r#"resource "rtype" "rname" { 
+            :[...]
+            attr = "value"
+            :[...] 
+        }"#
         )
-        .to_query_string()
+        .to_query()
         .is_ok());
 
         // with metavariables
         {
-            let rq =
-                RawQuery::<HCL>::new(r#"resource "rtype" "rname" { attr = :[[X]] }"#).to_query();
+            let rq = RawQuery::<HCL>::new(r#"resource "rtype" "rname" { attr = :[X] }"#).to_query();
             assert!(rq.is_ok());
             assert_eq!(rq.unwrap().metavariables.len(), 1);
+
+            let rq = RawQuery::<HCL>::new(
+                r#"resource "rtype" "rname" { 
+                attr = :[X]
+                :[...Y]
+            }"#,
+            )
+            .to_query();
+            assert!(rq.is_ok());
+            let Query { metavariables, .. } = rq.unwrap();
+            assert_eq!(metavariables.len(), 2);
         }
     }
 
@@ -96,27 +121,52 @@ mod tests {
                 .into_tree()
                 .unwrap();
 
-            let mut session = tree.matches(&query);
-            assert_eq!(session.as_iter().collect::<Vec<MatchedItem>>().len(), 1);
+            let session = tree.matches(&query);
+            assert_eq!(session.collect().len(), 1);
         }
 
         {
-            let query = RawQuery::<HCL>::new(r#"resource "rtype" "rname" { attr = :[[X]] }"#)
+            let query = RawQuery::<HCL>::new(r#"resource "rtype" "rname" { attr = :[X] }"#)
                 .to_query()
                 .unwrap();
             let tree = RawTree::<HCL>::new(r#"resource "rtype" "rname" { attr = "value" }"#)
                 .into_tree()
                 .unwrap();
 
-            let mut session = tree.matches(&query);
-            assert_eq!(session.as_iter().collect::<Vec<MatchedItem>>().len(), 1);
+            let session = tree.matches(&query);
+            assert_eq!(session.collect().len(), 1);
+        }
+
+        {
+            let query = RawQuery::<HCL>::new(
+                r#"resource "rtype" "rname" { 
+                attr = :[X]
+                :[...Y]
+            }"#,
+            )
+            .to_query()
+            .unwrap();
+            let tree = RawTree::<HCL>::new(
+                r#"resource "rtype" "rname" { 
+                attr = "value"
+                hoge = "foobar"
+                foo = "test"
+            }"#,
+            )
+            .into_tree()
+            .unwrap();
+
+            let session = tree.matches(&query);
+            let result = session.collect();
+            assert_eq!(result.len(), 1);
+            assert_eq!(result[0].captures.len(), 2);
         }
     }
 
     #[test]
     fn test_query_with_simple_metavariable() {
         {
-            let query = RawQuery::<HCL>::new(r#"attr = :[[X]]"#).to_query().unwrap();
+            let query = RawQuery::<HCL>::new(r#"attr = :[X]"#).to_query().unwrap();
             let tree = RawTree::<HCL>::new(
                 r#"resource "rtype" "rname" { 
                 attr = "value"
@@ -131,15 +181,15 @@ mod tests {
             .into_tree()
             .unwrap();
 
-            let mut session = tree.matches(&query);
-            assert_eq!(session.as_iter().collect::<Vec<MatchedItem>>().len(), 2);
+            let session = tree.matches(&query);
+            assert_eq!(session.collect().len(), 2);
         }
 
         {
             let query = RawQuery::<HCL>::new(
                 r#"
-                one_attr = :[[X]]
-                another_attr = :[[Y]]
+                one_attr = :[X]
+                another_attr = :[Y]
             "#,
             )
             .to_query()
@@ -177,8 +227,8 @@ mod tests {
             .into_tree()
             .unwrap();
 
-            let mut session = tree.matches(&query);
-            assert_eq!(session.as_iter().collect::<Vec<MatchedItem>>().len(), 2);
+            let session = tree.matches(&query);
+            assert_eq!(session.collect().len(), 2);
         }
     }
 
@@ -187,9 +237,9 @@ mod tests {
         {
             let query = RawQuery::<HCL>::new(
                 r#"
-                one_attr = :[[X]]
-                :[[...]]
-                another_attr = :[[Y]]
+                one_attr = :[X]
+                :[...]
+                another_attr = :[Y]
             "#,
             )
             .to_query()
@@ -227,8 +277,8 @@ mod tests {
             .into_tree()
             .unwrap();
 
-            let mut session = tree.matches(&query);
-            assert_eq!(session.as_iter().collect::<Vec<MatchedItem>>().len(), 3);
+            let session = tree.matches(&query);
+            assert_eq!(session.collect().len(), 3);
         }
     }
 
@@ -237,9 +287,9 @@ mod tests {
         {
             let query = RawQuery::<HCL>::new(
                 r#"
-                one_attr = :[[X]]
-                another_attr = :[[X]]
-                yetanother_attr = :[[X]]
+                one_attr = :[X]
+                another_attr = :[X]
+                yetanother_attr = :[X]
             "#,
             )
             .to_query()
@@ -271,8 +321,8 @@ mod tests {
             .into_tree()
             .unwrap();
 
-            let mut session = tree.matches(&query);
-            assert_eq!(session.as_iter().collect::<Vec<MatchedItem>>().len(), 1);
+            let session = tree.matches(&query);
+            assert_eq!(session.collect().len(), 1);
         }
     }
 }

@@ -41,14 +41,30 @@ where
     pub fn ts_query<'a>(&'a self) -> &'a tree_sitter::Query {
         &self.query
     }
+
+    pub fn get_cid_mvid_map(&self) -> HashMap<CaptureId, MetavariableId> {
+        self.metavariables
+            .iter()
+            .map(|(k, v)| {
+                v.into_iter()
+                    .map(move |field| (field.capture_id.clone(), k.clone()))
+            })
+            .flatten()
+            .collect::<HashMap<CaptureId, MetavariableId>>()
+    }
 }
 
 pub trait ToQueryConstraintString {
     fn to_query_constraints(&self) -> Vec<String>;
 }
 
-pub type CaptureId = String;
-pub type MetavariableTable = HashMap<String, Vec<MetavariableField>>;
+#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+pub struct CaptureId(pub String);
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+pub struct MetavariableId(pub String);
+
+pub type MetavariableTable = HashMap<MetavariableId, Vec<MetavariableField>>;
 
 impl ToQueryConstraintString for MetavariableTable {
     fn to_query_constraints(&self) -> Vec<String> {
@@ -56,7 +72,7 @@ impl ToQueryConstraintString for MetavariableTable {
             .filter_map(|(_k, mvs)| {
                 let ids: Vec<String> = mvs
                     .into_iter()
-                    .map(|field| field.capture_id.clone())
+                    .map(|field| field.capture_id.0.clone())
                     .collect();
                 if ids.len() <= 1 {
                     None
@@ -83,21 +99,6 @@ pub struct MetavariableField {
 impl MetavariableField {
     pub fn new(capture_id: CaptureId) -> Self {
         MetavariableField { capture_id }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub struct Metavariable {
-    pub id: String,
-    pub field: MetavariableField,
-}
-
-impl Metavariable {
-    pub fn new(id: impl Into<String>, field: MetavariableField) -> Self {
-        Metavariable {
-            id: id.into(),
-            field,
-        }
     }
 }
 
@@ -221,24 +222,44 @@ where
 
                 // extract child and get shisho_metavariable_name
                 let child = children[0];
-                if child.kind() != "shisho_metavariable_name" {
-                    return Err(QueryError::SyntaxError(format!("shisho_metavariable should have exactly one child (shisho_metavariable_name), but the child was {}", child.kind()).into()).into());
-                }
-                let variable_name = self.node_as_value(&child).to_string();
+                match child.kind() {
+                    "shisho_metavariable_name" => {
+                        let variable_name = self.node_as_value(&child).to_string();
 
-                // convert to the tsquery representation with a capture
-                let capture_id = format!("{}-{}", variable_name.clone(), node.id());
-                // NOTE: into_iter() can't be used here https://github.com/rust-lang/rust/pull/84147
-                let metavariables = IntoIter::new([(
-                    variable_name,
-                    vec![MetavariableField::new(capture_id.clone())],
-                )])
-                .collect::<MetavariableTable>();
+                        // convert to the tsquery representation with a capture
+                        let capture_id = format!("{}-{}", variable_name.clone(), node.id());
+                        // NOTE: into_iter() can't be used here https://github.com/rust-lang/rust/pull/84147
+                        let metavariables = IntoIter::new([(
+                            MetavariableId(variable_name),
+                            vec![MetavariableField::new(CaptureId(capture_id.clone()))],
+                        )])
+                        .collect::<MetavariableTable>();
+        
+                        Ok(TSQueryString::new(
+                            format!("(_) @{}", capture_id),
+                            metavariables,
+                        ))
+                    },
+                    "shisho_metavariable_ellipsis_name" => {                                                                        
+                        let child = child.named_child(0).ok_or(anyhow!("failed to get shisho_metavariable_ellipsis_name child"))?;
+                        let variable_name = self.node_as_value(&child).to_string();
 
-                Ok(TSQueryString::new(
-                    format!("(_) @{}", capture_id),
-                    metavariables,
-                ))
+                        // convert to the tsquery representation with a capture
+                        let capture_id = format!("{}-{}", variable_name.clone(), node.id());
+                        // NOTE: into_iter() can't be used here https://github.com/rust-lang/rust/pull/84147
+                        let metavariables = IntoIter::new([(
+                            MetavariableId(variable_name),
+                            vec![MetavariableField::new(CaptureId(capture_id.clone()))],
+                        )])
+                        .collect::<MetavariableTable>();
+        
+                        Ok(TSQueryString::new(
+                            format!("((_)* @{})", capture_id),
+                            metavariables,
+                        ))
+                    },
+                    _ => Err(QueryError::SyntaxError(format!("shisho_metavariable should have exactly one child (shisho_metavariable_name), but the child was {}", child.kind()).into()).into()),
+                }                
             }
             _ => {
                 let children: Vec<tree_sitter::Node> = {

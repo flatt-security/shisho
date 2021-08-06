@@ -1,0 +1,7 @@
+rules:
+  - id: aaa
+    language: go
+    message: test
+    patterns:
+      - match: |
+          len(:[X])
