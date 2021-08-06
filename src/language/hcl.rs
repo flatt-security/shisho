@@ -1,6 +1,6 @@
 use super::Queryable;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HCL;
 
 impl Queryable for HCL {
@@ -26,8 +26,10 @@ impl Queryable for HCL {
 
 #[cfg(test)]
 mod tests {
+    use crate::transform::Transformable;
     use crate::{
-        query::{Query, Pattern, TSQueryString},
+        code::Code,
+        query::{Pattern, Query, TSQueryString},
         tree::RawTree,
     };
 
@@ -324,5 +326,29 @@ mod tests {
             let session = tree.matches(&query);
             assert_eq!(session.collect().len(), 1);
         }
+    }
+
+    #[test]
+    fn basic_transform() {
+        let code: Code<HCL> = r#"resource "rtype" "rname" { attr = "value" }"#.into();
+
+        let tree_base = code.clone();
+        let tree = RawTree::<HCL>::new(tree_base.as_str()).into_tree().unwrap();
+        let query = Pattern::<HCL>::new(r#"resource "rtype" "rname" { attr = :[...] }"#)
+            .to_query()
+            .unwrap();
+
+        let session = tree.matches(&query);
+        let mut items = session.collect();
+        assert_eq!(items.len(), 1);
+        let item = items.pop().unwrap();
+
+        let new_code = code.transform(r#"resource "rtype" "rname" { attr = "changed" }"#, item);
+        assert!(new_code.is_ok());
+
+        assert_eq!(
+            new_code.unwrap().as_str(),
+            r#"resource "rtype" "rname" { attr = "changed" }"#
+        );
     }
 }

@@ -1,6 +1,6 @@
 use super::Queryable;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Go;
 
 impl Queryable for Go {
@@ -24,7 +24,7 @@ impl Queryable for Go {
 #[cfg(test)]
 mod tests {
     use crate::{
-        query::{Query, Pattern, TSQueryString},
+        query::{Pattern, Query, TSQueryString},
         tree::RawTree,
     };
 

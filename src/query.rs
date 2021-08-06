@@ -366,6 +366,7 @@ where
     T: Queryable,
 {
     type Error = anyhow::Error;
+
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         Pattern::new(value).to_query()
     }

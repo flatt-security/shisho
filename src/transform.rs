@@ -1,11 +1,8 @@
+use std::convert::TryInto;
+
 use anyhow::Result;
 
-use crate::{
-    code::Code,
-    language::Queryable,
-    matcher::MatchedItem,
-    query::{Pattern, Query},
-};
+use crate::{language::Queryable, matcher::MatchedItem, query::Query};
 
 pub type AutofixQuery<T> = Query<T>;
 
@@ -14,8 +11,11 @@ where
     T: Queryable,
     Self: Sized,
 {
-    fn transform_with_pattern(self, pattern: &str, item: MatchedItem) -> Result<Self> {
-        let query = Pattern::<T>::new(pattern).to_query()?;
+    fn transform<P>(self, p: P, item: MatchedItem) -> Result<Self>
+    where
+        P: TryInto<AutofixQuery<T>, Error = anyhow::Error>,
+    {
+        let query = p.try_into()?;
         self.transform_with_query(query, item)
     }
 

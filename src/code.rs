@@ -1,3 +1,5 @@
+use anyhow::Result;
+
 use crate::{
     language::Queryable,
     matcher::MatchedItem,
@@ -5,6 +7,7 @@ use crate::{
 };
 use std::marker::PhantomData;
 
+#[derive(Clone)]
 pub struct Code<L>
 where
     L: Queryable,
@@ -24,8 +27,8 @@ where
         }
     }
 
-    pub fn into_string(self) -> String {
-        self.code
+    pub fn as_str<'a>(&'a self) -> &'a str {
+        self.code.as_str()
     }
 }
 
@@ -43,7 +46,8 @@ impl<T> Transformable<T> for Code<T>
 where
     T: Queryable,
 {
-    fn transform_with_query(self, query: AutofixQuery<T>, item: MatchedItem) -> Result<Self> {
+    fn transform_with_query(self, _query: AutofixQuery<T>, _item: MatchedItem) -> Result<Self> {
+        // TODO
         Ok(self)
     }
 }
