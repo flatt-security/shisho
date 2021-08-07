@@ -54,7 +54,7 @@ fn show_items<'tree, 'item, T: 'static>(
     'tree: 'item,
 {
     for mitem in items {
-        println!("- item: {:?}", mitem.global.node.utf8_text(tree.raw).unwrap());
+        println!("- item: {:?}", mitem.top.utf8_text(tree.raw).unwrap());
         for (id, c) in &mitem.captures {
             println!("\t- {}: {}", id.0, c.node.utf8_text(tree.raw).unwrap());
         }

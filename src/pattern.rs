@@ -1,4 +1,4 @@
-use crate::{language::Queryable, query::{CaptureId, GLOBAL_CAPTURE_ID, MetavariableField, MetavariableId, MetavariableTable, Query, TSQueryString}};
+use crate::{language::Queryable, query::{CaptureId, TOP_CAPTURE_ID_PREFIX, MetavariableField, MetavariableId, MetavariableTable, Query, TSQueryString}};
 use anyhow::{anyhow, Result};
 use std::{array::IntoIter,  marker::PhantomData};
 use thiserror::Error;
@@ -66,9 +66,13 @@ where
             processor.convert_nodes(T::extract_query_nodes(&query_tree))?;
 
         let query = format!(
-            "({} {}) @{}",
+            "({} {})",
             child_query_strings
                 .into_iter()
+                .enumerate()
+                .map(|(index, query)|
+                    format!("{} @{}{}", query, TOP_CAPTURE_ID_PREFIX, index)
+               )
                 .collect::<Vec<String>>()
                 .join("."),
             metavariables
@@ -76,7 +80,6 @@ where
                 .into_iter()
                 .collect::<Vec<String>>()
                 .join(" "),
-            GLOBAL_CAPTURE_ID,
         );
 
         Ok(TSQueryString::new(query, metavariables))

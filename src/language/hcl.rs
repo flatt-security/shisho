@@ -339,6 +339,11 @@ mod tests {
             .to_query()
             .unwrap();
 
+        let a = Pattern::<HCL>::new(r#"resource "rtype" "rname" { attr = :[...] }"#)
+            .to_query_string()
+            .unwrap();
+        println!("query: {}", a.query_string);
+
         let item = {
             let session = tree.matches(&query);
             let mut items = session.collect();
@@ -352,6 +357,33 @@ mod tests {
         assert_eq!(
             new_code.unwrap().as_str(),
             "resource \"rtype\" \"rname\" { attr = \"changed\" }\nresource \"rtype\" \"another\" { attr = \"notchanged\" }",
+        );
+    }
+
+    #[test]
+    fn metavariable_transform() {
+        let code: Code<HCL> = "resource \"rtype\" \"rname\" { attr = \"one\" }\nresource \"rtype\" \"another\" { attr = \"two\" }".into();
+
+        let tree_base = code.clone();
+        let tree = RawTree::<HCL>::new(tree_base.as_str()).into_tree().unwrap();
+
+        let query = Pattern::<HCL>::new("resource \"rtype\" \"rname\" { attr = :[X] }\nresource \"rtype\" \"another\" { attr = :[Y] }")
+            .to_query()
+            .unwrap();
+
+        let item = {
+            let session = tree.matches(&query);
+            let mut items = session.collect();
+            assert_eq!(items.len(), 1);
+            items.pop().unwrap()
+        };
+
+        let new_code = code.transform("resource \"rtype\" \"rname\" { attr = :[Y] }\nresource \"rtype\" \"another\" { attr = :[X] }", item);
+        assert!(new_code.is_ok());
+
+        assert_eq!(
+            new_code.unwrap().as_str(),
+            "resource \"rtype\" \"rname\" { attr = \"two\" }\nresource \"rtype\" \"another\" { attr = \"one\" }",
         );
     }
 }

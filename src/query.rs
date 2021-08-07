@@ -2,7 +2,7 @@ use crate::{language::Queryable, pattern::Pattern};
 use std::{collections::HashMap, convert::TryFrom, marker::PhantomData};
 use thiserror::Error;
 
-pub const GLOBAL_CAPTURE_ID: &str = "GLOBAL";
+pub const TOP_CAPTURE_ID_PREFIX: &str = "TOP-";
 
 #[derive(Debug, Error, PartialEq)]
 pub enum QueryError {
