@@ -35,7 +35,7 @@ where
         &self.tstree
     }
 
-    pub fn matches<'query>(&'tree self, query: &'query Query<T>) -> QueryMatcher<'query, 'tree, T>
+    pub fn matches<'query>(&'tree self, query: &'query Query<T>) -> QueryMatcher<'tree, 'query, T>
     where
         'tree: 'query,
     {
@@ -77,7 +77,7 @@ impl<'a, T> RawTree<'a, T>
 where
     T: Queryable,
 {
-    pub fn into_tree<'b>(self) -> Result<Tree<'a, T>> {
+    pub fn into_tree(self) -> Result<Tree<'a, T>> {
         let mut parser = tree_sitter::Parser::new();
         parser
             .set_language(T::target_language())

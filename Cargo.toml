@@ -18,6 +18,8 @@ structopt = "0.3.21"
 anyhow = "1.0"
 thiserror = "1.0"
 tree-sitter = "0.19.5"
+serde =  { version = "1.0", features = ["derive"] }
+serde_yaml = "0.8"
 
 [dependencies.tree-sitter-hcl]
 path = "./third_party/tree-sitter-hcl"

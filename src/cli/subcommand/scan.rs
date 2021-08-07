@@ -2,7 +2,15 @@
 
 use std::path::PathBuf;
 
-use crate::{cli::CommonOpts, language::Go, matcher::MatchedItem, query::RawQuery, tree::RawTree};
+use crate::{
+    cli::CommonOpts,
+    language::{Go, Queryable, HCL},
+    matcher::MatchedItem,
+    pattern::Pattern,
+    ruleset::{self, Rule},
+    tree::{RawTree, Tree},
+};
+use anyhow::{anyhow, Result};
 use structopt::StructOpt;
 
 /// `Opts` defines possible options for the `scan` subcommand.
@@ -11,23 +19,78 @@ pub struct Opts {
     #[structopt(parse(from_os_str))]
     target_path: PathBuf,
 
-    policy_path: String,
+    #[structopt(parse(from_os_str))]
+    ruleset_path: PathBuf,
 }
 
-pub fn run(_common_opts: CommonOpts, opts: Opts) -> i32 {
-    // TODO (y0n3uchy): this is just a sample implementation! we need to improve this
+pub fn run(common_opts: CommonOpts, opts: Opts) -> i32 {
+    match intl(common_opts, opts) {
+        Ok(_) => 0,
+        Err(e) => {
+            eprintln!("{}", e);
+            1
+        }
+    }
+}
+
+fn find_with_rule<'tree, 'item, T: 'static>(
+    tree: &'tree Tree<'tree, T>,
+    rule: &Rule,
+) -> Result<Vec<MatchedItem<'item>>>
+where
+    T: Queryable,
+    'tree: 'item,
+{
+    let query = Pattern::<T>::new(&rule.pattern).to_query()?;
+    let session = tree.matches(&query);
+    Ok(session.collect())
+}
+
+fn show_items<'tree, 'item, T: 'static>(
+    tree: &'tree Tree<'tree, T>,
+    items: &Vec<MatchedItem<'item>>,
+) where
+    T: Queryable,
+    'tree: 'item,
+{
+    for mitem in items {
+        println!("- item: {:?}", mitem.top.utf8_text(tree.raw).unwrap());
+        for (id, c) in &mitem.captures {
+            println!("\t- {}: {}", id.0, c.node.utf8_text(tree.raw).unwrap());
+        }
+    }
+}
+
+// TODO (y0n3uchy): this is just a sample implementation! we need to improve this
+fn intl(_common_opts: CommonOpts, opts: Opts) -> Result<()> {
+    let ruleset = ruleset::from_reader(&opts.ruleset_path).map_err(|e| {
+        anyhow!(
+            "failed to load ruleset file {}: {}",
+            opts.ruleset_path.as_os_str().to_string_lossy(),
+            e
+        )
+    })?;
+
+    // TODO: commonize the implementation with appropriate generics wrapper
     let file = std::fs::read_to_string(&opts.target_path).unwrap();
-    let tree = RawTree::<Go>::new(file.as_str()).into_tree().unwrap();
+    let file = file.as_str();
 
-    let pattern = std::fs::read_to_string(&opts.policy_path)
-        .expect(format!("failed to load file: {}", opts.policy_path).as_str());
-    let query = RawQuery::<Go>::new(pattern.as_str()).to_query().unwrap();
+    for rule in ruleset.rules {
+        match rule.language {
+            ruleset::Language::HCL => {
+                let tree = RawTree::<HCL>::new(file).into_tree().unwrap();
+                let items = find_with_rule::<HCL>(&tree, &rule)?;
+                show_items(&tree, &items);
+                unimplemented!("should be implemented before the first release")
+            }
+            ruleset::Language::Go => {
+                let tree = RawTree::<Go>::new(file).into_tree().unwrap();
+                let items = find_with_rule::<Go>(&tree, &rule)?;
+                show_items(&tree, &items);
+                unimplemented!("should be implemented before the first release")
+            }
+        };
+    }
 
-    let mut session = tree.matches(&query);
-    println!(
-        "{} items matched",
-        session.as_iter().collect::<Vec<MatchedItem>>().len()
-    );
-
-    0
+    Ok(())
 }
