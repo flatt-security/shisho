@@ -30,7 +30,6 @@ mod tests {
     use crate::tree::Tree;
     use crate::{
         code::Code,
-        pattern::Pattern,
         query::{Query, TSQueryString},
     };
     use std::convert::TryFrom;
@@ -39,37 +38,31 @@ mod tests {
 
     #[test]
     fn test_rawquery_conversion() {
-        assert!(Pattern::<HCL>::from(r#"test = "hoge""#)
-            .to_query_string()
-            .is_ok());
+        assert!(TSQueryString::<HCL>::try_from(r#"test = "hoge""#).is_ok());
         assert!(
-            Pattern::<HCL>::from(r#"resource "rtype" "rname" { attr = "value" }"#)
-                .to_query_string()
+            TSQueryString::<HCL>::try_from(r#"resource "rtype" "rname" { attr = "value" }"#)
                 .is_ok()
         );
 
         // with ellipsis operators
-        assert!(Pattern::<HCL>::from(
+        assert!(TSQueryString::<HCL>::try_from(
             r#"resource "rtype" "rname" { :[...] attr = "value" :[...] }"#
         )
-        .to_query_string()
         .is_ok());
 
         // with metavariables
         {
-            let rq = Pattern::<HCL>::from(r#"resource "rtype" "rname" { attr = :[X] }"#)
-                .to_query_string();
+            let rq = TSQueryString::<HCL>::try_from(r#"resource "rtype" "rname" { attr = :[X] }"#);
             assert!(rq.is_ok());
             let TSQueryString { metavariables, .. } = rq.unwrap();
             assert_eq!(metavariables.len(), 1);
 
-            let rq = Pattern::<HCL>::from(
+            let rq = TSQueryString::<HCL>::try_from(
                 r#"resource "rtype" "rname" { 
                 attr = :[X]
                 :[...Y]
             }"#,
-            )
-            .to_query_string();
+            );
             assert!(rq.is_ok());
             let TSQueryString { metavariables, .. } = rq.unwrap();
             assert_eq!(metavariables.len(), 2);
@@ -78,37 +71,31 @@ mod tests {
 
     #[test]
     fn test_query_conversion() {
-        assert!(Pattern::<HCL>::from(r#"test = "hoge""#).to_query().is_ok());
-        assert!(
-            Pattern::<HCL>::from(r#"resource "rtype" "rname" { attr = "value" }"#)
-                .to_query()
-                .is_ok()
-        );
+        assert!(Query::<HCL>::try_from(r#"test = "hoge""#).is_ok());
+        assert!(Query::<HCL>::try_from(r#"resource "rtype" "rname" { attr = "value" }"#).is_ok());
 
         // with ellipsis operators
-        assert!(Pattern::<HCL>::from(
+        assert!(Query::<HCL>::try_from(
             r#"resource "rtype" "rname" { 
             :[...]
             attr = "value"
             :[...] 
         }"#
         )
-        .to_query()
         .is_ok());
 
         // with metavariables
         {
-            let rq = Pattern::<HCL>::from(r#"resource "rtype" "rname" { attr = :[X] }"#).to_query();
+            let rq = TSQueryString::<HCL>::try_from(r#"resource "rtype" "rname" { attr = :[X] }"#);
             assert!(rq.is_ok());
             assert_eq!(rq.unwrap().metavariables.len(), 1);
 
-            let rq = Pattern::<HCL>::from(
+            let rq = Query::<HCL>::try_from(
                 r#"resource "rtype" "rname" { 
                 attr = :[X]
                 :[...Y]
             }"#,
-            )
-            .to_query();
+            );
             assert!(rq.is_ok());
             let Query { metavariables, .. } = rq.unwrap();
             assert_eq!(metavariables.len(), 2);
@@ -138,13 +125,12 @@ mod tests {
         }
 
         {
-            let query = Pattern::<HCL>::from(
+            let query = Query::<HCL>::try_from(
                 r#"resource "rtype" "rname" { 
                 attr = :[X]
                 :[...Y]
             }"#,
             )
-            .to_query()
             .unwrap();
             let tree = Tree::<HCL>::try_from(
                 r#"resource "rtype" "rname" { 

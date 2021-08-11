@@ -24,7 +24,6 @@ impl Queryable for Go {
 #[cfg(test)]
 mod tests {
     use crate::{
-        pattern::Pattern,
         query::{Query, TSQueryString},
         tree::Tree,
     };
@@ -35,11 +34,10 @@ mod tests {
     #[test]
     fn test_rawquery_conversion() {
         assert!(
-            Pattern::<Go>::from(r#"for _, x := range iter { fmt.Printf("%s", x) }"#)
-                .to_query_string()
+            TSQueryString::<Go>::try_from(r#"for _, x := range iter { fmt.Printf("%s", x) }"#)
                 .is_ok()
         );
-        assert!(Pattern::<Go>::from(
+        assert!(TSQueryString::<Go>::try_from(
             r#"import "fmt"
             func main () { 
                 x = []int{1, 2, 3}
@@ -48,30 +46,27 @@ mod tests {
                 } 
             }"#
         )
-        .to_query_string()
         .is_ok());
 
         // with ellipsis operators
-        assert!(Pattern::<Go>::from(
+        assert!(TSQueryString::<Go>::try_from(
             r#"for _, x := range iter {
                 :[...]
                 fmt.Printf("%s", x)
                 :[...]
             }"#
         )
-        .to_query_string()
         .is_ok());
 
         // with metavariables
         {
-            let rq = Pattern::<Go>::from(
+            let rq = TSQueryString::<Go>::try_from(
                 r#"for _, :[X] := range iter { 
                     :[...] 
                     fmt.Printf("%s", :[Y])
                     :[...]
             }"#,
-            )
-            .to_query_string();
+            );
             assert!(rq.is_ok());
             let TSQueryString { metavariables, .. } = rq.unwrap();
             assert_eq!(metavariables.len(), 2);
@@ -80,12 +75,8 @@ mod tests {
 
     #[test]
     fn test_query_conversion() {
-        assert!(
-            Pattern::<Go>::from(r#"for _, x := range iter { fmt.Printf("%s", x) }"#)
-                .to_query()
-                .is_ok()
-        );
-        assert!(Pattern::<Go>::from(
+        assert!(Query::<Go>::try_from(r#"for _, x := range iter { fmt.Printf("%s", x) }"#).is_ok());
+        assert!(Query::<Go>::try_from(
             r#"import "fmt"
             func main () { 
                 x = []int{1, 2, 3}
@@ -94,30 +85,27 @@ mod tests {
                 } 
             }"#
         )
-        .to_query()
         .is_ok());
 
         // with ellipsis operators
-        assert!(Pattern::<Go>::from(
+        assert!(Query::<Go>::try_from(
             r#"for _, x := range iter {
                 :[...]
                 fmt.Printf("%s", x)
                 :[...]
             }"#
         )
-        .to_query()
         .is_ok());
 
         // with metavariables
         {
-            let rq = Pattern::<Go>::from(
+            let rq = Query::<Go>::try_from(
                 r#"for _, :[X] := range iter { 
                     :[...] 
                     fmt.Printf("%s", :[X])
                     :[...]
             }"#,
-            )
-            .to_query();
+            );
             assert!(rq.is_ok());
             let Query { metavariables, .. } = rq.unwrap();
             assert_eq!(metavariables.len(), 1);

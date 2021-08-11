@@ -4,7 +4,7 @@ use crate::{
     cli::CommonOpts,
     language::{Go, Queryable, HCL},
     matcher::MatchedItem,
-    pattern::Pattern,
+    query::Query,
     ruleset::{self, Rule},
     tree::Tree,
 };
@@ -41,7 +41,7 @@ where
     T: Queryable,
     'tree: 'item,
 {
-    let query = Pattern::<T>::from(rule.pattern.as_str()).to_query()?;
+    let query = Query::<T>::try_from(rule.pattern.as_str())?;
     let session = tree.matches(&query);
     Ok(session.collect())
 }
