@@ -285,6 +285,7 @@ dependencies = [
  "clap-verbosity-flag",
  "fern",
  "log",
+ "regex",
  "serde",
  "serde_yaml",
  "structopt",

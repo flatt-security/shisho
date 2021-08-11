@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct RuleSet {
+    pub version: String,
     pub rules: Vec<Rule>,
 }
 
@@ -14,6 +15,24 @@ pub struct Rule {
     pub language: Language,
     pub message: String,
     pub pattern: String,
+    pub constraints: Vec<RawConstraint>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct RawConstraint {
+    pub target: String,
+    pub predicate: RawPredicate,
+    pub pattern: String,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RawPredicate {
+    Match,
+    NotMatch,
+
+    MatchRegex,
+    NotMatchRegex,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
