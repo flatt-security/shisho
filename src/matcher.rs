@@ -4,7 +4,7 @@ use crate::{
     constraint::{Constraint, Predicate},
     language::Queryable,
     query::{CaptureId, MetavariableId, Query, TOP_CAPTURE_ID_PREFIX},
-    tree::{PartialTree, Tree},
+    tree::PartialTree,
 };
 use std::collections::HashMap;
 
@@ -44,7 +44,7 @@ where
         let cid_mvid_map = self.query.get_cid_mvid_map();
 
         self.cursor
-            .matches(tsquery, self.ptree.as_ts_node().clone(), move |x| {
+            .matches(tsquery, self.ptree.as_ref().clone(), move |x| {
                 x.utf8_text(raw).unwrap()
             })
             .map(|m| MatchedItem::try_from(m, raw, cidx_cid_map, &cid_mvid_map))
@@ -60,10 +60,15 @@ pub struct MatchedItem<'tree> {
 }
 
 impl<'tree> MatchedItem<'tree> {
-    pub fn metavariable_string(&self, id: &MetavariableId) -> Option<&'tree str> {
+    pub fn get_captured_string(&self, id: &MetavariableId) -> Option<&'tree str> {
         let capture = self.captures.get(&id)?;
         let t = capture.node.utf8_text(self.raw).unwrap();
         Some(t)
+    }
+
+    pub fn get_captured_node(&self, id: &MetavariableId) -> Option<tree_sitter::Node<'tree>> {
+        let capture = self.captures.get(&id)?;
+        Some(capture.node)
     }
 
     pub fn satisfies_all<T: Queryable>(&self, constraints: &Vec<Constraint<T>>) -> bool {
@@ -79,22 +84,20 @@ impl<'tree> MatchedItem<'tree> {
 
         match &constraint.predicate {
             Predicate::MatchQuery(q) => {
-                // 1. tree の metavariable に該当するやつとってくる
-                // 2. metavariable の部分の tree をとってくる
-                // 3. match して少なくとも一個 MatchedItem があれば true
-                true
+                let item = self.get_captured_node(&constraint.target).unwrap();
+                let ptree = PartialTree::<T>::new(item, self.raw);
+                ptree.matches(q).collect().len() > 0
             }
             Predicate::NotMatchQuery(q) => {
-                // 1. tree の metavariable に該当するやつとってくる
-                // 2. metavariable の部分の tree をとってくる
-                // 3. match して MatchedItem がなければ true
-                true
+                let item = self.get_captured_node(&constraint.target).unwrap();
+                let ptree = PartialTree::new(item, self.raw);
+                ptree.matches(q).collect().len() > 0
             }
             Predicate::MatchRegex(r) => {
-                r.is_match(self.metavariable_string(&constraint.target).unwrap())
+                r.is_match(self.get_captured_string(&constraint.target).unwrap())
             }
             Predicate::NotMatchRegex(r) => {
-                !r.is_match(self.metavariable_string(&constraint.target).unwrap())
+                !r.is_match(self.get_captured_string(&constraint.target).unwrap())
             }
         }
     }

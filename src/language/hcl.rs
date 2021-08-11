@@ -110,7 +110,8 @@ mod tests {
             let tree =
                 Tree::<HCL>::try_from(r#"resource "rtype" "rname" { attr = "value" }"#).unwrap();
 
-            let session = tree.matches(&query);
+            let ptree = tree.to_partial();
+            let session = ptree.matches(&query);
             assert_eq!(session.collect().len(), 1);
         }
 
@@ -120,7 +121,8 @@ mod tests {
             let tree =
                 Tree::<HCL>::try_from(r#"resource "rtype" "rname" { attr = "value" }"#).unwrap();
 
-            let session = tree.matches(&query);
+            let ptree = tree.to_partial();
+            let session = ptree.matches(&query);
             assert_eq!(session.collect().len(), 1);
         }
 
@@ -141,7 +143,8 @@ mod tests {
             )
             .unwrap();
 
-            let session = tree.matches(&query);
+            let ptree = tree.to_partial();
+            let session = ptree.matches(&query);
             let result = session.collect();
             assert_eq!(result.len(), 1);
             assert_eq!(result[0].captures.len(), 2);
@@ -165,7 +168,8 @@ mod tests {
             )
             .unwrap();
 
-            let session = tree.matches(&query);
+            let ptree = tree.to_partial();
+            let session = ptree.matches(&query);
             assert_eq!(session.collect().len(), 2);
         }
 
@@ -209,7 +213,8 @@ mod tests {
             )
             .unwrap();
 
-            let session = tree.matches(&query);
+            let ptree = tree.to_partial();
+            let session = ptree.matches(&query);
             assert_eq!(session.collect().len(), 2);
         }
     }
@@ -257,7 +262,8 @@ mod tests {
             )
             .unwrap();
 
-            let session = tree.matches(&query);
+            let ptree = tree.to_partial();
+            let session = ptree.matches(&query);
             assert_eq!(session.collect().len(), 3);
         }
     }
@@ -299,7 +305,8 @@ mod tests {
             )
             .unwrap();
 
-            let session = tree.matches(&query);
+            let ptree = tree.to_partial();
+            let session = ptree.matches(&query);
             assert_eq!(session.collect().len(), 1);
         }
     }
@@ -310,11 +317,13 @@ mod tests {
 
         let tree_base = code.clone();
         let tree = Tree::<HCL>::try_from(tree_base.as_str()).unwrap();
+        let ptree = tree.to_partial();
+
         let query =
             Query::<HCL>::try_from(r#"resource "rtype" "rname" { attr = :[...] }"#).unwrap();
 
         let item = {
-            let session = tree.matches(&query);
+            let session = ptree.matches(&query);
             let mut items = session.collect();
             assert_eq!(items.len(), 1);
             items.pop().unwrap()
@@ -335,12 +344,13 @@ mod tests {
 
         let tree_base = code.clone();
         let tree = Tree::<HCL>::try_from(tree_base.as_str()).unwrap();
+        let ptree = tree.to_partial();
 
         let query = Query::<HCL>::try_from("resource \"rtype\" \"rname\" { attr = :[X] }\nresource \"rtype\" \"another\" { attr = :[Y] }")        
             .unwrap();
 
         let item = {
-            let session = tree.matches(&query);
+            let session = ptree.matches(&query);
             let mut items = session.collect();
             assert_eq!(items.len(), 1);
             items.pop().unwrap()

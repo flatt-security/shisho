@@ -37,8 +37,10 @@ where
     pub fn to_partial<'node>(&'tree self) -> PartialTree<'tree, 'node, T> {
         PartialTree::new(self.tstree.root_node(), self.raw)
     }
+}
 
-    pub(crate) fn as_ts_tree<'a>(&'a self) -> &'a tree_sitter::Tree {
+impl<'a, 'tree, T> AsRef<tree_sitter::Tree> for Tree<'tree, T> {
+    fn as_ref(&self) -> &tree_sitter::Tree {
         &self.tstree
     }
 }
@@ -49,7 +51,7 @@ where
 {
     pub raw: &'tree [u8],
 
-    top: &'tree tree_sitter::Node<'tree>,
+    top: tree_sitter::Node<'node>,
     _marker: PhantomData<T>,
 }
 
@@ -74,8 +76,10 @@ where
     {
         QueryMatcher::new(self, query)
     }
+}
 
-    pub(crate) fn as_ts_node<'a>(&'a self) -> &'a tree_sitter::Node {
+impl<'a, 'tree, 'node, T> AsRef<tree_sitter::Node<'node>> for PartialTree<'tree, 'node, T> {
+    fn as_ref(&self) -> &tree_sitter::Node<'node> {
         &self.top
     }
 }

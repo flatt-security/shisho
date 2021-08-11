@@ -120,7 +120,8 @@ mod tests {
             let tree =
                 Tree::<Go>::try_from(r#"for _, x := range iter { fmt.Printf("%s", x) }"#).unwrap();
 
-            let session = tree.matches(&query);
+            let ptree = tree.to_partial();
+            let session = ptree.matches(&query);
             assert_eq!(session.collect().len(), 1);
         }
 
@@ -131,7 +132,8 @@ mod tests {
             let tree =
                 Tree::<Go>::try_from(r#"for _, x := range iter { fmt.Printf("%s", x) }"#).unwrap();
 
-            let session = tree.matches(&query);
+            let ptree = tree.to_partial();
+            let session = ptree.matches(&query);
             assert_eq!(session.collect().len(), 1);
         }
     }
@@ -160,7 +162,8 @@ mod tests {
             )
             .unwrap();
 
-            let session = tree.matches(&query);
+            let ptree = tree.to_partial();
+            let session = ptree.matches(&query);
             assert_eq!(session.collect().len(), 1);
         }
 
@@ -183,7 +186,8 @@ mod tests {
             )
             .unwrap();
 
-            let session = tree.matches(&query);
+            let ptree = tree.to_partial();
+            let session = ptree.matches(&query);
             assert_eq!(session.collect().len(), 1);
         }
     }

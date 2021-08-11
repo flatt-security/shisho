@@ -63,7 +63,7 @@ where
                         }
                     };
                     let value = item
-                        .metavariable_string(&id)
+                        .get_captured_string(&id)
                         .ok_or(anyhow!("metavariable not found"))?;
 
                     text = text
