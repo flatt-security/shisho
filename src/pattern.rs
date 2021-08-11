@@ -29,7 +29,7 @@ where
     T: Queryable,
 {
     fn from(value: &'a str) -> Self {
-        Pattern::new(value)
+        Self::new(value)
     }
 }
 

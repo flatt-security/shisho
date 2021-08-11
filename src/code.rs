@@ -32,6 +32,6 @@ where
     C: Queryable,
 {
     fn from(code: T) -> Self {
-        Code::new(code)
+        Self::new(code)
     }
 }

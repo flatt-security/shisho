@@ -61,6 +61,6 @@ where
     type Error = anyhow::Error;
 
     fn try_from(rc: RawConstraint) -> Result<Self, Self::Error> {
-        Constraint::new(rc)
+        Self::new(rc)
     }
 }

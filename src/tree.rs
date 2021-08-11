@@ -57,7 +57,7 @@ where
     T: Queryable,
 {
     fn from(value: &'a str) -> Self {
-        RawTree::new(value)
+        Self::new(value)
     }
 }
 
