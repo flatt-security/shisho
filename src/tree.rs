@@ -1,6 +1,9 @@
 use crate::{language::Queryable, matcher::QueryMatcher, query::Query};
 use anyhow::Result;
-use std::{convert::{TryFrom, TryInto}, marker::PhantomData};
+use std::{
+    convert::{TryFrom, TryInto},
+    marker::PhantomData,
+};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -31,15 +34,15 @@ where
         }
     }
 
-    pub fn ts_tree<'a>(&'a self) -> &'a tree_sitter::Tree {
-        &self.tstree
-    }
-
     pub fn matches<'query>(&'tree self, query: &'query Query<T>) -> QueryMatcher<'tree, 'query, T>
     where
         'tree: 'query,
     {
         QueryMatcher::new(self, query)
+    }
+
+    pub(crate) fn ts_tree<'a>(&'a self) -> &'a tree_sitter::Tree {
+        &self.tstree
     }
 }
 
@@ -73,23 +76,6 @@ where
     }
 }
 
-impl<'a, T> RawTree<'a, T>
-where
-    T: Queryable,
-{
-    pub fn into_tree(self) -> Result<Tree<'a, T>> {
-        let mut parser = tree_sitter::Parser::new();
-        parser
-            .set_language(T::target_language())
-            .expect("Error loading hcl grammar");
-
-        Ok(Tree::new(
-            parser.parse(self.raw_bytes, None).unwrap(),
-            self.raw_bytes,
-        ))
-    }
-}
-
 impl<'a, T> TryFrom<RawTree<'a, T>> for Tree<'a, T>
 where
     T: Queryable,
@@ -97,7 +83,15 @@ where
     type Error = anyhow::Error;
 
     fn try_from(value: RawTree<'a, T>) -> Result<Self, Self::Error> {
-        value.into_tree()
+        let mut parser = tree_sitter::Parser::new();
+        parser
+            .set_language(T::target_language())
+            .expect("Error loading hcl grammar");
+
+        Ok(Tree::new(
+            parser.parse(value.raw_bytes, None).unwrap(),
+            value.raw_bytes,
+        ))
     }
 }
 
@@ -108,7 +102,7 @@ where
     type Error = anyhow::Error;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        let r= RawTree::new(value);
+        let r = RawTree::new(value);
         r.try_into()
     }
 }

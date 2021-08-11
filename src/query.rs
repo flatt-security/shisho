@@ -1,4 +1,5 @@
 use crate::{language::Queryable, pattern::Pattern};
+use anyhow::Result;
 use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
@@ -43,10 +44,6 @@ where
         }
     }
 
-    pub fn ts_query<'a>(&'a self) -> &'a tree_sitter::Query {
-        &self.query
-    }
-
     pub fn get_cid_mvid_map(&self) -> HashMap<CaptureId, MetavariableId> {
         self.metavariables
             .iter()
@@ -56,6 +53,10 @@ where
             })
             .flatten()
             .collect::<HashMap<CaptureId, MetavariableId>>()
+    }
+
+    pub(crate) fn ts_query<'a>(&'a self) -> &'a tree_sitter::Query {
+        &self.query
     }
 }
 
