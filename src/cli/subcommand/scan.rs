@@ -2,6 +2,7 @@
 
 use crate::{
     cli::CommonOpts,
+    constraint::Constraint,
     language::{Go, Queryable, HCL},
     matcher::MatchedItem,
     query::Query,
@@ -41,9 +42,19 @@ where
     T: Queryable,
     'tree: 'item,
 {
+    let constraints = rule
+        .constraints
+        .iter()
+        .map(|x| Constraint::try_from(x.clone()))
+        .collect::<Result<Vec<Constraint<T>>>>()?;
+
     let query = Query::<T>::try_from(rule.pattern.as_str())?;
     let session = tree.matches(&query);
-    Ok(session.collect())
+    Ok(session
+        .collect()
+        .into_iter()
+        .filter(|x| x.satisfies_all(&constraints))
+        .collect())
 }
 
 fn show_items<'tree, 'item, T: 'static>(

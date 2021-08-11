@@ -19,17 +19,19 @@ pub struct Rule {
     pub language: Language,
     pub message: String,
     pub pattern: String,
+
+    #[serde(default)]
     pub constraints: Vec<RawConstraint>,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct RawConstraint {
     pub target: String,
     pub should: RawPredicate,
     pub pattern: String,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub enum RawPredicate {
     Match,
