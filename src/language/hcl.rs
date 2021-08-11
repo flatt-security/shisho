@@ -27,48 +27,42 @@ impl Queryable for HCL {
 #[cfg(test)]
 mod tests {
     use crate::transform::Transformable;
+    use crate::tree::Tree;
     use crate::{
         code::Code,
-        pattern::Pattern,
         query::{Query, TSQueryString},
-        tree::RawTree,
     };
+    use std::convert::TryFrom;
 
     use super::*;
 
     #[test]
     fn test_rawquery_conversion() {
-        assert!(Pattern::<HCL>::new(r#"test = "hoge""#)
-            .to_query_string()
-            .is_ok());
+        assert!(TSQueryString::<HCL>::try_from(r#"test = "hoge""#).is_ok());
         assert!(
-            Pattern::<HCL>::new(r#"resource "rtype" "rname" { attr = "value" }"#)
-                .to_query_string()
+            TSQueryString::<HCL>::try_from(r#"resource "rtype" "rname" { attr = "value" }"#)
                 .is_ok()
         );
 
         // with ellipsis operators
-        assert!(Pattern::<HCL>::new(
+        assert!(TSQueryString::<HCL>::try_from(
             r#"resource "rtype" "rname" { :[...] attr = "value" :[...] }"#
         )
-        .to_query_string()
         .is_ok());
 
         // with metavariables
         {
-            let rq = Pattern::<HCL>::new(r#"resource "rtype" "rname" { attr = :[X] }"#)
-                .to_query_string();
+            let rq = TSQueryString::<HCL>::try_from(r#"resource "rtype" "rname" { attr = :[X] }"#);
             assert!(rq.is_ok());
             let TSQueryString { metavariables, .. } = rq.unwrap();
             assert_eq!(metavariables.len(), 1);
 
-            let rq = Pattern::<HCL>::new(
+            let rq = TSQueryString::<HCL>::try_from(
                 r#"resource "rtype" "rname" { 
                 attr = :[X]
                 :[...Y]
             }"#,
-            )
-            .to_query_string();
+            );
             assert!(rq.is_ok());
             let TSQueryString { metavariables, .. } = rq.unwrap();
             assert_eq!(metavariables.len(), 2);
@@ -77,37 +71,31 @@ mod tests {
 
     #[test]
     fn test_query_conversion() {
-        assert!(Pattern::<HCL>::new(r#"test = "hoge""#).to_query().is_ok());
-        assert!(
-            Pattern::<HCL>::new(r#"resource "rtype" "rname" { attr = "value" }"#)
-                .to_query()
-                .is_ok()
-        );
+        assert!(Query::<HCL>::try_from(r#"test = "hoge""#).is_ok());
+        assert!(Query::<HCL>::try_from(r#"resource "rtype" "rname" { attr = "value" }"#).is_ok());
 
         // with ellipsis operators
-        assert!(Pattern::<HCL>::new(
+        assert!(Query::<HCL>::try_from(
             r#"resource "rtype" "rname" { 
             :[...]
             attr = "value"
             :[...] 
         }"#
         )
-        .to_query()
         .is_ok());
 
         // with metavariables
         {
-            let rq = Pattern::<HCL>::new(r#"resource "rtype" "rname" { attr = :[X] }"#).to_query();
+            let rq = TSQueryString::<HCL>::try_from(r#"resource "rtype" "rname" { attr = :[X] }"#);
             assert!(rq.is_ok());
             assert_eq!(rq.unwrap().metavariables.len(), 1);
 
-            let rq = Pattern::<HCL>::new(
+            let rq = Query::<HCL>::try_from(
                 r#"resource "rtype" "rname" { 
                 attr = :[X]
                 :[...Y]
             }"#,
-            )
-            .to_query();
+            );
             assert!(rq.is_ok());
             let Query { metavariables, .. } = rq.unwrap();
             assert_eq!(metavariables.len(), 2);
@@ -117,49 +105,46 @@ mod tests {
     #[test]
     fn test_basic_query() {
         {
-            let query = Pattern::<HCL>::new(r#"resource "rtype" "rname" { attr = "value" }"#)
-                .to_query()
-                .unwrap();
-            let tree = RawTree::<HCL>::new(r#"resource "rtype" "rname" { attr = "value" }"#)
-                .into_tree()
-                .unwrap();
+            let query =
+                Query::<HCL>::try_from(r#"resource "rtype" "rname" { attr = "value" }"#).unwrap();
+            let tree =
+                Tree::<HCL>::try_from(r#"resource "rtype" "rname" { attr = "value" }"#).unwrap();
 
-            let session = tree.matches(&query);
+            let ptree = tree.to_partial();
+            let session = ptree.matches(&query);
             assert_eq!(session.collect().len(), 1);
         }
 
         {
-            let query = Pattern::<HCL>::new(r#"resource "rtype" "rname" { attr = :[X] }"#)
-                .to_query()
-                .unwrap();
-            let tree = RawTree::<HCL>::new(r#"resource "rtype" "rname" { attr = "value" }"#)
-                .into_tree()
-                .unwrap();
+            let query =
+                Query::<HCL>::try_from(r#"resource "rtype" "rname" { attr = :[X] }"#).unwrap();
+            let tree =
+                Tree::<HCL>::try_from(r#"resource "rtype" "rname" { attr = "value" }"#).unwrap();
 
-            let session = tree.matches(&query);
+            let ptree = tree.to_partial();
+            let session = ptree.matches(&query);
             assert_eq!(session.collect().len(), 1);
         }
 
         {
-            let query = Pattern::<HCL>::new(
+            let query = Query::<HCL>::try_from(
                 r#"resource "rtype" "rname" { 
                 attr = :[X]
                 :[...Y]
             }"#,
             )
-            .to_query()
             .unwrap();
-            let tree = RawTree::<HCL>::new(
+            let tree = Tree::<HCL>::try_from(
                 r#"resource "rtype" "rname" { 
                 attr = "value"
                 hoge = "foobar"
                 foo = "test"
             }"#,
             )
-            .into_tree()
             .unwrap();
 
-            let session = tree.matches(&query);
+            let ptree = tree.to_partial();
+            let session = ptree.matches(&query);
             let result = session.collect();
             assert_eq!(result.len(), 1);
             assert_eq!(result[0].captures.len(), 2);
@@ -169,8 +154,8 @@ mod tests {
     #[test]
     fn test_query_with_simple_metavariable() {
         {
-            let query = Pattern::<HCL>::new(r#"attr = :[X]"#).to_query().unwrap();
-            let tree = RawTree::<HCL>::new(
+            let query = Query::<HCL>::try_from(r#"attr = :[X]"#).unwrap();
+            let tree = Tree::<HCL>::try_from(
                 r#"resource "rtype" "rname" { 
                 attr = "value"
             }
@@ -181,24 +166,23 @@ mod tests {
                 attr = "value"
             }"#,
             )
-            .into_tree()
             .unwrap();
 
-            let session = tree.matches(&query);
+            let ptree = tree.to_partial();
+            let session = ptree.matches(&query);
             assert_eq!(session.collect().len(), 2);
         }
 
         {
-            let query = Pattern::<HCL>::new(
+            let query = Query::<HCL>::try_from(
                 r#"
                 one_attr = :[X]
                 another_attr = :[Y]
             "#,
             )
-            .to_query()
             .unwrap();
 
-            let tree = RawTree::<HCL>::new(
+            let tree = Tree::<HCL>::try_from(
                 r#"
                 # should match
                 resource "rtype" "rname1" { 
@@ -227,10 +211,10 @@ mod tests {
                 }
             "#,
             )
-            .into_tree()
             .unwrap();
 
-            let session = tree.matches(&query);
+            let ptree = tree.to_partial();
+            let session = ptree.matches(&query);
             assert_eq!(session.collect().len(), 2);
         }
     }
@@ -238,17 +222,16 @@ mod tests {
     #[test]
     fn test_query_with_ellipsis_opearator() {
         {
-            let query = Pattern::<HCL>::new(
+            let query = Query::<HCL>::try_from(
                 r#"
                 one_attr = :[X]
                 :[...]
                 another_attr = :[Y]
             "#,
             )
-            .to_query()
             .unwrap();
 
-            let tree = RawTree::<HCL>::new(
+            let tree = Tree::<HCL>::try_from(
                 r#"
                 # should match
                 resource "rtype" "rname1" { 
@@ -277,10 +260,10 @@ mod tests {
                 }
             "#,
             )
-            .into_tree()
             .unwrap();
 
-            let session = tree.matches(&query);
+            let ptree = tree.to_partial();
+            let session = ptree.matches(&query);
             assert_eq!(session.collect().len(), 3);
         }
     }
@@ -288,17 +271,16 @@ mod tests {
     #[test]
     fn test_query_with_simple_equivalence() {
         {
-            let query = Pattern::<HCL>::new(
+            let query = Query::<HCL>::try_from(
                 r#"
                 one_attr = :[X]
                 another_attr = :[X]
                 yetanother_attr = :[X]
             "#,
             )
-            .to_query()
             .unwrap();
 
-            let tree = RawTree::<HCL>::new(
+            let tree = Tree::<HCL>::try_from(
                 r#"
                 # should match
                 resource "rtype" "rname1" { 
@@ -321,10 +303,10 @@ mod tests {
                 }
             "#,
             )
-            .into_tree()
             .unwrap();
 
-            let session = tree.matches(&query);
+            let ptree = tree.to_partial();
+            let session = ptree.matches(&query);
             assert_eq!(session.collect().len(), 1);
         }
     }
@@ -334,55 +316,51 @@ mod tests {
         let code: Code<HCL> = "resource \"rtype\" \"rname\" { attr = \"notchanged\" }\nresource \"rtype\" \"another\" { attr = \"notchanged\" }".into();
 
         let tree_base = code.clone();
-        let tree = RawTree::<HCL>::new(tree_base.as_str()).into_tree().unwrap();
-        let query = Pattern::<HCL>::new(r#"resource "rtype" "rname" { attr = :[...] }"#)
-            .to_query()
-            .unwrap();
+        let tree = Tree::<HCL>::try_from(tree_base.as_str()).unwrap();
+        let ptree = tree.to_partial();
 
-        let a = Pattern::<HCL>::new(r#"resource "rtype" "rname" { attr = :[...] }"#)
-            .to_query_string()
-            .unwrap();
-        println!("query: {}", a.query_string);
+        let query =
+            Query::<HCL>::try_from(r#"resource "rtype" "rname" { attr = :[...] }"#).unwrap();
 
         let item = {
-            let session = tree.matches(&query);
+            let session = ptree.matches(&query);
             let mut items = session.collect();
             assert_eq!(items.len(), 1);
             items.pop().unwrap()
         };
 
-        let new_code = code.transform(r#"resource "rtype" "rname" { attr = "changed" }"#, item);
-        assert!(new_code.is_ok());
+        let from_code = code.transform(r#"resource "rtype" "rname" { attr = "changed" }"#, item);
+        assert!(from_code.is_ok());
 
         assert_eq!(
-            new_code.unwrap().as_str(),
+            from_code.unwrap().as_str(),
             "resource \"rtype\" \"rname\" { attr = \"changed\" }\nresource \"rtype\" \"another\" { attr = \"notchanged\" }",
         );
     }
 
     #[test]
     fn metavariable_transform() {
-        let code: Code<HCL> = "resource \"rtype\" \"rname\" { attr = \"one\" }\nresource \"rtype\" \"another\" { attr = \"two\" }".into();
+        let code = Code::<HCL>::from("resource \"rtype\" \"rname\" { attr = \"one\" }\nresource \"rtype\" \"another\" { attr = \"two\" }");
 
         let tree_base = code.clone();
-        let tree = RawTree::<HCL>::new(tree_base.as_str()).into_tree().unwrap();
+        let tree = Tree::<HCL>::try_from(tree_base.as_str()).unwrap();
+        let ptree = tree.to_partial();
 
-        let query = Pattern::<HCL>::new("resource \"rtype\" \"rname\" { attr = :[X] }\nresource \"rtype\" \"another\" { attr = :[Y] }")
-            .to_query()
+        let query = Query::<HCL>::try_from("resource \"rtype\" \"rname\" { attr = :[X] }\nresource \"rtype\" \"another\" { attr = :[Y] }")        
             .unwrap();
 
         let item = {
-            let session = tree.matches(&query);
+            let session = ptree.matches(&query);
             let mut items = session.collect();
             assert_eq!(items.len(), 1);
             items.pop().unwrap()
         };
 
-        let new_code = code.transform("resource \"rtype\" \"rname\" { attr = :[Y] }\nresource \"rtype\" \"another\" { attr = :[X] }", item);
-        assert!(new_code.is_ok());
+        let from_code = code.transform("resource \"rtype\" \"rname\" { attr = :[Y] }\nresource \"rtype\" \"another\" { attr = :[X] }", item);
+        assert!(from_code.is_ok());
 
         assert_eq!(
-            new_code.unwrap().as_str(),
+            from_code.unwrap().as_str(),
             "resource \"rtype\" \"rname\" { attr = \"two\" }\nresource \"rtype\" \"another\" { attr = \"one\" }",
         );
     }

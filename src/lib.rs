@@ -1,5 +1,6 @@
 pub mod cli;
 pub mod code;
+pub mod constraint;
 pub mod language;
 pub mod matcher;
 pub mod pattern;

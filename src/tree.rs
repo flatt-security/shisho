@@ -1,6 +1,9 @@
 use crate::{language::Queryable, matcher::QueryMatcher, query::Query};
 use anyhow::Result;
-use std::{convert::TryFrom, marker::PhantomData};
+use std::{
+    convert::{TryFrom, TryInto},
+    marker::PhantomData,
+};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -31,15 +34,53 @@ where
         }
     }
 
-    pub fn ts_tree<'a>(&'a self) -> &'a tree_sitter::Tree {
+    pub fn to_partial<'node>(&'tree self) -> PartialTree<'tree, 'node, T> {
+        PartialTree::new(self.tstree.root_node(), self.raw)
+    }
+}
+
+impl<'a, 'tree, T> AsRef<tree_sitter::Tree> for Tree<'tree, T> {
+    fn as_ref(&self) -> &tree_sitter::Tree {
         &self.tstree
     }
+}
 
-    pub fn matches<'query>(&'tree self, query: &'query Query<T>) -> QueryMatcher<'tree, 'query, T>
+pub struct PartialTree<'tree, 'node, T>
+where
+    'tree: 'node,
+{
+    pub raw: &'tree [u8],
+
+    top: tree_sitter::Node<'node>,
+    _marker: PhantomData<T>,
+}
+
+impl<'tree, 'node, T> PartialTree<'tree, 'node, T>
+where
+    T: Queryable,
+{
+    pub fn new(top: tree_sitter::Node<'node>, raw: &'tree [u8]) -> PartialTree<'tree, 'node, T> {
+        PartialTree {
+            top,
+            raw,
+            _marker: PhantomData,
+        }
+    }
+
+    pub fn matches<'query>(
+        &'tree self,
+        query: &'query Query<T>,
+    ) -> QueryMatcher<'tree, 'node, 'query, T>
     where
         'tree: 'query,
     {
         QueryMatcher::new(self, query)
+    }
+}
+
+impl<'a, 'tree, 'node, T> AsRef<tree_sitter::Node<'node>> for PartialTree<'tree, 'node, T> {
+    fn as_ref(&self) -> &tree_sitter::Node<'node> {
+        &self.top
     }
 }
 
@@ -57,35 +98,28 @@ where
     T: Queryable,
 {
     fn from(value: &'a str) -> Self {
-        RawTree::new(value)
-    }
-}
-
-impl<'a, T> RawTree<'a, T>
-where
-    T: Queryable,
-{
-    pub fn new(raw_str: &'a str) -> Self {
         RawTree {
-            raw_bytes: raw_str.as_bytes(),
+            raw_bytes: value.as_bytes(),
             _marker: PhantomData,
         }
     }
 }
 
-impl<'a, T> RawTree<'a, T>
+impl<'a, T> TryFrom<RawTree<'a, T>> for Tree<'a, T>
 where
     T: Queryable,
 {
-    pub fn into_tree(self) -> Result<Tree<'a, T>> {
+    type Error = anyhow::Error;
+
+    fn try_from(value: RawTree<'a, T>) -> Result<Self, Self::Error> {
         let mut parser = tree_sitter::Parser::new();
         parser
             .set_language(T::target_language())
             .expect("Error loading hcl grammar");
 
         Ok(Tree::new(
-            parser.parse(self.raw_bytes, None).unwrap(),
-            self.raw_bytes,
+            parser.parse(value.raw_bytes, None).unwrap(),
+            value.raw_bytes,
         ))
     }
 }
@@ -97,6 +131,7 @@ where
     type Error = anyhow::Error;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        RawTree::new(value).into_tree()
+        let r = RawTree::from(value);
+        r.try_into()
     }
 }

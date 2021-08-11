@@ -63,7 +63,7 @@ where
                         }
                     };
                     let value = item
-                        .metavariable_string(id)
+                        .get_captured_string(&id)
                         .ok_or(anyhow!("metavariable not found"))?;
 
                     text = text
@@ -127,8 +127,8 @@ where
     type Error = anyhow::Error;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        let tree = Pattern::<T>::new(value).to_tstree()?;
-        Ok(AutofixPattern {
+        let tree = Pattern::<T>::from(value).to_tstree()?;
+        Ok(Self {
             tree,
             raw_pattern: value.as_bytes(),
             _marker: PhantomData,
@@ -167,12 +167,6 @@ where
         let before = String::from_utf8(current_code[0..start].to_vec())?;
         let after = String::from_utf8(current_code[end..current_code.len()].to_vec())?;
 
-        println!("code: {}", self.as_str());
-
-        println!("before: {}", before);
-        println!("snippet: {}", snippet);
-        println!("after ({}-{}): {}", end, current_code.len(), after);
-
-        Ok(Code::new(format!("{}{}{}", before, snippet, after)))
+        Ok(Code::from(format!("{}{}{}", before, snippet, after)))
     }
 }

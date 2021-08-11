@@ -1,31 +1,33 @@
 use anyhow::{anyhow, Result};
 
 use crate::{
+    constraint::{Constraint, Predicate},
     language::Queryable,
     query::{CaptureId, MetavariableId, Query, TOP_CAPTURE_ID_PREFIX},
-    tree::Tree,
+    tree::PartialTree,
 };
 use std::collections::HashMap;
 
-pub struct QueryMatcher<'tree, 'query, T>
+pub struct QueryMatcher<'tree, 'node, 'query, T>
 where
     T: Queryable,
     'tree: 'query,
+    'tree: 'node,
 {
     cursor: tree_sitter::QueryCursor,
     query: &'query Query<T>,
-    tree: &'tree Tree<'tree, T>,
+    ptree: &'tree PartialTree<'tree, 'node, T>,
 }
 
-impl<'tree, 'query, T> QueryMatcher<'tree, 'query, T>
+impl<'tree, 'node, 'query, T> QueryMatcher<'tree, 'node, 'query, T>
 where
     T: Queryable,
     'tree: 'query,
 {
-    pub fn new(tree: &'tree Tree<'tree, T>, query: &'query Query<T>) -> Self {
+    pub fn new(ptree: &'tree PartialTree<'tree, 'node, T>, query: &'query Query<T>) -> Self {
         let cursor = tree_sitter::QueryCursor::new();
         QueryMatcher {
-            tree,
+            ptree,
             cursor,
             query,
         }
@@ -35,14 +37,14 @@ where
     where
         'tree: 'item,
     {
-        let raw = self.tree.raw;
+        let raw = self.ptree.raw;
         let tsquery: &'query tree_sitter::Query = self.query.ts_query();
 
         let cidx_cid_map: &'query [String] = tsquery.capture_names();
         let cid_mvid_map = self.query.get_cid_mvid_map();
 
         self.cursor
-            .matches(tsquery, self.tree.ts_tree().root_node(), move |x| {
+            .matches(tsquery, self.ptree.as_ref().clone(), move |x| {
                 x.utf8_text(raw).unwrap()
             })
             .map(|m| MatchedItem::try_from(m, raw, cidx_cid_map, &cid_mvid_map))
@@ -58,10 +60,46 @@ pub struct MatchedItem<'tree> {
 }
 
 impl<'tree> MatchedItem<'tree> {
-    pub fn metavariable_string(&self, id: MetavariableId) -> Option<&'tree str> {
+    pub fn get_captured_string(&self, id: &MetavariableId) -> Option<&'tree str> {
         let capture = self.captures.get(&id)?;
         let t = capture.node.utf8_text(self.raw).unwrap();
         Some(t)
+    }
+
+    pub fn get_captured_node(&self, id: &MetavariableId) -> Option<tree_sitter::Node<'tree>> {
+        let capture = self.captures.get(&id)?;
+        Some(capture.node)
+    }
+
+    pub fn satisfies_all<T: Queryable>(&self, constraints: &Vec<Constraint<T>>) -> bool {
+        constraints
+            .iter()
+            .all(|constraint| self.satisfies(constraint))
+    }
+
+    pub fn satisfies<T: Queryable>(&self, constraint: &Constraint<T>) -> bool {
+        if !self.captures.contains_key(&constraint.target) {
+            return false;
+        }
+
+        match &constraint.predicate {
+            Predicate::MatchQuery(q) => {
+                let item = self.get_captured_node(&constraint.target).unwrap();
+                let ptree = PartialTree::<T>::new(item, self.raw);
+                ptree.matches(q).collect().len() > 0
+            }
+            Predicate::NotMatchQuery(q) => {
+                let item = self.get_captured_node(&constraint.target).unwrap();
+                let ptree = PartialTree::new(item, self.raw);
+                ptree.matches(q).collect().len() > 0
+            }
+            Predicate::MatchRegex(r) => {
+                r.is_match(self.get_captured_string(&constraint.target).unwrap())
+            }
+            Predicate::NotMatchRegex(r) => {
+                !r.is_match(self.get_captured_string(&constraint.target).unwrap())
+            }
+        }
     }
 }
 
@@ -130,7 +168,6 @@ impl<'tree> MatchedItem<'tree> {
         }
 
         top.sort_by(|x, y| x.0.cmp(&y.0));
-        println!("{:?}", top);
 
         let top = top.into_iter().map(|item| item.1).collect();
         let top = ConsecutiveCaptureItems::try_from(top)

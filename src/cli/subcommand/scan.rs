@@ -1,16 +1,17 @@
 //! This module defines `scan` subcommand.
 
-use std::path::PathBuf;
-
 use crate::{
     cli::CommonOpts,
+    constraint::Constraint,
     language::{Go, Queryable, HCL},
     matcher::MatchedItem,
-    pattern::Pattern,
+    query::Query,
     ruleset::{self, Rule},
-    tree::{RawTree, Tree},
+    tree::{PartialTree, Tree},
 };
 use anyhow::{anyhow, Result};
+use std::convert::TryFrom;
+use std::path::PathBuf;
 use structopt::StructOpt;
 
 /// `Opts` defines possible options for the `scan` subcommand.
@@ -34,16 +35,26 @@ pub fn run(common_opts: CommonOpts, opts: Opts) -> i32 {
 }
 
 fn find_with_rule<'tree, 'item, T: 'static>(
-    tree: &'tree Tree<'tree, T>,
+    tree: &'tree PartialTree<'tree, 'tree, T>,
     rule: &Rule,
 ) -> Result<Vec<MatchedItem<'item>>>
 where
     T: Queryable,
     'tree: 'item,
 {
-    let query = Pattern::<T>::new(&rule.pattern).to_query()?;
+    let constraints = rule
+        .constraints
+        .iter()
+        .map(|x| Constraint::try_from(x.clone()))
+        .collect::<Result<Vec<Constraint<T>>>>()?;
+
+    let query = Query::<T>::try_from(rule.pattern.as_str())?;
     let session = tree.matches(&query);
-    Ok(session.collect())
+    Ok(session
+        .collect()
+        .into_iter()
+        .filter(|x| x.satisfies_all(&constraints))
+        .collect())
 }
 
 fn show_items<'tree, 'item, T: 'static>(
@@ -78,14 +89,16 @@ fn intl(_common_opts: CommonOpts, opts: Opts) -> Result<()> {
     for rule in ruleset.rules {
         match rule.language {
             ruleset::Language::HCL => {
-                let tree = RawTree::<HCL>::new(file).into_tree().unwrap();
-                let items = find_with_rule::<HCL>(&tree, &rule)?;
+                let tree = Tree::<HCL>::try_from(file).unwrap();
+                let ptree = tree.to_partial();
+                let items = find_with_rule::<HCL>(&ptree, &rule)?;
                 show_items(&tree, &items);
                 unimplemented!("should be implemented before the first release")
             }
             ruleset::Language::Go => {
-                let tree = RawTree::<Go>::new(file).into_tree().unwrap();
-                let items = find_with_rule::<Go>(&tree, &rule)?;
+                let tree = Tree::<Go>::try_from(file).unwrap();
+                let ptree = tree.to_partial();
+                let items = find_with_rule::<Go>(&ptree, &rule)?;
                 show_items(&tree, &items);
                 unimplemented!("should be implemented before the first release")
             }

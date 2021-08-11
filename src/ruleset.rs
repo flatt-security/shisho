@@ -1,10 +1,15 @@
-use std::{fs::File, path::Path};
+use std::{
+    convert::TryFrom,
+    fs::File,
+    path::{Path, PathBuf},
+};
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct RuleSet {
+    pub version: String,
     pub rules: Vec<Rule>,
 }
 
@@ -14,6 +19,26 @@ pub struct Rule {
     pub language: Language,
     pub message: String,
     pub pattern: String,
+
+    #[serde(default)]
+    pub constraints: Vec<RawConstraint>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct RawConstraint {
+    pub target: String,
+    pub should: RawPredicate,
+    pub pattern: String,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub enum RawPredicate {
+    Match,
+    NotMatch,
+
+    MatchRegex,
+    NotMatchRegex,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -23,15 +48,31 @@ pub enum Language {
     Go,
 }
 
+pub fn from_str(s: &str) -> Result<RuleSet> {
+    let rset: RuleSet = serde_yaml::from_str(s)?;
+    Ok(rset)
+}
+
 pub fn from_reader<P: AsRef<Path>>(ruleset_path: P) -> Result<RuleSet> {
     let f = File::open(ruleset_path)?;
     let rset: RuleSet = serde_yaml::from_reader(f)?;
     Ok(rset)
 }
 
-pub fn from_str(s: &str) -> Result<RuleSet> {
-    let rset: RuleSet = serde_yaml::from_str(s)?;
-    Ok(rset)
+impl<'a> TryFrom<&'a str> for RuleSet {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        from_str(value)
+    }
+}
+
+impl<'a> TryFrom<PathBuf> for RuleSet {
+    type Error = anyhow::Error;
+
+    fn try_from(value: PathBuf) -> Result<Self, Self::Error> {
+        from_reader(value)
+    }
 }
 
 #[cfg(test)]
@@ -40,9 +81,7 @@ mod tests {
 
     #[test]
     fn test_load() {
-        let raw = include_str!("./tests/ruleset/basic.yaml");
-        let ruleset = from_str(raw);
-
-        assert!(ruleset.is_ok());
+        let rs = RuleSet::try_from(include_str!("./tests/ruleset/basic.yaml"));
+        assert!(rs.is_ok());
     }
 }
