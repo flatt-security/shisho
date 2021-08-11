@@ -1,6 +1,6 @@
-use std::convert::{TryFrom, TryInto};
-
 use anyhow::Result;
+use regex::Regex;
+use std::convert::{TryFrom, TryInto};
 
 use crate::{
     language::Queryable,
@@ -8,16 +8,16 @@ use crate::{
     ruleset::{RawConstraint, RawPredicate},
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Constraint<T>
 where
     T: Queryable,
 {
-    target: MetavariableId,
-    predicate: Predicate<T>,
+    pub target: MetavariableId,
+    pub predicate: Predicate<T>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum Predicate<T>
 where
     T: Queryable,
@@ -25,8 +25,8 @@ where
     MatchQuery(Query<T>),
     NotMatchQuery(Query<T>),
 
-    MatchRegex(String),
-    NotMatchRegex(String),
+    MatchRegex(Regex),
+    NotMatchRegex(Regex),
 }
 
 impl<T> Constraint<T> where T: Queryable {}
@@ -47,8 +47,14 @@ where
                 let p = rc.pattern.as_str().try_into()?;
                 Predicate::NotMatchQuery(p)
             }
-            RawPredicate::MatchRegex => Predicate::MatchRegex(rc.pattern),
-            RawPredicate::NotMatchRegex => Predicate::NotMatchRegex(rc.pattern),
+            RawPredicate::MatchRegex => {
+                let r = Regex::new(rc.pattern.as_str())?;
+                Predicate::MatchRegex(r)
+            }
+            RawPredicate::NotMatchRegex => {
+                let r = Regex::new(rc.pattern.as_str())?;
+                Predicate::NotMatchRegex(r)
+            }
         };
 
         Ok(Constraint {

@@ -34,15 +34,49 @@ where
         }
     }
 
-    pub fn matches<'query>(&'tree self, query: &'query Query<T>) -> QueryMatcher<'tree, 'query, T>
+    pub fn to_partial<'node>(&'tree self) -> PartialTree<'tree, 'node, T> {
+        PartialTree::new(self.tstree.root_node(), self.raw)
+    }
+
+    pub(crate) fn as_ts_tree<'a>(&'a self) -> &'a tree_sitter::Tree {
+        &self.tstree
+    }
+}
+
+pub struct PartialTree<'tree, 'node, T>
+where
+    'tree: 'node,
+{
+    pub raw: &'tree [u8],
+
+    top: &'tree tree_sitter::Node<'tree>,
+    _marker: PhantomData<T>,
+}
+
+impl<'tree, 'node, T> PartialTree<'tree, 'node, T>
+where
+    T: Queryable,
+{
+    pub fn new(top: tree_sitter::Node<'node>, raw: &'tree [u8]) -> PartialTree<'tree, 'node, T> {
+        PartialTree {
+            top,
+            raw,
+            _marker: PhantomData,
+        }
+    }
+
+    pub fn matches<'query>(
+        &'tree self,
+        query: &'query Query<T>,
+    ) -> QueryMatcher<'tree, 'node, 'query, T>
     where
         'tree: 'query,
     {
         QueryMatcher::new(self, query)
     }
 
-    pub(crate) fn ts_tree<'a>(&'a self) -> &'a tree_sitter::Tree {
-        &self.tstree
+    pub(crate) fn as_ts_node<'a>(&'a self) -> &'a tree_sitter::Node {
+        &self.top
     }
 }
 

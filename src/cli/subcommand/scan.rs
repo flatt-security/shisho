@@ -6,7 +6,7 @@ use crate::{
     matcher::MatchedItem,
     query::Query,
     ruleset::{self, Rule},
-    tree::Tree,
+    tree::{PartialTree, Tree},
 };
 use anyhow::{anyhow, Result};
 use std::convert::TryFrom;
@@ -34,7 +34,7 @@ pub fn run(common_opts: CommonOpts, opts: Opts) -> i32 {
 }
 
 fn find_with_rule<'tree, 'item, T: 'static>(
-    tree: &'tree Tree<'tree, T>,
+    tree: &'tree PartialTree<'tree, 'tree, T>,
     rule: &Rule,
 ) -> Result<Vec<MatchedItem<'item>>>
 where
@@ -79,13 +79,15 @@ fn intl(_common_opts: CommonOpts, opts: Opts) -> Result<()> {
         match rule.language {
             ruleset::Language::HCL => {
                 let tree = Tree::<HCL>::try_from(file).unwrap();
-                let items = find_with_rule::<HCL>(&tree, &rule)?;
+                let ptree = tree.to_partial();
+                let items = find_with_rule::<HCL>(&ptree, &rule)?;
                 show_items(&tree, &items);
                 unimplemented!("should be implemented before the first release")
             }
             ruleset::Language::Go => {
                 let tree = Tree::<Go>::try_from(file).unwrap();
-                let items = find_with_rule::<Go>(&tree, &rule)?;
+                let ptree = tree.to_partial();
+                let items = find_with_rule::<Go>(&ptree, &rule)?;
                 show_items(&tree, &items);
                 unimplemented!("should be implemented before the first release")
             }
