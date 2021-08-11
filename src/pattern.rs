@@ -29,17 +29,8 @@ where
     T: Queryable,
 {
     fn from(value: &'a str) -> Self {
-        Self::new(value)
-    }
-}
-
-impl<'a, T> Pattern<'a, T>
-where
-    T: Queryable,
-{
-    pub fn new(raw_str: &'a str) -> Self {
         Pattern {
-            raw_bytes: raw_str.as_bytes(),
+            raw_bytes: value.as_bytes(),
             _marker: PhantomData,
         }
     }
@@ -61,7 +52,7 @@ where
     pub fn to_query_string(&self) -> Result<TSQueryString<T>> {
         let query_tree = self.to_tstree()?;
 
-        let processor = RawQueryProcessor::<T>::new(self.raw_bytes);
+        let processor = RawQueryProcessor::<T>::from(self.raw_bytes);
         let (child_query_strings, metavariables) =
             processor.convert_nodes(T::extract_query_nodes(&query_tree))?;
 
@@ -137,13 +128,11 @@ where
     _marker: PhantomData<T>,
 }
 
-impl<'a, T> RawQueryProcessor<'a, T>
-where
-    T: Queryable,
-{
-    pub fn new(raw_bytes: &'a [u8]) -> Self {
+
+impl <'a, T>From<&'a [u8]> for RawQueryProcessor<'a, T> where T: Queryable{    
+    fn from(value: &'a [u8]) -> Self {
         RawQueryProcessor {
-            raw_bytes,
+            raw_bytes: value,
             _marker: PhantomData,
         }
     }

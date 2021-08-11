@@ -25,12 +25,12 @@ pub struct Rule {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct RawConstraint {
     pub target: String,
-    pub predicate: RawPredicate,
+    pub should: RawPredicate,
     pub pattern: String,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 pub enum RawPredicate {
     Match,
     NotMatch,
@@ -79,9 +79,7 @@ mod tests {
 
     #[test]
     fn test_load() {
-        let raw = include_str!("./tests/ruleset/basic.yaml");
-        let ruleset = from_str(raw);
-
-        assert!(ruleset.is_ok());
+        let rs = RuleSet::try_from(include_str!("./tests/ruleset/basic.yaml"));
+        assert!(rs.is_ok());
     }
 }

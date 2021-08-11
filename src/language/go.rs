@@ -26,19 +26,20 @@ mod tests {
     use crate::{
         pattern::Pattern,
         query::{Query, TSQueryString},
-        tree::RawTree,
+        tree::Tree,
     };
+    use std::convert::TryFrom;
 
     use super::*;
 
     #[test]
     fn test_rawquery_conversion() {
         assert!(
-            Pattern::<Go>::new(r#"for _, x := range iter { fmt.Printf("%s", x) }"#)
+            Pattern::<Go>::from(r#"for _, x := range iter { fmt.Printf("%s", x) }"#)
                 .to_query_string()
                 .is_ok()
         );
-        assert!(Pattern::<Go>::new(
+        assert!(Pattern::<Go>::from(
             r#"import "fmt"
             func main () { 
                 x = []int{1, 2, 3}
@@ -51,7 +52,7 @@ mod tests {
         .is_ok());
 
         // with ellipsis operators
-        assert!(Pattern::<Go>::new(
+        assert!(Pattern::<Go>::from(
             r#"for _, x := range iter {
                 :[...]
                 fmt.Printf("%s", x)
@@ -63,7 +64,7 @@ mod tests {
 
         // with metavariables
         {
-            let rq = Pattern::<Go>::new(
+            let rq = Pattern::<Go>::from(
                 r#"for _, :[X] := range iter { 
                     :[...] 
                     fmt.Printf("%s", :[Y])
@@ -80,11 +81,11 @@ mod tests {
     #[test]
     fn test_query_conversion() {
         assert!(
-            Pattern::<Go>::new(r#"for _, x := range iter { fmt.Printf("%s", x) }"#)
+            Pattern::<Go>::from(r#"for _, x := range iter { fmt.Printf("%s", x) }"#)
                 .to_query()
                 .is_ok()
         );
-        assert!(Pattern::<Go>::new(
+        assert!(Pattern::<Go>::from(
             r#"import "fmt"
             func main () { 
                 x = []int{1, 2, 3}
@@ -97,7 +98,7 @@ mod tests {
         .is_ok());
 
         // with ellipsis operators
-        assert!(Pattern::<Go>::new(
+        assert!(Pattern::<Go>::from(
             r#"for _, x := range iter {
                 :[...]
                 fmt.Printf("%s", x)
@@ -109,7 +110,7 @@ mod tests {
 
         // with metavariables
         {
-            let rq = Pattern::<Go>::new(
+            let rq = Pattern::<Go>::from(
                 r#"for _, :[X] := range iter { 
                     :[...] 
                     fmt.Printf("%s", :[X])
@@ -126,12 +127,10 @@ mod tests {
     #[test]
     fn test_basic_query() {
         {
-            let query = Pattern::<Go>::new(r#"for _, x := range iter { fmt.Printf("%s", x) }"#)
-                .to_query()
-                .unwrap();
-            let tree = RawTree::<Go>::new(r#"for _, x := range iter { fmt.Printf("%s", x) }"#)
-                .into_tree()
-                .unwrap();
+            let query =
+                Query::<Go>::try_from(r#"for _, x := range iter { fmt.Printf("%s", x) }"#).unwrap();
+            let tree =
+                Tree::<Go>::try_from(r#"for _, x := range iter { fmt.Printf("%s", x) }"#).unwrap();
 
             let session = tree.matches(&query);
             assert_eq!(session.collect().len(), 1);
@@ -139,12 +138,10 @@ mod tests {
 
         {
             let query =
-                Pattern::<Go>::new(r#"for _, x := range iter { fmt.Printf("%s", :[VAR]) }"#)
-                    .to_query()
+                Query::<Go>::try_from(r#"for _, x := range iter { fmt.Printf("%s", :[VAR]) }"#)
                     .unwrap();
-            let tree = RawTree::<Go>::new(r#"for _, x := range iter { fmt.Printf("%s", x) }"#)
-                .into_tree()
-                .unwrap();
+            let tree =
+                Tree::<Go>::try_from(r#"for _, x := range iter { fmt.Printf("%s", x) }"#).unwrap();
 
             let session = tree.matches(&query);
             assert_eq!(session.collect().len(), 1);
@@ -154,14 +151,13 @@ mod tests {
     #[test]
     fn test_query_with_simple_metavariable() {
         {
-            let query = Pattern::<Go>::new(
+            let query = Query::<Go>::try_from(
                 r#"for _, :[VAR] := range iter {
                 :[...]
             }"#,
             )
-            .to_query()
             .unwrap();
-            let tree = RawTree::<Go>::new(
+            let tree = Tree::<Go>::try_from(
                 r#"
                 for _, x := range iter { 
                     fmt.Printf("%s", x) 
@@ -174,7 +170,6 @@ mod tests {
                 }
                 "#,
             )
-            .into_tree()
             .unwrap();
 
             let session = tree.matches(&query);
@@ -182,24 +177,22 @@ mod tests {
         }
 
         {
-            let query = Pattern::<Go>::new(
+            let query = Query::<Go>::try_from(
                 r#"
                 :[TMP] := :[X]
                 :[X] = :[Y]
                 :[Y] = :[TMP]
             "#,
             )
-            .to_query()
             .unwrap();
 
-            let tree = RawTree::<Go>::new(
+            let tree = Tree::<Go>::try_from(
                 r#"
                 x := def
                 def = abc
                 abc = x
             "#,
             )
-            .into_tree()
             .unwrap();
 
             let session = tree.matches(&query);

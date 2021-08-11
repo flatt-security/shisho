@@ -121,7 +121,7 @@ where
     type Error = anyhow::Error;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let p = Pattern::new(value);
+        let p = Pattern::from(value);
         p.try_into()
     }
 }

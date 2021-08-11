@@ -60,17 +60,8 @@ where
     T: Queryable,
 {
     fn from(value: &'a str) -> Self {
-        Self::new(value)
-    }
-}
-
-impl<'a, T> RawTree<'a, T>
-where
-    T: Queryable,
-{
-    pub fn new(raw_str: &'a str) -> Self {
         RawTree {
-            raw_bytes: raw_str.as_bytes(),
+            raw_bytes: value.as_bytes(),
             _marker: PhantomData,
         }
     }
@@ -102,7 +93,7 @@ where
     type Error = anyhow::Error;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        let r = RawTree::new(value);
+        let r = RawTree::from(value);
         r.try_into()
     }
 }

@@ -20,15 +20,6 @@ impl<'a, T> AutofixPattern<'a, T>
 where
     T: Queryable,
 {
-    pub fn new(value: &'a str) -> Result<Self> {
-        let tree = Pattern::<T>::new(value).to_tstree()?;
-        Ok(Self {
-            tree,
-            raw_pattern: value.as_bytes(),
-            _marker: PhantomData,
-        })
-    }
-
     pub fn to_patched_snippet<'tree>(&self, item: &'tree MatchedItem) -> Result<String> {
         let mut cursor = self.tree.walk();
         if !to_deepest_leaf(&mut cursor) {
@@ -136,7 +127,12 @@ where
     type Error = anyhow::Error;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        Self::new(value)
+        let tree = Pattern::<T>::from(value).to_tstree()?;
+        Ok(Self {
+            tree,
+            raw_pattern: value.as_bytes(),
+            _marker: PhantomData,
+        })
     }
 }
 
@@ -171,6 +167,6 @@ where
         let before = String::from_utf8(current_code[0..start].to_vec())?;
         let after = String::from_utf8(current_code[end..current_code.len()].to_vec())?;
 
-        Ok(Code::new(format!("{}{}{}", before, snippet, after)))
+        Ok(Code::from(format!("{}{}{}", before, snippet, after)))
     }
 }

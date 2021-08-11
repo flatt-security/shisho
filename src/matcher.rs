@@ -130,7 +130,6 @@ impl<'tree> MatchedItem<'tree> {
         }
 
         top.sort_by(|x, y| x.0.cmp(&y.0));
-        println!("{:?}", top);
 
         let top = top.into_iter().map(|item| item.1).collect();
         let top = ConsecutiveCaptureItems::try_from(top)

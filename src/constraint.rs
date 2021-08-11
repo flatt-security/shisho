@@ -29,12 +29,16 @@ where
     NotMatchRegex(String),
 }
 
-impl<T> Constraint<T>
+impl<T> Constraint<T> where T: Queryable {}
+
+impl<T> TryFrom<RawConstraint> for Constraint<T>
 where
     T: Queryable,
 {
-    pub fn new(rc: RawConstraint) -> Result<Self> {
-        let predicate = match rc.predicate {
+    type Error = anyhow::Error;
+
+    fn try_from(rc: RawConstraint) -> Result<Self, Self::Error> {
+        let predicate = match rc.should {
             RawPredicate::Match => {
                 let p = rc.pattern.as_str().try_into()?;
                 Predicate::MatchQuery(p)
@@ -51,16 +55,5 @@ where
             target: MetavariableId(rc.target),
             predicate,
         })
-    }
-}
-
-impl<T> TryFrom<RawConstraint> for Constraint<T>
-where
-    T: Queryable,
-{
-    type Error = anyhow::Error;
-
-    fn try_from(rc: RawConstraint) -> Result<Self, Self::Error> {
-        Self::new(rc)
     }
 }
