@@ -1,4 +1,8 @@
-use std::{fs::File, path::Path};
+use std::{
+    convert::TryFrom,
+    fs::File,
+    path::{Path, PathBuf},
+};
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -42,15 +46,31 @@ pub enum Language {
     Go,
 }
 
+pub fn from_str(s: &str) -> Result<RuleSet> {
+    let rset: RuleSet = serde_yaml::from_str(s)?;
+    Ok(rset)
+}
+
 pub fn from_reader<P: AsRef<Path>>(ruleset_path: P) -> Result<RuleSet> {
     let f = File::open(ruleset_path)?;
     let rset: RuleSet = serde_yaml::from_reader(f)?;
     Ok(rset)
 }
 
-pub fn from_str(s: &str) -> Result<RuleSet> {
-    let rset: RuleSet = serde_yaml::from_str(s)?;
-    Ok(rset)
+impl<'a> TryFrom<&'a str> for RuleSet {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        from_str(value)
+    }
+}
+
+impl<'a> TryFrom<PathBuf> for RuleSet {
+    type Error = anyhow::Error;
+
+    fn try_from(value: PathBuf) -> Result<Self, Self::Error> {
+        from_reader(value)
+    }
 }
 
 #[cfg(test)]

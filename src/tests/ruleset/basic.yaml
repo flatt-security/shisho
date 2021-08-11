@@ -3,4 +3,8 @@ rules:
     language: go
     message: test
     pattern: |
-      len(:[X])
+      :[X] + 1
+    constraints:
+      - target: X
+        should: not-match
+        pattern: len(:[...])

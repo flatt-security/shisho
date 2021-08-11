@@ -1,6 +1,6 @@
 use crate::{language::Queryable, matcher::QueryMatcher, query::Query};
 use anyhow::Result;
-use std::{convert::TryFrom, marker::PhantomData};
+use std::{convert::{TryFrom, TryInto}, marker::PhantomData};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -90,6 +90,17 @@ where
     }
 }
 
+impl<'a, T> TryFrom<RawTree<'a, T>> for Tree<'a, T>
+where
+    T: Queryable,
+{
+    type Error = anyhow::Error;
+
+    fn try_from(value: RawTree<'a, T>) -> Result<Self, Self::Error> {
+        value.into_tree()
+    }
+}
+
 impl<'a, T> TryFrom<&'a str> for Tree<'a, T>
 where
     T: Queryable,
@@ -97,6 +108,7 @@ where
     type Error = anyhow::Error;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        RawTree::new(value).into_tree()
+        let r= RawTree::new(value);
+        r.try_into()
     }
 }

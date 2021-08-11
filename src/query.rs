@@ -1,5 +1,9 @@
 use crate::{language::Queryable, pattern::Pattern};
-use std::{collections::HashMap, convert::TryFrom, marker::PhantomData};
+use std::{
+    collections::HashMap,
+    convert::{TryFrom, TryInto},
+    marker::PhantomData,
+};
 use thiserror::Error;
 
 pub const TOP_CAPTURE_ID_PREFIX: &str = "TOP-";
@@ -98,6 +102,17 @@ impl MetavariableField {
     }
 }
 
+impl<T> TryFrom<Pattern<'_, T>> for Query<T>
+where
+    T: Queryable,
+{
+    type Error = anyhow::Error;
+
+    fn try_from(value: Pattern<T>) -> Result<Self, Self::Error> {
+        value.to_query()
+    }
+}
+
 impl<T> TryFrom<&str> for Query<T>
 where
     T: Queryable,
@@ -105,6 +120,7 @@ where
     type Error = anyhow::Error;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Pattern::new(value).to_query()
+        let p = Pattern::new(value);
+        p.try_into()
     }
 }
