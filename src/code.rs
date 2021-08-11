@@ -19,6 +19,15 @@ where
     }
 }
 
+impl<T> AsRef<str> for Code<T>
+where
+    T: Queryable,
+{
+    fn as_ref(&self) -> &str {
+        self.code.as_str()
+    }
+}
+
 impl<T, C> From<T> for Code<C>
 where
     T: Into<String>,
