@@ -1,7 +1,7 @@
 [package]
 name = "shisho"
 version = "0.1.0"
-authors = ["Flatt Security <t.yoneuchi@flatt.tech>"]
+authors = ["Flatt Security Inc.<t.yoneuchi@flatt.tech>"]
 edition = "2018"
 license = "AGPL-3.0-only"
 
