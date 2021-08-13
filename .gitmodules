@@ -1,12 +1,12 @@
 [submodule "third_party/tree-sitter-hcl"]
 	path = third_party/tree-sitter-hcl
-	url = git@github.com:lmt-swallow/tree-sitter-hcl.git
+	url = https://github.com/mitchellh/tree-sitter-hcl
 [submodule "third_party/tree-sitter-hcl-query"]
 	path = third_party/tree-sitter-hcl-query
-	url = git@github.com:flatt-security/tree-sitter-hcl-query.git
+	url = https://github.com/flatt-security/tree-sitter-hcl-query
 [submodule "third_party/tree-sitter-go"]
 	path = third_party/tree-sitter-go
-	url = git@github.com:tree-sitter/tree-sitter-go.git
+	url = https://github.com/tree-sitter/tree-sitter-go
 [submodule "third_party/tree-sitter-go-query"]
 	path = third_party/tree-sitter-go-query
-	url = git@github.com:flatt-security/tree-sitter-go-query.git
+	url = https://github.com/flatt-security/tree-sitter-go-query
