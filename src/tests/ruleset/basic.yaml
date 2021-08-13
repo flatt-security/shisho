@@ -4,8 +4,28 @@ rules:
     language: go
     message: test
     pattern: |
-      :[X] + 1
+      if :[X]; :[Z] { :[...Y] }
     constraints:
-      - target: X
-        should: not-match
-        pattern: len(:[...])
+      []
+      # - target: X
+      #   should: match-partially
+      #   pattern: |
+      #     len(:[...])
+      # - target: X
+      #   should: not-match
+      #   pattern: |
+      #     len(:[...]) > 1
+  # - id: aaa
+  #   language: go
+  #   message: test
+  #   pattern: |
+  #     if :[...X] { :[...Y] }
+  #   constraints:
+  #     - target: X
+  #       should: not-match-partially
+  #       pattern: |
+  #         :[X].Len(:[...])
+  #     # - target: X
+  #     #   should: not-match
+  #     #   pattern: |
+  #     #     len(:[...]) > 1

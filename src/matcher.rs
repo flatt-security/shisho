@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use tree_sitter::Point;
 
 use crate::{
     constraint::{Constraint, Predicate},
@@ -83,15 +84,31 @@ impl<'tree> MatchedItem<'tree> {
         }
 
         match &constraint.predicate {
-            Predicate::MatchQuery(q) => {
+            Predicate::MatchExactQuery(q) => {
                 let item = self.get_captured_node(&constraint.target).unwrap();
                 let ptree = PartialTree::<T>::new(item, self.raw);
-                ptree.matches(q).collect().len() > 0
+
+                let matches = ptree.matches(q).collect();
+                matches.len() == 1 && matches[0].top.as_vec().first().unwrap().node == item
             }
-            Predicate::NotMatchQuery(q) => {
+            Predicate::NotMatchExactQuery(q) => {
                 let item = self.get_captured_node(&constraint.target).unwrap();
                 let ptree = PartialTree::new(item, self.raw);
+
+                let matches = ptree.matches(q).collect();
+                matches.len() != 1 || matches[0].top.as_vec().first().unwrap().node != item
+            }
+            Predicate::MatchPartialQuery(q) => {
+                let item = self.get_captured_node(&constraint.target).unwrap();
+                let ptree = PartialTree::<T>::new(item, self.raw);
+
                 ptree.matches(q).collect().len() > 0
+            }
+            Predicate::NotMatchPartialQuery(q) => {
+                let item = self.get_captured_node(&constraint.target).unwrap();
+                let ptree = PartialTree::new(item, self.raw);
+
+                ptree.matches(q).collect().len() == 0
             }
             Predicate::MatchRegex(r) => {
                 r.is_match(self.get_captured_string(&constraint.target).unwrap())
@@ -119,6 +136,14 @@ impl<'tree> ConsecutiveCaptureItems<'tree> {
 
     pub fn as_vec(&self) -> &Vec<CaptureItem<'tree>> {
         &self.0
+    }
+
+    pub fn start_position(&self) -> Point {
+        self.as_vec().first().unwrap().node.start_position()
+    }
+
+    pub fn end_position(&self) -> Point {
+        self.as_vec().last().unwrap().node.end_position()
     }
 
     pub fn start_byte(&self) -> usize {
