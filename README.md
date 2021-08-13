@@ -1,6 +1,8 @@
 # shisho
 
-[![Run tests](https://github.com/flatt-jp/shisho/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/flatt-jp/shisho/actions/workflows/test.yml) [![Run lint](https://github.com/flatt-jp/shisho/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/flatt-jp/shisho/actions/workflows/lint.yml)
+![shisho](./docs/public/images/header.png)
+
+[![Run tests](https://github.com/flatt-security/shisho/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/flatt-security/shisho/actions/workflows/test.yml) [![Run lint](https://github.com/flatt-security/shisho/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/flatt-security/shisho/actions/workflows/lint.yml)
 
 ## How to run shisho locally
 
