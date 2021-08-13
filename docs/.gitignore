@@ -1,0 +1,10 @@
+.cache
+node_modules
+*DS_Store
+*.env
+
+.idea/
+public/*
+!public/images/
+!public/images/*
+!public/favicon.png
