@@ -24,7 +24,7 @@ impl Queryable for Go {
 #[cfg(test)]
 mod tests {
     use crate::{
-        query::{Query, TSQueryString},
+        query::{MetavariableId, Query, TSQueryString},
         tree::Tree,
     };
     use std::convert::TryFrom;
@@ -189,6 +189,61 @@ mod tests {
             let ptree = tree.to_partial();
             let session = ptree.matches(&query);
             assert_eq!(session.collect().len(), 1);
+        }
+    }
+
+    #[test]
+    fn test_call_expression() {
+        {
+            let query = Query::<Go>::try_from(r#"fmt.Printf("%s%d", :[X], 2)"#).unwrap();
+            let tree = Tree::<Go>::try_from(r#"fmt.Printf("%s%d", "test", 2)"#).unwrap();
+            let ptree = tree.to_partial();
+            let session = ptree.matches(&query);
+
+            let c = session.collect();
+            assert_eq!(c.len(), 1);
+            assert_eq!(
+                c[0].get_captured_string(&MetavariableId("X".into())),
+                Some("\"test\"")
+            );
+        }
+        {
+            let query = Query::<Go>::try_from(r#"f("%s%d", :[...X])"#).unwrap();
+            {
+                let tree = Tree::<Go>::try_from(r#"f("%s%d")"#).unwrap();
+                let ptree = tree.to_partial();
+                let session = ptree.matches(&query);
+
+                let c = session.collect();
+                assert_eq!(c.len(), 1);
+                assert_eq!(c[0].get_captured_string(&MetavariableId("X".into())), None);
+            }
+            {
+                let tree = Tree::<Go>::try_from(r#"f("%s%d", 1, 2)"#).unwrap();
+                let ptree = tree.to_partial();
+                let session = ptree.matches(&query);
+
+                let c = session.collect();
+                assert_eq!(c.len(), 1);
+                assert_eq!(
+                    c[0].get_captured_string(&MetavariableId("X".into())),
+                    Some("1, 2")
+                );
+            }
+        }
+
+        {
+            let query = Query::<Go>::try_from(r#"f("%s%d", :[...X], 3)"#).unwrap();
+            let tree = Tree::<Go>::try_from(r#"f("%s%d", 1, 2, 3)"#).unwrap();
+            let ptree = tree.to_partial();
+            let session = ptree.matches(&query);
+
+            let c = session.collect();
+            assert_eq!(c.len(), 1);
+            assert_eq!(
+                c[0].get_captured_string(&MetavariableId("X".into())),
+                Some("1, 2")
+            );
         }
     }
 }
