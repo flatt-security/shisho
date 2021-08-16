@@ -238,7 +238,10 @@ where
         'a: 'b,
     {
         match node.kind() {
-            "shisho_ellipsis" => Ok(TSQueryString::new("(_)*".into(), MetavariableTable::new())),
+            "shisho_ellipsis" => Ok(TSQueryString::new(
+                " ((_) _?)*  . ((_) _?)? ".into(),
+                MetavariableTable::new(),
+            )),
             "shisho_ellipsis_metavariable" => {
                 let mut cursor = node.walk();
                 for child in node.named_children(&mut cursor) {

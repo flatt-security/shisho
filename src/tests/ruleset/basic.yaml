@@ -4,17 +4,12 @@ rules:
     language: go
     message: test
     pattern: |
-      if :[X]; :[Z] { :[...Y] }
+      if :[X] { :[...Y] }
     constraints:
-      []
-      # - target: X
-      #   should: match-partially
-      #   pattern: |
-      #     len(:[...])
-      # - target: X
-      #   should: not-match
-      #   pattern: |
-      #     len(:[...]) > 1
+      - target: X
+        should: match
+        pattern: |
+          len(:[...])
   # - id: aaa
   #   language: go
   #   message: test

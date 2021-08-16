@@ -84,36 +84,26 @@ impl<'tree> MatchedItem<'tree> {
         }
 
         match &constraint.predicate {
-            Predicate::MatchExactQuery(q) => {
-                // let item = self.get_captured(&constraint.target).unwrap();
-                // let ptree = PartialTree::<T>::new(item, self.raw);
-
-                // let matches = ptree.matches(q).collect();
-                // matches.len() == 1 && matches[0].top.as_vec().first().unwrap().node == item
-                true
-            }
-            Predicate::NotMatchExactQuery(q) => {
-                // let item = self.get_captured(&constraint.target).unwrap();
-                // let ptree = PartialTree::new(item, self.raw);
-
-                // let matches = ptree.matches(q).collect();
-                // matches.len() != 1 || matches[0].top.as_vec().first().unwrap().node != item
-                true
-            }
-            Predicate::MatchPartialQuery(q) => {
-                // let item = self.get_captured(&constraint.target).unwrap();
-                // let ptree = PartialTree::<T>::new(item, self.raw);
-
-                // ptree.matches(q).collect().len() > 0
-                true
-            }
-            Predicate::NotMatchPartialQuery(q) => {
-                // let item = self.get_captured(&constraint.target).unwrap();
-                // let ptree = PartialTree::new(item, self.raw);
-
-                // ptree.matches(q).collect().len() == 0
-                true
-            }
+            Predicate::MatchQuery(q) => self
+                .get_captured(&constraint.target)
+                .unwrap()
+                .as_vec()
+                .into_iter()
+                .any(|node| {
+                    let ptree = PartialTree::<T>::new(node.clone(), self.raw);
+                    let matches = ptree.matches(q).collect();
+                    matches.len() > 0
+                }),
+            Predicate::NotMatchQuery(q) => self
+                .get_captured(&constraint.target)
+                .unwrap()
+                .as_vec()
+                .into_iter()
+                .all(|node| {
+                    let ptree = PartialTree::<T>::new(node.clone(), self.raw);
+                    let matches = ptree.matches(q).collect();
+                    matches.len() == 0
+                }),
             Predicate::MatchRegex(r) => {
                 r.is_match(self.get_captured_string(&constraint.target).unwrap())
             }

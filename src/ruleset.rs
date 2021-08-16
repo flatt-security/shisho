@@ -66,12 +66,7 @@ pub struct RawConstraint {
 #[serde(rename_all = "kebab-case")]
 pub enum RawPredicate {
     Match,
-    MatchExactly,
     NotMatch,
-    NotMatchExactly,
-
-    MatchPartially,
-    NotMatchPartially,
 
     MatchRegex,
     NotMatchRegex,

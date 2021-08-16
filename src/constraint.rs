@@ -22,11 +22,8 @@ pub enum Predicate<T>
 where
     T: Queryable,
 {
-    MatchExactQuery(Query<T>),
-    NotMatchExactQuery(Query<T>),
-
-    MatchPartialQuery(Query<T>),
-    NotMatchPartialQuery(Query<T>),
+    MatchQuery(Query<T>),
+    NotMatchQuery(Query<T>),
 
     MatchRegex(Regex),
     NotMatchRegex(Regex),
@@ -42,21 +39,13 @@ where
 
     fn try_from(rc: RawConstraint) -> Result<Self, Self::Error> {
         let predicate = match rc.should {
-            RawPredicate::Match | RawPredicate::MatchExactly => {
+            RawPredicate::Match => {
                 let p = rc.pattern.as_str().try_into()?;
-                Predicate::MatchExactQuery(p)
+                Predicate::MatchQuery(p)
             }
-            RawPredicate::NotMatch | RawPredicate::NotMatchExactly => {
+            RawPredicate::NotMatch => {
                 let p = rc.pattern.as_str().try_into()?;
-                Predicate::NotMatchExactQuery(p)
-            }
-            RawPredicate::MatchPartially => {
-                let p = rc.pattern.as_str().try_into()?;
-                Predicate::MatchPartialQuery(p)
-            }
-            RawPredicate::NotMatchPartially => {
-                let p = rc.pattern.as_str().try_into()?;
-                Predicate::NotMatchPartialQuery(p)
+                Predicate::NotMatchQuery(p)
             }
             RawPredicate::MatchRegex => {
                 let r = Regex::new(rc.pattern.as_str())?;
