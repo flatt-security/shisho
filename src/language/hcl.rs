@@ -517,7 +517,10 @@ mod tests {
             items.pop().unwrap()
         };
 
-        let from_code = code.transform(r#"resource "rtype" "rname" { attr = "changed" }"#, item);
+        let from_code = code.transform(
+            item,
+            "resource \"rtype\" \"rname\" { attr = \"changed\" }\n",
+        );
         assert!(from_code.is_ok());
 
         assert_eq!(
@@ -544,7 +547,7 @@ mod tests {
             items.pop().unwrap()
         };
 
-        let from_code = code.transform("resource \"rtype\" \"rname\" { attr = :[Y] }\nresource \"rtype\" \"another\" { attr = :[X] }", item);
+        let from_code = code.transform(item, "resource \"rtype\" \"rname\" { attr = :[Y] }\nresource \"rtype\" \"another\" { attr = :[X] }", );
         assert!(from_code.is_ok());
 
         assert_eq!(
