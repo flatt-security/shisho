@@ -23,7 +23,9 @@ impl Queryable for Go {
 
 #[cfg(test)]
 mod tests {
+    use crate::transform::Transformable;
     use crate::{
+        code::Code,
         query::{MetavariableId, Query},
         tree::Tree,
     };
@@ -343,5 +345,28 @@ mod tests {
             let c = session.collect();
             assert_eq!(c.len(), 0);
         }
+    }
+
+    #[test]
+    fn basic_transform() {
+        let code: Code<Go> = "func a() { b := 1 || 1 }".into();
+
+        let tree_base = code.clone();
+        let tree = Tree::<Go>::try_from(tree_base.as_str()).unwrap();
+        let ptree = tree.to_partial();
+
+        let query = Query::<Go>::try_from(r#":[X] || :[X]"#).unwrap();
+
+        let item = {
+            let session = ptree.matches(&query);
+            let mut items = session.collect();
+            assert_eq!(items.len(), 1);
+            items.pop().unwrap()
+        };
+
+        let from_code = code.transform(item, ":[X]");
+        assert!(from_code.is_ok());
+
+        assert_eq!(from_code.unwrap().as_str(), "func a() { b := 1 }",);
     }
 }

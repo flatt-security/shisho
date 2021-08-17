@@ -125,7 +125,9 @@ where
             .expect("Error loading hcl grammar");
 
         Ok(Tree::new(
-            parser.parse(value.raw_bytes, None).unwrap(),
+            parser
+                .parse([value.raw_bytes, "\n".as_bytes()].concat(), None)
+                .unwrap(),
             value.raw_bytes,
         ))
     }

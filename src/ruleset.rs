@@ -27,6 +27,8 @@ pub struct Rule {
 
     #[serde(default)]
     pub constraints: Vec<RawConstraint>,
+
+    pub rewrite: Option<String>,
 }
 
 impl Rule {
@@ -77,6 +79,13 @@ pub enum RawPredicate {
 pub enum Language {
     HCL,
     Go,
+}
+
+impl Language {
+    pub fn from_str(s: &str) -> Result<Self> {
+        let rset: Self = serde_yaml::from_str(s)?;
+        Ok(rset)
+    }
 }
 
 pub fn from_str(s: &str) -> Result<RuleSet> {

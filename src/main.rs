@@ -9,7 +9,8 @@ fn main() {
         cli::SubCommand::Completion(sub_opts) => {
             cli::subcommand::completion::run(opts.common_opts, sub_opts)
         }
-        cli::SubCommand::Scan(sub_opts) => cli::subcommand::scan::run(opts.common_opts, sub_opts),
+        cli::SubCommand::Check(sub_opts) => cli::subcommand::check::run(opts.common_opts, sub_opts),
+        cli::SubCommand::Find(sub_opts) => cli::subcommand::find::run(opts.common_opts, sub_opts),
     };
 
     std::process::exit(exit_code)
