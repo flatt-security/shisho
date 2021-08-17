@@ -24,10 +24,17 @@ where
     pub fn to_patched_snippet<'tree>(&self, item: &'tree MatchedItem) -> Result<String> {
         let processor = PatchProcessor {
             pattern: self,
-            item: item,
+            item,
         };
-        let patched_item = processor.walk(&self.tree)?;
-        Ok(patched_item.body)
+        let patched_item = T::extract_query_nodes(&self.tree)
+            .into_iter()
+            .map(|node| processor.handle_node(node))
+            .collect::<Result<Vec<PatchedItem>>>()?;
+        Ok(patched_item
+            .into_iter()
+            .map(|item| item.body)
+            .collect::<Vec<String>>()
+            .join(""))
     }
 }
 

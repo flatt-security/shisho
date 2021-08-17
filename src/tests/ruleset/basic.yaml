@@ -1,21 +1,10 @@
 version: "1"
 rules:
-  - id: aaa
+  - id: redundunt-or-expr
     language: go
-    message: test
+    message: |
+      There was a redundunt or expression.
     pattern: |
-      len(:[...])
-  # - id: aaa
-  #   language: go
-  #   message: test
-  #   pattern: |
-  #     if :[...X] { :[...Y] }
-  #   constraints:
-  #     - target: X
-  #       should: not-match-partially
-  #       pattern: |
-  #         :[X].Len(:[...])
-  #     # - target: X
-  #     #   should: not-match
-  #     #   pattern: |
-  #     #     len(:[...]) > 1
+      :[X] || :[X]
+    rewrite: |
+      :[X]

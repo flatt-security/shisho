@@ -41,7 +41,7 @@ where
         parser.set_language(T::query_language())?;
 
         parser
-            .parse(self.raw_bytes, None)
+            .parse([self.raw_bytes, "\n".as_bytes()].concat(), None)
             .ok_or(anyhow!("failed to parse query"))
     }
 }
