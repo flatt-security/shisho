@@ -26,10 +26,12 @@ where
             pattern: self,
             item,
         };
+
         let patched_item = T::extract_query_nodes(&self.tree)
             .into_iter()
             .map(|node| processor.handle_node(node))
             .collect::<Result<Vec<PatchedItem>>>()?;
+
         Ok(patched_item
             .into_iter()
             .map(|item| item.body)
@@ -51,7 +53,8 @@ where
     T: Queryable,
 {
     fn str_from_range(&self, start: usize, end: usize) -> String {
-        String::from_utf8(self.pattern.raw[start..end].to_vec()).unwrap()
+        String::from_utf8(self.pattern.raw[start..end.min(self.pattern.raw.len())].to_vec())
+            .unwrap()
     }
 }
 
@@ -194,8 +197,9 @@ where
 
         let before_snippet = String::from_utf8(current_code[0..item.top.start_byte()].to_vec())?;
         let snippet = query.to_patched_snippet(&item)?;
-        let after_snippet =
-            String::from_utf8(current_code[item.top.end_byte()..current_code.len()].to_vec())?;
+        let after_snippet = String::from_utf8(
+            current_code[item.top.end_byte().min(current_code.len())..current_code.len()].to_vec(),
+        )?;
 
         Ok(Code::from(format!(
             "{}{}{}",
