@@ -28,10 +28,16 @@ Run the following command(s):
 
 ```sh
 # Linux
-bash <(curl -sL get.shisho.dev/linux)
+wget https://github.com/flatt-security/shisho/releases/latest/download/build-x86_64-unknown-linux-gnu.zip -O shisho.zip
+unzip shisho.zip
+chmod +x ./shisho
+mv ./shisho /usr/local/bin/shisho
 
 # macOS
-bash <(curl -sL get.shisho.dev/macos)
+wget https://github.com/flatt-security/shisho/releases/latest/download/build-x86_64-apple-darwin.zip -O shisho.zip
+unzip shisho.zip
+chmod +x ./shisho
+mv ./shisho /usr/local/bin/shisho
 ```
 
 Then you'll see a shisho's executable in `/usr/local/bin`.
