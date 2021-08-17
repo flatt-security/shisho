@@ -48,10 +48,7 @@ where
     pub fn get_cid_mvid_map(&self) -> HashMap<CaptureId, MetavariableId> {
         self.metavariables
             .iter()
-            .map(|(k, v)| {
-                v.into_iter()
-                    .map(move |field| (field.capture_id.clone(), k.clone()))
-            })
+            .map(|(k, v)| v.capture_ids.iter().map(move |id| (id.clone(), k.clone())))
             .flatten()
             .collect::<HashMap<CaptureId, MetavariableId>>()
     }
@@ -67,16 +64,16 @@ pub struct CaptureId(pub String);
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct MetavariableId(pub String);
 
-pub type MetavariableTable = HashMap<MetavariableId, Vec<MetavariableField>>;
+pub type MetavariableTable = HashMap<MetavariableId, MetavariableField>;
 
 #[derive(Debug, PartialEq)]
 pub struct MetavariableField {
-    pub capture_id: CaptureId,
+    pub capture_ids: Vec<CaptureId>,
 }
 
 impl MetavariableField {
-    pub fn new(capture_id: CaptureId) -> Self {
-        MetavariableField { capture_id }
+    pub fn new(capture_ids: Vec<CaptureId>) -> Self {
+        MetavariableField { capture_ids }
     }
 }
 
@@ -187,10 +184,7 @@ impl ToQueryConstraintString for MetavariableTable {
     fn to_query_constraints(&self) -> Vec<String> {
         self.into_iter()
             .filter_map(|(_k, mvs)| {
-                let ids: Vec<String> = mvs
-                    .into_iter()
-                    .map(|field| field.capture_id.0.clone())
-                    .collect();
+                let ids: Vec<String> = mvs.capture_ids.iter().map(|id| id.0.clone()).collect();
                 if ids.len() <= 1 {
                     None
                 } else {
@@ -254,7 +248,7 @@ where
                         // NOTE: into_iter() can't be used here https://github.com/rust-lang/rust/pull/84147
                         let metavariables = IntoIter::new([(
                             MetavariableId(variable_name),
-                            vec![MetavariableField::new(CaptureId(capture_id.clone()))],
+                            MetavariableField::new(vec![CaptureId(capture_id.clone())]),
                         )])
                         .collect::<MetavariableTable>();
 
@@ -278,7 +272,7 @@ where
                         // NOTE: into_iter() can't be used here https://github.com/rust-lang/rust/pull/84147
                         let metavariables = IntoIter::new([(
                             MetavariableId(variable_name),
-                            vec![MetavariableField::new(CaptureId(capture_id.clone()))],
+                            MetavariableField::new(vec![CaptureId(capture_id.clone())]),
                         )])
                         .collect::<MetavariableTable>();
 
@@ -345,7 +339,7 @@ where
                     child_queries.push(query_string);
                     for (key, value) in child_metavariables {
                         if let Some(mv) = metavariables.get_mut(&key) {
-                            mv.extend(value);
+                            mv.capture_ids.extend(value.capture_ids);
                         } else {
                             metavariables.insert(key, value);
                         }

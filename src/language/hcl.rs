@@ -26,81 +26,13 @@ impl Queryable for HCL {
 
 #[cfg(test)]
 mod tests {
+    use crate::query::MetavariableId;
     use crate::transform::Transformable;
     use crate::tree::Tree;
-    use crate::{
-        code::Code,
-        query::{Query, TSQueryString},
-    };
+    use crate::{code::Code, query::Query};
     use std::convert::TryFrom;
 
     use super::*;
-
-    #[test]
-    fn test_rawquery_conversion() {
-        assert!(TSQueryString::<HCL>::try_from(r#"test = "hoge""#).is_ok());
-        assert!(
-            TSQueryString::<HCL>::try_from(r#"resource "rtype" "rname" { attr = "value" }"#)
-                .is_ok()
-        );
-
-        // with ellipsis operators
-        assert!(TSQueryString::<HCL>::try_from(
-            r#"resource "rtype" "rname" { :[...] attr = "value" :[...] }"#
-        )
-        .is_ok());
-
-        // with metavariables
-        {
-            let rq = TSQueryString::<HCL>::try_from(r#"resource "rtype" "rname" { attr = :[X] }"#);
-            assert!(rq.is_ok());
-            let TSQueryString { metavariables, .. } = rq.unwrap();
-            assert_eq!(metavariables.len(), 1);
-
-            let rq = TSQueryString::<HCL>::try_from(
-                r#"resource "rtype" "rname" { 
-                attr = :[X]
-                :[...Y]
-            }"#,
-            );
-            assert!(rq.is_ok());
-            let TSQueryString { metavariables, .. } = rq.unwrap();
-            assert_eq!(metavariables.len(), 2);
-        }
-    }
-
-    #[test]
-    fn test_query_conversion() {
-        assert!(Query::<HCL>::try_from(r#"test = "hoge""#).is_ok());
-        assert!(Query::<HCL>::try_from(r#"resource "rtype" "rname" { attr = "value" }"#).is_ok());
-
-        // with ellipsis operators
-        assert!(Query::<HCL>::try_from(
-            r#"resource "rtype" "rname" { 
-            :[...]
-            attr = "value"
-            :[...] 
-        }"#
-        )
-        .is_ok());
-
-        // with metavariables
-        {
-            let rq = TSQueryString::<HCL>::try_from(r#"resource "rtype" "rname" { attr = :[X] }"#);
-            assert!(rq.is_ok());
-            assert_eq!(rq.unwrap().metavariables.len(), 1);
-
-            let rq = Query::<HCL>::try_from(
-                r#"resource "rtype" "rname" { 
-                attr = :[X]
-                :[...Y]
-            }"#,
-            );
-            assert!(rq.is_ok());
-            let Query { metavariables, .. } = rq.unwrap();
-            assert_eq!(metavariables.len(), 2);
-        }
-    }
 
     #[test]
     fn test_basic_query() {
@@ -265,10 +197,6 @@ mod tests {
             let session = ptree.matches(&query);
             assert_eq!(session.collect().len(), 3);
         }
-    }
-
-    #[test]
-    fn test_query_with_simple_equivalence() {
         {
             let query = Query::<HCL>::try_from(
                 r#"
@@ -307,6 +235,268 @@ mod tests {
             let ptree = tree.to_partial();
             let session = ptree.matches(&query);
             assert_eq!(session.collect().len(), 1);
+        }
+    }
+
+    #[test]
+    fn test_function_call() {
+        {
+            let query = Query::<HCL>::try_from(
+                r#"
+                one_attr = max(1, :[X], 5)
+            "#,
+            )
+            .unwrap();
+
+            let tree = Tree::<HCL>::try_from(
+                r#"
+                resource "rtype" "rname1" { 
+                    one_attr = max(1, 2, 5)
+                }
+            "#,
+            )
+            .unwrap();
+
+            let ptree = tree.to_partial();
+            let c = ptree.matches(&query).collect();
+            assert_eq!(c.len(), 1);
+            assert_eq!(
+                c[0].get_captured_string(&MetavariableId("X".into())),
+                Some("2")
+            );
+        }
+
+        {
+            let query = Query::<HCL>::try_from(
+                r#"
+                one_attr = max(1, :[...X], 5)
+            "#,
+            )
+            .unwrap();
+
+            let tree = Tree::<HCL>::try_from(
+                r#"
+                resource "rtype" "rname1" { 
+                    one_attr = max(1, 2, 3, 4, 5)
+                }
+            "#,
+            )
+            .unwrap();
+
+            let ptree = tree.to_partial();
+            let c = ptree.matches(&query).collect();
+            assert_eq!(c.len(), 1);
+            assert_eq!(
+                c[0].get_captured_string(&MetavariableId("X".into())),
+                Some("2, 3, 4")
+            );
+        }
+    }
+
+    #[test]
+    fn test_attr() {
+        {
+            let query = Query::<HCL>::try_from(
+                r#"
+                attr = :[X]
+            "#,
+            )
+            .unwrap();
+
+            let tree = Tree::<HCL>::try_from(
+                r#"
+                resource "rtype" "rname1" { 
+                    attr = "hello1"
+                }
+                resource "rtype" "rname2" { 
+                    attr = "hello2" 
+                }
+            "#,
+            )
+            .unwrap();
+
+            let ptree = tree.to_partial();
+            let c = ptree.matches(&query).collect();
+            assert_eq!(c.len(), 2);
+            assert_eq!(
+                c[0].get_captured_string(&MetavariableId("X".into())),
+                Some("\"hello1\"")
+            );
+            assert_eq!(
+                c[1].get_captured_string(&MetavariableId("X".into())),
+                Some("\"hello2\"")
+            );
+        }
+    }
+
+    #[test]
+    fn test_array() {
+        let tree = Tree::<HCL>::try_from(
+            r#"
+            resource "rtype" "rname1" { 
+                attr = [1, 2, 3, 4, 5]
+            }                
+        "#,
+        )
+        .unwrap();
+        let ptree = tree.to_partial();
+        {
+            let query = Query::<HCL>::try_from(
+                r#"
+                attr = [1, :[...X]]
+            "#,
+            )
+            .unwrap();
+            let c = ptree.matches(&query).collect();
+            assert_eq!(c.len(), 1);
+            assert_eq!(
+                c[0].get_captured_string(&MetavariableId("X".into())),
+                Some("2, 3, 4, 5")
+            );
+        }
+        {
+            let query = Query::<HCL>::try_from(
+                r#"
+                attr = [1, :[X], 3, :[Y], 5]
+            "#,
+            )
+            .unwrap();
+            let c = ptree.matches(&query).collect();
+            assert_eq!(c.len(), 1);
+            assert_eq!(
+                c[0].get_captured_string(&MetavariableId("X".into())),
+                Some("2")
+            );
+            assert_eq!(
+                c[0].get_captured_string(&MetavariableId("Y".into())),
+                Some("4")
+            );
+        }
+    }
+
+    #[test]
+    fn test_object() {
+        let tree = Tree::<HCL>::try_from(
+            r#"
+            resource "rtype" "rname1" { 
+                attr = {
+                    key1 = value1
+                    key2 = value2
+                    key3 = value3
+                    key4 = value4
+                }
+            }                
+        "#,
+        )
+        .unwrap();
+        let ptree = tree.to_partial();
+        {
+            let query = Query::<HCL>::try_from(
+                r#"
+                attr = { 
+                    :[...X]
+                    key2 = :[Y]
+                    :[...Z]
+                }
+            "#,
+            )
+            .unwrap();
+            let c = ptree.matches(&query).collect();
+            assert_eq!(c.len(), 1);
+            assert_eq!(
+                c[0].get_captured_string(&MetavariableId("X".into())),
+                Some("key1 = value1")
+            );
+            assert_eq!(
+                c[0].get_captured_string(&MetavariableId("Y".into())),
+                Some("value2")
+            );
+
+            assert_eq!(
+                c[0].get_captured_string(&MetavariableId("Z".into())),
+                Some(
+                    r#"key3 = value3
+                    key4 = value4"#
+                )
+            );
+        }
+    }
+
+    #[test]
+    fn test_for() {
+        let tree = Tree::<HCL>::try_from(
+            r#"
+            resource "rtype" "rname1" {                
+                attr = [for s in var.list : upper(s) if s != ""]
+            }
+            resource "rtype" "rname2" {                
+                attr = [for s, ss in var.list : upper(s) if s != ""]
+            }            
+            resource "rtype" "rname3" { 
+                attr = {for s in var.list : s => upper(s) if s != ""}
+            }                
+        "#,
+        )
+        .unwrap();
+        let ptree = tree.to_partial();
+        {
+            let query = Query::<HCL>::try_from(
+                r#"
+                attr = [for :[Y] in :[X] : upper(:[Y]) if :[Y] != ""]
+                }
+            "#,
+            )
+            .unwrap();
+            let c = ptree.matches(&query).collect();
+            assert_eq!(c.len(), 1);
+            assert_eq!(
+                c[0].get_captured_string(&MetavariableId("X".into())),
+                Some("var.list")
+            );
+            assert_eq!(
+                c[0].get_captured_string(&MetavariableId("Y".into())),
+                Some("s")
+            );
+        }
+        {
+            let query = Query::<HCL>::try_from(
+                r#"
+                attr = [for :[...Y] in :[X] : upper(:[_]) if :[_] != ""]
+                }
+            "#,
+            )
+            .unwrap();
+
+            let c = ptree.matches(&query).collect();
+            assert_eq!(c.len(), 2);
+            assert_eq!(
+                c[1].get_captured_string(&MetavariableId("X".into())),
+                Some("var.list")
+            );
+            assert_eq!(
+                c[1].get_captured_string(&MetavariableId("Y".into())),
+                Some("s, ss")
+            );
+        }
+        {
+            let query = Query::<HCL>::try_from(
+                r#"
+                attr = {for :[...Y] in :[X] : :[_] => upper(:[_]) if :[_] != ""}
+                }
+            "#,
+            )
+            .unwrap();
+
+            let c = ptree.matches(&query).collect();
+            assert_eq!(c.len(), 1);
+            assert_eq!(
+                c[0].get_captured_string(&MetavariableId("X".into())),
+                Some("var.list")
+            );
+            assert_eq!(
+                c[0].get_captured_string(&MetavariableId("Y".into())),
+                Some("s")
+            );
         }
     }
 
