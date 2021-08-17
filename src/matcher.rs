@@ -196,11 +196,25 @@ impl<'tree> MatchedItem<'tree> {
                 }
                 Some(s) => {
                     if let Some(metavariable_id) = cid_mvid_map.get(&CaptureId(s)) {
-                        if let Some(v) = meta_captures.get_mut(metavariable_id) {
-                            v.push(capture.node);
-                        } else {
+                        if query
+                            .metavariables
+                            .get(metavariable_id)
+                            .unwrap()
+                            .capture_ids
+                            .len()
+                            >= 2
+                        {
+                            // in this case the metavariable is not related to ellipsis op
                             let v = vec![capture.node].try_into().unwrap();
-                            meta_captures.insert(metavariable_id.clone(), v);
+                            meta_captures.insert(metavariable_id.clone(), v);                       
+                        } else {
+                            // TODO: capture ID might be 
+                            if let Some(v) = meta_captures.get_mut(metavariable_id) {
+                                v.push(capture.node);
+                            } else {
+                                let v = vec![capture.node].try_into().unwrap();
+                                meta_captures.insert(metavariable_id.clone(), v);
+                            }
                         }
                     }
                 }
