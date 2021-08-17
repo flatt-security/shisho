@@ -4,42 +4,39 @@
 
 [![Run tests](https://github.com/flatt-security/shisho/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/flatt-security/shisho/actions/workflows/test.yml) [![Run lint](https://github.com/flatt-security/shisho/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/flatt-security/shisho/actions/workflows/lint.yml)
 
-## How to run shisho locally
+Shisho is a lightweight static analyzer for developers. Please see [the usage documentation](https://docs.shisho.dev) for further information.
 
-You can run shisho program with the following command(s):
+## Try with Docker
 
-```sh
-cargo run -- help
-```
-
-## How to install shisho
-
-You can install shisho by the following command(s):
+You can try shisho in your machine as follows:
 
 ```sh
-cargo install --locked --path . --force
+cat file.go | docker run shisho/shisho-cli find "len(:[...])"
 ```
-
-After you have successfully installed shisho, you can see help as follows:
 
 ```sh
-shisho help
+docker run -v $(PWD):/workspace shisho/shisho-cli find "len(:[...])" file.go
 ```
 
-You can install shell completions as follows:
+## Install with pre-built binaries
+
+When you'd like to run shisho outside docker containers, please follow the instructions below:
+
+### Linux / macOS
+
+Run the following command(s):
 
 ```sh
-# in bash
-eval "$(shisho completion bash)"
+# Linux
+bash <(curl -sL get.shisho.dev/linux)
 
-# in fish
-shisho completion fish | source
+# macOS
+bash <(curl -sL get.shisho.dev/macos)
 ```
 
-## How to run tests locally
+Then you'll see a shisho's executable in `/usr/local/bin`.
 
-You can run tests with the following command(s):
+### Windows
 
-```sh
-cargo test
-```
+Download the prebuild binary from [releases](https://github.com/flatt-security/shisho/releases) and put it into your `%PATH%` directory.
+If you're using [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/install-win10), you can install shisho by `bash <(curl -sL get.shisho.dev/linux)`.
