@@ -2,7 +2,7 @@ const config = {
   gatsby: {
     pathPrefix: '/',
     siteUrl: 'https://docs.shisho.dev',
-    gaTrackingId: null,
+    gaTrackingId: "UA-145321226-11",
     trailingSlash: false,
   },
   header: {
