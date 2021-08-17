@@ -20,11 +20,11 @@ Shisho runs offline on your machine.
 You can try shisho in your machine as follows:
 
 ```sh
-cat file.go | docker run shisho/shisho-cli find "len(:[...])"
+cat file.go | docker run ghcr.io/flatt-security/shisho-cli find "len(:[...])"
 ```
 
 ```sh
-docker run -v $(PWD):/workspace shisho/shisho-cli find "len(:[...])" file.go
+docker run -v $(PWD):/workspace ghcr.io/flatt-security/shisho-cli find "len(:[...])" file.go
 ```
 
 ## Run with pre-built binaries
