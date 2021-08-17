@@ -4,12 +4,7 @@ rules:
     language: go
     message: test
     pattern: |
-      if :[X] { :[...Y] }
-    constraints:
-      - target: X
-        should: match
-        pattern: |
-          len(:[...])
+      len(:[...])
   # - id: aaa
   #   language: go
   #   message: test

@@ -21,6 +21,6 @@ pub struct CommonOpts {
 
 #[derive(StructOpt, Debug)]
 pub enum SubCommand {
-    Completion(completion::Opts),
-    Scan(scan::Opts),
+    Completion(completion::CompletionOpts),
+    Scan(scan::ScanOpts),
 }

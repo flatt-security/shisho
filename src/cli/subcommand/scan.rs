@@ -13,17 +13,22 @@ use std::path::PathBuf;
 use std::{collections::HashMap, convert::TryFrom};
 use structopt::StructOpt;
 
-/// `Opts` defines possible options for the `scan` subcommand.
+/// Scans files under the given path with the given rule sets
 #[derive(StructOpt, Debug)]
-pub struct Opts {
+pub struct ScanOpts {
     #[structopt(parse(from_os_str))]
     target_path: PathBuf,
 
-    #[structopt(parse(from_os_str))]
-    ruleset_path: PathBuf,
+    #[structopt(required_unless_all(&["lang", "rule"]))]
+    ruleset_path: Option<PathBuf>,
+
+    #[structopt(short, long)]
+    lang: Option<String>,
+    #[structopt(short, long)]
+    rule: Option<String>,
 }
 
-pub fn run(common_opts: CommonOpts, opts: Opts) -> i32 {
+pub fn run(common_opts: CommonOpts, opts: ScanOpts) -> i32 {
     match intl(common_opts, opts) {
         Ok(_) => 0,
         Err(e) => {
@@ -33,23 +38,40 @@ pub fn run(common_opts: CommonOpts, opts: Opts) -> i32 {
     }
 }
 
-fn intl(_common_opts: CommonOpts, opts: Opts) -> Result<()> {
-    let ruleset = ruleset::from_reader(&opts.ruleset_path).map_err(|e| {
-        anyhow!(
-            "failed to load ruleset file {}: {}",
-            opts.ruleset_path.as_os_str().to_string_lossy(),
-            e
-        )
-    })?;
-
+fn intl(_common_opts: CommonOpts, opts: ScanOpts) -> Result<()> {
     let mut rule_map = HashMap::<ruleset::Language, Vec<Rule>>::new();
-    for rule in ruleset.rules {
-        if let Some(v) = rule_map.get_mut(&rule.language) {
-            v.push(rule);
-        } else {
-            rule_map.insert(rule.language, vec![rule]);
+    match (opts.ruleset_path, opts.lang, opts.rule) {
+        (Some(ruleset_path), _, _) => {
+            let ruleset = ruleset::from_reader(&ruleset_path).map_err(|e| {
+                anyhow!(
+                    "failed to load ruleset file {}: {}",
+                    ruleset_path.as_os_str().to_string_lossy(),
+                    e
+                )
+            })?;
+            for rule in ruleset.rules {
+                if let Some(v) = rule_map.get_mut(&rule.language) {
+                    v.push(rule);
+                } else {
+                    rule_map.insert(rule.language, vec![rule]);
+                }
+            }
         }
-    }
+        (None, Some(lang), Some(rule_raw)) => {
+            let lang: ruleset::Language = serde_yaml::from_str(lang.as_str())?;
+            let rule = Rule {
+                id: "inline".into(),
+                language: lang,
+                message: "".into(),
+                pattern: rule_raw,
+                constraints: vec![],
+            };
+            rule_map.insert(lang, vec![rule]);
+        }
+        _ => {
+            panic!("todo");
+        }
+    };
 
     let target = Target::new(opts.target_path)?;
 
