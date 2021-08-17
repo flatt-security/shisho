@@ -161,7 +161,7 @@ where
             child_query_strings
                 .into_iter()
                 .enumerate()
-                .map(|(index, query)| format!("{} @{}{}", query, TOP_CAPTURE_ID_PREFIX, index))
+                .map(|(index, query)| format!(" {} @{}{} ", query, TOP_CAPTURE_ID_PREFIX, index))
                 .collect::<Vec<String>>()
                 .join("."),
             metavariables

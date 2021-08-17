@@ -24,93 +24,12 @@ impl Queryable for Go {
 #[cfg(test)]
 mod tests {
     use crate::{
-        query::{MetavariableId, Query, TSQueryString},
+        query::{MetavariableId, Query},
         tree::Tree,
     };
     use std::convert::TryFrom;
 
     use super::*;
-
-    #[test]
-    fn test_rawquery_conversion() {
-        assert!(
-            TSQueryString::<Go>::try_from(r#"for _, x := range iter { fmt.Printf("%s", x) }"#)
-                .is_ok()
-        );
-        assert!(TSQueryString::<Go>::try_from(
-            r#"import "fmt"
-            func main () { 
-                x = []int{1, 2, 3}
-                for _, y := range x {
-                    fmt.Printf("%s", x) 
-                } 
-            }"#
-        )
-        .is_ok());
-
-        // with ellipsis operators
-        assert!(TSQueryString::<Go>::try_from(
-            r#"for _, x := range iter {
-                :[...]
-                fmt.Printf("%s", x)
-                :[...]
-            }"#
-        )
-        .is_ok());
-
-        // with metavariables
-        {
-            let rq = TSQueryString::<Go>::try_from(
-                r#"for _, :[X] := range iter { 
-                    :[...] 
-                    fmt.Printf("%s", :[Y])
-                    :[...]
-            }"#,
-            );
-            assert!(rq.is_ok());
-            let TSQueryString { metavariables, .. } = rq.unwrap();
-            assert_eq!(metavariables.len(), 2);
-        }
-    }
-
-    #[test]
-    fn test_query_conversion() {
-        assert!(Query::<Go>::try_from(r#"for _, x := range iter { fmt.Printf("%s", x) }"#).is_ok());
-        assert!(Query::<Go>::try_from(
-            r#"import "fmt"
-            func main () { 
-                x = []int{1, 2, 3}
-                for _, y := range x {
-                    fmt.Printf("%s", x) 
-                } 
-            }"#
-        )
-        .is_ok());
-
-        // with ellipsis operators
-        assert!(Query::<Go>::try_from(
-            r#"for _, x := range iter {
-                :[...]
-                fmt.Printf("%s", x)
-                :[...]
-            }"#
-        )
-        .is_ok());
-
-        // with metavariables
-        {
-            let rq = Query::<Go>::try_from(
-                r#"for _, :[X] := range iter { 
-                    :[...] 
-                    fmt.Printf("%s", :[X])
-                    :[...]
-            }"#,
-            );
-            assert!(rq.is_ok());
-            let Query { metavariables, .. } = rq.unwrap();
-            assert_eq!(metavariables.len(), 1);
-        }
-    }
 
     #[test]
     fn test_basic_query() {
@@ -413,15 +332,15 @@ mod tests {
         }
 
         {
-            let tree =
-                Tree::<Go>::try_from(r#"if err := nil; true == false { a := 2; b := 3 }"#).unwrap();
+            let tree = Tree::<Go>::try_from(
+                r#"if err := nil; true == false { a := 2; b := 3 } else { c := 4 }"#,
+            )
+            .unwrap();
             let ptree = tree.to_partial();
-
             let query = Query::<Go>::try_from(r#"if :[X] { :[...] }"#).unwrap();
             let session = ptree.matches(&query);
 
             let c = session.collect();
-            println!("{:?}", c);
             assert_eq!(c.len(), 0);
         }
     }

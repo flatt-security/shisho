@@ -181,7 +181,6 @@ mod tests {
             "#,
             )
             .unwrap();
-
             let tree = Tree::<HCL>::try_from(
                 r#"
                 # should match
@@ -319,8 +318,7 @@ mod tests {
         let tree = Tree::<HCL>::try_from(tree_base.as_str()).unwrap();
         let ptree = tree.to_partial();
 
-        let query =
-            Query::<HCL>::try_from(r#"resource "rtype" "rname" { attr = :[...] }"#).unwrap();
+        let query = Query::<HCL>::try_from(r#"resource "rtype" "rname" { attr = :[_] }"#).unwrap();
 
         let item = {
             let session = ptree.matches(&query);
