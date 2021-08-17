@@ -13,9 +13,9 @@ use std::path::PathBuf;
 use std::{collections::HashMap, convert::TryFrom};
 use structopt::StructOpt;
 
-/// `Opts` defines possible options for the `scan` subcommand.
+/// Scans files under the given path with the given rule sets
 #[derive(StructOpt, Debug)]
-pub struct Opts {
+pub struct ScanOpts {
     #[structopt(parse(from_os_str))]
     target_path: PathBuf,
 
@@ -23,7 +23,7 @@ pub struct Opts {
     ruleset_path: PathBuf,
 }
 
-pub fn run(common_opts: CommonOpts, opts: Opts) -> i32 {
+pub fn run(common_opts: CommonOpts, opts: ScanOpts) -> i32 {
     match intl(common_opts, opts) {
         Ok(_) => 0,
         Err(e) => {
@@ -33,7 +33,7 @@ pub fn run(common_opts: CommonOpts, opts: Opts) -> i32 {
     }
 }
 
-fn intl(_common_opts: CommonOpts, opts: Opts) -> Result<()> {
+fn intl(_common_opts: CommonOpts, opts: ScanOpts) -> Result<()> {
     let ruleset = ruleset::from_reader(&opts.ruleset_path).map_err(|e| {
         anyhow!(
             "failed to load ruleset file {}: {}",

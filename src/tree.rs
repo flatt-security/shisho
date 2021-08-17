@@ -4,16 +4,6 @@ use std::{
     convert::{TryFrom, TryInto},
     marker::PhantomData,
 };
-use thiserror::Error;
-
-#[derive(Debug, Error)]
-pub enum TreeError {
-    #[error("ParseError: failed to parse query")]
-    ParseError,
-
-    #[error("ParseError: {0}")]
-    ConvertError(tree_sitter::QueryError),
-}
 
 pub struct Tree<'a, T> {
     pub raw: &'a [u8],

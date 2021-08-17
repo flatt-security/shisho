@@ -1,19 +1,6 @@
 use crate::language::Queryable;
 use anyhow::{anyhow, Result};
 use std::marker::PhantomData;
-use thiserror::Error;
-
-#[derive(Debug, Error, PartialEq)]
-pub enum QueryError {
-    #[error("ParseError: failed to parse query")]
-    ParseError,
-
-    #[error("ParseError: {0}")]
-    ConvertError(tree_sitter::QueryError),
-
-    #[error("ParseError: {0}")]
-    SyntaxError(String),
-}
 
 #[derive(Debug, PartialEq)]
 pub struct Pattern<'a, T>

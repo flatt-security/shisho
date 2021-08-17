@@ -1,26 +1,13 @@
 use crate::{language::Queryable, pattern::Pattern};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use std::{
     array::IntoIter,
     collections::HashMap,
     convert::{TryFrom, TryInto},
     marker::PhantomData,
 };
-use thiserror::Error;
 
 pub const TOP_CAPTURE_ID_PREFIX: &str = "TOP-";
-
-#[derive(Debug, Error, PartialEq)]
-pub enum QueryError {
-    #[error("ParseError: failed to parse query")]
-    ParseError,
-
-    #[error("ParseError: {0}")]
-    ConvertError(tree_sitter::QueryError),
-
-    #[error("ParseError: {0}")]
-    SyntaxError(String),
-}
 
 #[derive(Debug, PartialEq)]
 pub struct Query<T>
@@ -258,7 +245,7 @@ where
                         ));
                     }
                 }
-                return Err(QueryError::SyntaxError(format!("shisho_metavariable should have exactly one child (shisho_metavariable_name), but there are {} children", node.child_count()).into()).into());
+                return Err(anyhow!("shisho_metavariable should have exactly one child (shisho_metavariable_name), but there are {} children", node.child_count()));
             }
             "shisho_metavariable" => {
                 let mut cursor = node.walk();
@@ -282,7 +269,7 @@ where
                         ));
                     }
                 }
-                return Err(QueryError::SyntaxError(format!("shisho_metavariable should have exactly one child (shisho_metavariable_name), but there are {} children", node.child_count()).into()).into());
+                return Err(anyhow!("shisho_metavariable should have exactly one child (shisho_metavariable_name), but there are {} children", node.child_count()));
             }
             _ => {
                 let children: Vec<tree_sitter::Node> = {

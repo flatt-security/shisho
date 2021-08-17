@@ -6,20 +6,19 @@ use structopt::StructOpt;
 
 use crate::cli::CommonOpts;
 
-/// `Opts` defines possible options for the `completion` subcommand.
+/// Prints scripts for shell completion.
 #[derive(StructOpt, Debug)]
-pub enum Opts {
+pub enum CompletionOpts {
     Zsh,
     Bash,
     Fish,
 }
 
-/// `run` emits a completion script for some shell environments.
-pub fn run(_common_opts: CommonOpts, opts: Opts) -> i32 {
+pub fn run(_common_opts: CommonOpts, opts: CompletionOpts) -> i32 {
     match opts {
-        Opts::Bash => completion(Shell::Bash),
-        Opts::Zsh => completion(Shell::Zsh),
-        Opts::Fish => completion(Shell::Fish),
+        CompletionOpts::Bash => completion(Shell::Bash),
+        CompletionOpts::Zsh => completion(Shell::Zsh),
+        CompletionOpts::Fish => completion(Shell::Fish),
     };
 
     return 0;
