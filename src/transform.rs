@@ -1,5 +1,14 @@
+use crate::tree::ShishoOperation;
 use crate::{
-    code::Code, language::Queryable, matcher::MatchedItem, pattern::Pattern, query::MetavariableId,
+    code::Code,
+    language::Queryable,
+    matcher::MatchedItem,
+    pattern::Pattern,
+    query::{
+        MetavariableId, SHISHO_NODE_ELLIPSIS, SHISHO_NODE_ELLIPSIS_METAVARIABLE,
+        SHISHO_NODE_METAVARIABLE, SHISHO_NODE_METAVARIABLE_NAME,
+    },
+    tree::TreeLike,
 };
 use anyhow::{anyhow, Result};
 use std::{
@@ -30,25 +39,22 @@ where
         node: &'tree tree_sitter::Node,
     ) -> Result<String> {
         match node.kind() {
-            "shisho_metavariable" => {
-                let mut cursor = node.walk();
-                for child in node.named_children(&mut cursor) {
-                    if child.kind() == "shisho_metavariable_name" {
-                        let id = MetavariableId(self.str_from_node(&child).to_string());
-                        let value = item
-                            .get_captured_string(&id)
-                            .ok_or(anyhow!("metavariable not found"))?;
-                        return Ok(value.into());
-                    }
-                }
-                return Err(anyhow!("shisho_metavariable should have exactly one child (shisho_metavariable_name), but there are {} children", node.child_count()));
+            SHISHO_NODE_METAVARIABLE => {
+                let (variable_name, _) = self.extract_vname_from_node(node).ok_or(anyhow!(
+                    "{} did not have {}",
+                    SHISHO_NODE_METAVARIABLE,
+                    SHISHO_NODE_METAVARIABLE_NAME,
+                ))?;
+                let id = MetavariableId(variable_name.into());
+                let value = item
+                    .get_captured_string(&id)
+                    .ok_or(anyhow!("metavariable not found"))?;
+                Ok(value.into())
             }
-            "shisho_ellipsis" | "shisho_ellipsis_metavariable" => {
-                return Err(anyhow!(
-                    "cannot use ellipsis operator inside the transformation query"
-                ));
-            }
-            _ if node.child_count() == 0 => Ok(self.str_from_node(node).into()),
+            SHISHO_NODE_ELLIPSIS | SHISHO_NODE_ELLIPSIS_METAVARIABLE => Err(anyhow!(
+                "cannot use ellipsis operator inside the transformation query"
+            )),
+            _ if node.child_count() == 0 => Ok(self.node_as_str(node).into()),
             _ => {
                 let mut cursor = node.walk();
 
@@ -68,12 +74,17 @@ where
         }
     }
 
-    fn str_from_node(&self, n: &tree_sitter::Node) -> &str {
-        n.utf8_text(self.raw).unwrap()
-    }
-
     fn str_from_range(&self, start: usize, end: usize) -> String {
         String::from_utf8(self.raw[start..end].to_vec()).unwrap()
+    }
+}
+
+impl<'a, T> TreeLike<'a> for AutofixPattern<'a, T>
+where
+    T: Queryable,
+{
+    fn node_as_str(&self, node: &tree_sitter::Node) -> &'a str {
+        node.utf8_text(self.raw).unwrap()
     }
 }
 

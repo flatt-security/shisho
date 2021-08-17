@@ -1,4 +1,8 @@
-use crate::{language::Queryable, matcher::QueryMatcher, query::Query};
+use crate::{
+    language::Queryable,
+    matcher::QueryMatcher,
+    query::{CaptureId, Query, SHISHO_NODE_METAVARIABLE_NAME},
+};
 use anyhow::Result;
 use std::{
     convert::{TryFrom, TryInto},
@@ -133,5 +137,30 @@ where
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
         let r = RawTree::from(value);
         r.try_into()
+    }
+}
+
+pub trait TreeLike<'a> {
+    fn node_as_str(&self, node: &tree_sitter::Node) -> &'a str;
+}
+
+pub trait ShishoOperation<'a> {
+    fn extract_vname_from_node(&self, node: &tree_sitter::Node) -> Option<(&'a str, CaptureId)>;
+}
+
+impl<'a, TL> ShishoOperation<'a> for TL
+where
+    TL: TreeLike<'a>,
+{
+    fn extract_vname_from_node(&self, node: &tree_sitter::Node) -> Option<(&'a str, CaptureId)> {
+        let mut cursor = node.walk();
+        let find_result = node
+            .named_children(&mut cursor)
+            .find(|child| child.kind() == SHISHO_NODE_METAVARIABLE_NAME)
+            .map(|child| {
+                let vname = self.node_as_str(&child);
+                (vname, CaptureId(format!("{}-{}", vname, child.id())))
+            });
+        find_result
     }
 }

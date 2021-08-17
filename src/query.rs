@@ -1,4 +1,8 @@
-use crate::{language::Queryable, pattern::Pattern};
+use crate::{
+    language::Queryable,
+    pattern::Pattern,
+    tree::{ShishoOperation, TreeLike},
+};
 use anyhow::{anyhow, Result};
 use std::{
     array::IntoIter,
@@ -281,7 +285,7 @@ where
     where
         'a: 'b,
     {
-        let (variable_name, capture_id) = self.find_vname_from_children(node).ok_or(anyhow!(
+        let (variable_name, capture_id) = self.extract_vname_from_node(node).ok_or(anyhow!(
             "{} did not have {}",
             SHISHO_NODE_METAVARIABLE,
             SHISHO_NODE_METAVARIABLE_NAME
@@ -311,7 +315,7 @@ where
     where
         'a: 'b,
     {
-        let (variable_name, capture_id) = self.find_vname_from_children(node).ok_or(anyhow!(
+        let (variable_name, capture_id) = self.extract_vname_from_node(node).ok_or(anyhow!(
             "{} did not have {}",
             SHISHO_NODE_METAVARIABLE,
             SHISHO_NODE_METAVARIABLE_NAME
@@ -362,29 +366,13 @@ where
 
         Ok((child_queries, metavariables))
     }
+}
 
-    fn find_vname_from_children<'b>(
-        &self,
-        node: &'b tree_sitter::Node,
-    ) -> Option<(&'a str, CaptureId)>
-    where
-        'a: 'b,
-    {
-        let mut cursor = node.walk();
-        let find_result = node
-            .named_children(&mut cursor)
-            .find(|child| child.kind() == SHISHO_NODE_METAVARIABLE_NAME)
-            .map(|child| {
-                let vname = self.node_as_str(&child);
-                (vname, CaptureId(format!("{}-{}", vname, child.id())))
-            });
-        find_result
-    }
-
-    fn node_as_str<'b>(&self, node: &'b tree_sitter::Node) -> &'a str
-    where
-        'a: 'b,
-    {
+impl<'a, T> TreeLike<'a> for RawQueryProcessor<'a, T>
+where
+    T: Queryable,
+{
+    fn node_as_str(&self, node: &tree_sitter::Node) -> &'a str {
         node.utf8_text(self.raw_bytes).unwrap()
     }
 }
