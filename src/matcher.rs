@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use tree_sitter::Point;
 
 use crate::{
     constraint::{Constraint, Predicate},
@@ -6,7 +7,10 @@ use crate::{
     query::{CaptureId, MetavariableId, Query, TOP_CAPTURE_ID_PREFIX},
     tree::PartialTree,
 };
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    convert::{TryFrom, TryInto},
+};
 
 pub struct QueryMatcher<'tree, 'node, 'query, T>
 where
@@ -39,15 +43,13 @@ where
     {
         let raw = self.ptree.raw;
         let tsquery: &'query tree_sitter::Query = self.query.ts_query();
-
-        let cidx_cid_map: &'query [String] = tsquery.capture_names();
-        let cid_mvid_map = self.query.get_cid_mvid_map();
+        let query = self.query;
 
         self.cursor
             .matches(tsquery, self.ptree.as_ref().clone(), move |x| {
                 x.utf8_text(raw).unwrap()
             })
-            .map(|m| MatchedItem::try_from(m, raw, cidx_cid_map, &cid_mvid_map))
+            .map(|m| MatchedItem::from(m, raw, query))
             .collect::<Vec<MatchedItem>>()
     }
 }
@@ -56,19 +58,18 @@ where
 pub struct MatchedItem<'tree> {
     pub raw: &'tree [u8],
     pub top: ConsecutiveCaptureItems<'tree>,
-    pub captures: HashMap<MetavariableId, CaptureItem<'tree>>,
+    pub captures: HashMap<MetavariableId, ConsecutiveCaptureItems<'tree>>,
 }
 
 impl<'tree> MatchedItem<'tree> {
     pub fn get_captured_string(&self, id: &MetavariableId) -> Option<&'tree str> {
         let capture = self.captures.get(&id)?;
-        let t = capture.node.utf8_text(self.raw).unwrap();
+        let t = capture.utf8_text(self.raw).unwrap();
         Some(t)
     }
 
-    pub fn get_captured_node(&self, id: &MetavariableId) -> Option<tree_sitter::Node<'tree>> {
-        let capture = self.captures.get(&id)?;
-        Some(capture.node)
+    pub fn get_captured(&self, id: &MetavariableId) -> Option<&ConsecutiveCaptureItems<'tree>> {
+        self.captures.get(&id)
     }
 
     pub fn satisfies_all<T: Queryable>(&self, constraints: &Vec<Constraint<T>>) -> bool {
@@ -83,16 +84,26 @@ impl<'tree> MatchedItem<'tree> {
         }
 
         match &constraint.predicate {
-            Predicate::MatchQuery(q) => {
-                let item = self.get_captured_node(&constraint.target).unwrap();
-                let ptree = PartialTree::<T>::new(item, self.raw);
-                ptree.matches(q).collect().len() > 0
-            }
-            Predicate::NotMatchQuery(q) => {
-                let item = self.get_captured_node(&constraint.target).unwrap();
-                let ptree = PartialTree::new(item, self.raw);
-                ptree.matches(q).collect().len() > 0
-            }
+            Predicate::MatchQuery(q) => self
+                .get_captured(&constraint.target)
+                .unwrap()
+                .as_vec()
+                .into_iter()
+                .any(|node| {
+                    let ptree = PartialTree::<T>::new(node.clone(), self.raw);
+                    let matches = ptree.matches(q).collect();
+                    matches.len() > 0
+                }),
+            Predicate::NotMatchQuery(q) => self
+                .get_captured(&constraint.target)
+                .unwrap()
+                .as_vec()
+                .into_iter()
+                .all(|node| {
+                    let ptree = PartialTree::<T>::new(node.clone(), self.raw);
+                    let matches = ptree.matches(q).collect();
+                    matches.len() == 0
+                }),
             Predicate::MatchRegex(r) => {
                 r.is_match(self.get_captured_string(&constraint.target).unwrap())
             }
@@ -104,29 +115,45 @@ impl<'tree> MatchedItem<'tree> {
 }
 
 #[derive(Debug)]
-pub struct ConsecutiveCaptureItems<'tree>(Vec<CaptureItem<'tree>>);
+pub struct ConsecutiveCaptureItems<'tree>(Vec<tree_sitter::Node<'tree>>);
 
-impl<'tree> ConsecutiveCaptureItems<'tree> {
-    pub fn try_from(v: Vec<CaptureItem<'tree>>) -> Result<Self> {
-        if v.len() == 0 {
+impl<'tree> TryFrom<Vec<tree_sitter::Node<'tree>>> for ConsecutiveCaptureItems<'tree> {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Vec<tree_sitter::Node<'tree>>) -> Result<Self, Self::Error> {
+        if value.len() == 0 {
             return Err(anyhow!("no item included"));
         }
 
         // TODO (y0n3uchy): check all capture items are consecutive
 
-        Ok(Self(v))
+        Ok(Self(value))
     }
+}
 
-    pub fn as_vec(&self) -> &Vec<CaptureItem<'tree>> {
+impl<'tree> ConsecutiveCaptureItems<'tree> {
+    pub fn as_vec(&self) -> &Vec<tree_sitter::Node<'tree>> {
         &self.0
     }
 
+    pub fn push(&mut self, n: tree_sitter::Node<'tree>) {
+        self.0.push(n)
+    }
+
+    pub fn start_position(&self) -> Point {
+        self.as_vec().first().unwrap().start_position()
+    }
+
+    pub fn end_position(&self) -> Point {
+        self.as_vec().last().unwrap().end_position()
+    }
+
     pub fn start_byte(&self) -> usize {
-        self.as_vec().first().unwrap().node.start_byte()
+        self.as_vec().first().unwrap().start_byte()
     }
 
     pub fn end_byte(&self) -> usize {
-        self.as_vec().last().unwrap().node.end_byte()
+        self.as_vec().last().unwrap().end_byte()
     }
 
     pub fn utf8_text<'a>(&self, source: &'a [u8]) -> Result<&'a str, core::str::Utf8Error> {
@@ -136,43 +163,61 @@ impl<'tree> ConsecutiveCaptureItems<'tree> {
 
 #[derive(Debug)]
 pub struct CaptureItem<'tree> {
-    pub node: tree_sitter::Node<'tree>,
+    pub node: Vec<tree_sitter::Node<'tree>>,
 }
 
 impl<'tree> MatchedItem<'tree> {
-    fn try_from<'query>(
+    fn from<'query, T: Queryable>(
         x: tree_sitter::QueryMatch<'tree>,
         raw: &'tree [u8],
-        cidx_cid_map: &'query [String],
-        cid_mvid_map: &'query HashMap<CaptureId, MetavariableId>,
+        query: &'query Query<T>,
     ) -> MatchedItem<'tree> {
-        let mut captures = HashMap::<MetavariableId, CaptureItem>::new();
-        let mut top = vec![];
+        // map from QueryCapture index to Capture Name
+        let cidx_cid_map: &'query [String] = query.ts_query().capture_names();
 
-        for y in x.captures {
+        // map from capture id to metavariable id
+        let cid_mvid_map = query.get_cid_mvid_map();
+
+        // captures for each metavariable IDs
+        let mut meta_captures = HashMap::<MetavariableId, ConsecutiveCaptureItems>::new();
+
+        // captures for top-level nodes
+        let mut top_captures = vec![];
+
+        // part up all the captures into meta_captures or top_captures
+        for capture in x.captures {
             let capture_id = cidx_cid_map
-                .get(y.index as usize)
+                .get(capture.index as usize)
                 .and_then(|capture_id| Some(capture_id.clone()));
             match capture_id {
                 Some(s) if s.as_str().starts_with(TOP_CAPTURE_ID_PREFIX) => {
                     // TODO (y0n3uchy): introduce appropriate abstraction layer to isolate `matcher` and `pattern` a little bit
-                    top.push((s, CaptureItem { node: y.node }));
+                    top_captures.push((s, capture.node));
                 }
                 Some(s) => {
                     if let Some(metavariable_id) = cid_mvid_map.get(&CaptureId(s)) {
-                        captures.insert(metavariable_id.clone(), CaptureItem { node: y.node });
+                        if let Some(v) = meta_captures.get_mut(metavariable_id) {
+                            v.push(capture.node);
+                        } else {
+                            let v = vec![capture.node].try_into().unwrap();
+                            meta_captures.insert(metavariable_id.clone(), v);
+                        }
                     }
                 }
                 None => (),
             }
         }
 
-        top.sort_by(|x, y| x.0.cmp(&y.0));
-
-        let top = top.into_iter().map(|item| item.1).collect();
-        let top = ConsecutiveCaptureItems::try_from(top)
+        top_captures.sort_by(|x, y| x.0.cmp(&y.0));
+        let top_captures: Vec<tree_sitter::Node> =
+            top_captures.into_iter().map(|item| item.1).collect();
+        let top_captures = ConsecutiveCaptureItems::try_from(top_captures)
             .expect("internal error: global matching is invalid");
 
-        MatchedItem { raw, top, captures }
+        MatchedItem {
+            raw,
+            top: top_captures,
+            captures: meta_captures,
+        }
     }
 }

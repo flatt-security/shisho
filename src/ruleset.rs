@@ -7,6 +7,11 @@ use std::{
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
+use crate::{
+    constraint::Constraint, language::Queryable, matcher::MatchedItem, query::Query,
+    tree::PartialTree,
+};
+
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct RuleSet {
     pub version: String,
@@ -22,6 +27,32 @@ pub struct Rule {
 
     #[serde(default)]
     pub constraints: Vec<RawConstraint>,
+}
+
+impl Rule {
+    pub fn find<'tree, 'item, T: 'static>(
+        &self,
+        tree: &'tree PartialTree<'tree, 'tree, T>,
+    ) -> Result<Vec<MatchedItem<'item>>>
+    where
+        T: Queryable,
+        'tree: 'item,
+    {
+        let constraints = self
+            .constraints
+            .iter()
+            .map(|x| Constraint::try_from(x.clone()))
+            .collect::<Result<Vec<Constraint<T>>>>()?;
+
+        let query = Query::<T>::try_from(self.pattern.as_str())?;
+        let session = tree.matches(&query);
+
+        Ok(session
+            .collect()
+            .into_iter()
+            .filter(|x| x.satisfies_all(&constraints))
+            .collect())
+    }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
@@ -41,7 +72,7 @@ pub enum RawPredicate {
     NotMatchRegex,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Hash, Eq, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub enum Language {
     HCL,
