@@ -191,13 +191,7 @@ impl<'tree> MatchedItem<'tree> {
                 }
                 Some(s) => {
                     if let Some(metavariable_id) = cid_mvid_map.get(&CaptureId(s)) {
-                        if query
-                            .metavariables
-                            .get(metavariable_id)
-                            .unwrap()
-                            .len()
-                            >= 2
-                        {
+                        if query.metavariables.get(metavariable_id).unwrap().len() >= 2 {
                             // in this case the metavariable is not related to ellipsis op
                             let v = vec![capture.node].try_into().unwrap();
                             meta_captures.insert(metavariable_id.clone(), v);
