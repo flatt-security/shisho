@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout HEAD
         uses: actions/checkout@v1
+        with:
+          submodules: true
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
         with:
