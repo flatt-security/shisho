@@ -2,13 +2,13 @@ const config = {
   gatsby: {
     pathPrefix: '/',
     siteUrl: 'https://docs.shisho.dev',
-    gaTrackingId: "UA-145321226-11",
+    gaTrackingId: 'UA-145321226-11',
     trailingSlash: false,
   },
   header: {
     logo: '/images/logo-white.png',
     logoLink: '/',
-    title: "",
+    title: '',
     githubUrl: 'https://github.com/flatt-security/shisho',
     helpUrl: '',
     tweetText: '',
@@ -29,21 +29,15 @@ const config = {
     },
   },
   sidebar: {
-    forcedNavOrder: [
-      '/',
-      '/getting-started',
-      '/key-concepts',
-      '/roadmap',
-    ],
-    collapsedNav: [
-    ],
+    forcedNavOrder: ['/', '/getting-started', '/key-concepts', '/roadmap'],
+    collapsedNav: [],
     links: [
       { text: 'Shisho as a Service', link: 'https://shisho.dev' },
-      { text: 'Flatt Security, Inc.', link: 'https://flatt.tech/en' }
+      { text: 'Flatt Security Inc.', link: 'https://flatt.tech/en' },
     ],
     frontline: false,
     ignoreIndex: false,
-    title:"",
+    title: '',
   },
   siteMetadata: {
     title: 'Shisho',
