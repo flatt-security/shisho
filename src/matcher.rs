@@ -195,7 +195,6 @@ impl<'tree> MatchedItem<'tree> {
                             .metavariables
                             .get(metavariable_id)
                             .unwrap()
-                            .capture_ids
                             .len()
                             >= 2
                         {
