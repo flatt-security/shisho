@@ -39,8 +39,13 @@ where
             .flatten()
             .collect::<HashMap<CaptureId, MetavariableId>>()
     }
+}
 
-    pub(crate) fn ts_query<'a>(&'a self) -> &'a tree_sitter::Query {
+impl<T> AsRef<tree_sitter::Query> for Query<T>
+where
+    T: Queryable,
+{
+    fn as_ref(&self) -> &tree_sitter::Query {
         &self.query
     }
 }

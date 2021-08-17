@@ -7,11 +7,11 @@ use std::{
     marker::PhantomData,
 };
 
-pub struct AutofixPattern<'a, T>
+pub struct AutofixPattern<'pattern, T>
 where
     T: Queryable,
 {
-    pub raw_pattern: &'a [u8],
+    raw: &'pattern [u8],
     tree: tree_sitter::Tree,
     _marker: PhantomData<T>,
 }
@@ -50,13 +50,13 @@ where
                     let child = children[0];
                     let id = match child.kind() {
                         "shisho_metavariable_name" => {
-                            MetavariableId(child.utf8_text(self.raw_pattern).unwrap().to_string())
+                            MetavariableId(child.utf8_text(self.raw).unwrap().to_string())
                         }
                         "shisho_metavariable_ellipsis_name" => {
                             let child = child.named_child(0).ok_or(anyhow!(
                                 "failed to get shisho_metavariable_ellipsis_name child"
                             ))?;
-                            MetavariableId(child.utf8_text(self.raw_pattern).unwrap().to_string())
+                            MetavariableId(child.utf8_text(self.raw).unwrap().to_string())
                         }
                         _ => {
                             return Err(anyhow!("shisho_metavariable should have exactly one child (shisho_metavariable_name), but the child was {}", child.kind()));
@@ -68,7 +68,7 @@ where
 
                     text = text
                         + String::from_utf8(
-                            self.raw_pattern[(last_consumed_byte)..node.start_byte()].to_vec(),
+                            self.raw[(last_consumed_byte)..node.start_byte()].to_vec(),
                         )
                         .unwrap()
                         .as_str()
@@ -78,7 +78,7 @@ where
                 _ => {
                     text = text
                         + String::from_utf8(
-                            self.raw_pattern[(last_consumed_byte)..node.end_byte()].to_vec(),
+                            self.raw[(last_consumed_byte)..node.end_byte()].to_vec(),
                         )
                         .unwrap()
                         .as_str();
@@ -89,11 +89,27 @@ where
         } {}
 
         Ok(text
-            + String::from_utf8(
-                self.raw_pattern[(last_consumed_byte)..(self.raw_pattern.len())].to_vec(),
-            )
-            .unwrap()
-            .as_str())
+            + String::from_utf8(self.raw[(last_consumed_byte)..(self.raw.len())].to_vec())
+                .unwrap()
+                .as_str())
+    }
+}
+
+impl<'pattern, T> AsRef<tree_sitter::Tree> for AutofixPattern<'pattern, T>
+where
+    T: Queryable,
+{
+    fn as_ref(&self) -> &tree_sitter::Tree {
+        &self.tree
+    }
+}
+
+impl<'pattern, T> AsRef<[u8]> for AutofixPattern<'pattern, T>
+where
+    T: Queryable,
+{
+    fn as_ref(&self) -> &[u8] {
+        &self.raw
     }
 }
 
@@ -130,7 +146,7 @@ where
         let tree = Pattern::<T>::from(value).to_tstree()?;
         Ok(Self {
             tree,
-            raw_pattern: value.as_bytes(),
+            raw: value.as_bytes(),
             _marker: PhantomData,
         })
     }

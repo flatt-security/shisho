@@ -6,8 +6,7 @@ use std::{
 };
 
 pub struct Tree<'a, T> {
-    pub raw: &'a [u8],
-
+    raw: &'a [u8],
     tstree: tree_sitter::Tree,
     _marker: PhantomData<T>,
 }
@@ -35,12 +34,17 @@ impl<'a, 'tree, T> AsRef<tree_sitter::Tree> for Tree<'tree, T> {
     }
 }
 
+impl<'a, 'tree, T> AsRef<[u8]> for Tree<'tree, T> {
+    fn as_ref(&self) -> &[u8] {
+        &self.raw
+    }
+}
+
 pub struct PartialTree<'tree, 'node, T>
 where
     'tree: 'node,
 {
-    pub raw: &'tree [u8],
-
+    raw: &'tree [u8],
     top: tree_sitter::Node<'node>,
     _marker: PhantomData<T>,
 }
@@ -71,6 +75,12 @@ where
 impl<'a, 'tree, 'node, T> AsRef<tree_sitter::Node<'node>> for PartialTree<'tree, 'node, T> {
     fn as_ref(&self) -> &tree_sitter::Node<'node> {
         &self.top
+    }
+}
+
+impl<'a, 'tree, 'node, T> AsRef<[u8]> for PartialTree<'tree, 'node, T> {
+    fn as_ref(&self) -> &[u8] {
+        &self.raw
     }
 }
 
