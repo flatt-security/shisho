@@ -29,10 +29,7 @@ mod tests {
     use crate::query::MetavariableId;
     use crate::transform::Transformable;
     use crate::tree::Tree;
-    use crate::{
-        code::Code,
-        query::{Query, TSQueryString},
-    };
+    use crate::{code::Code, query::Query};
     use std::convert::TryFrom;
 
     use super::*;
