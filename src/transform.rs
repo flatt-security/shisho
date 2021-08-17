@@ -1,14 +1,6 @@
-use crate::tree::ShishoOperation;
+use crate::tree::TSTreeVisitor;
 use crate::{
-    code::Code,
-    language::Queryable,
-    matcher::MatchedItem,
-    pattern::Pattern,
-    query::{
-        MetavariableId, SHISHO_NODE_ELLIPSIS, SHISHO_NODE_ELLIPSIS_METAVARIABLE,
-        SHISHO_NODE_METAVARIABLE, SHISHO_NODE_METAVARIABLE_NAME,
-    },
-    tree::TreeLike,
+    code::Code, language::Queryable, matcher::MatchedItem, pattern::Pattern, query::MetavariableId,
 };
 use anyhow::{anyhow, Result};
 use std::{
@@ -30,61 +22,108 @@ where
     T: Queryable,
 {
     pub fn to_patched_snippet<'tree>(&self, item: &'tree MatchedItem) -> Result<String> {
-        self.to_patched_snippet_intl(item, &self.tree.root_node())
-    }
-
-    fn to_patched_snippet_intl<'tree>(
-        &self,
-        item: &'tree MatchedItem,
-        node: &'tree tree_sitter::Node,
-    ) -> Result<String> {
-        match node.kind() {
-            SHISHO_NODE_METAVARIABLE => {
-                let (variable_name, _) = self.extract_vname_from_node(node).ok_or(anyhow!(
-                    "{} did not have {}",
-                    SHISHO_NODE_METAVARIABLE,
-                    SHISHO_NODE_METAVARIABLE_NAME,
-                ))?;
-                let id = MetavariableId(variable_name.into());
-                let value = item
-                    .get_captured_string(&id)
-                    .ok_or(anyhow!("metavariable not found"))?;
-                Ok(value.into())
-            }
-            SHISHO_NODE_ELLIPSIS | SHISHO_NODE_ELLIPSIS_METAVARIABLE => Err(anyhow!(
-                "cannot use ellipsis operator inside the transformation query"
-            )),
-            _ if node.child_count() == 0 => Ok(self.node_as_str(node).into()),
-            _ => {
-                let mut cursor = node.walk();
-
-                let mut snippet: String = "".into();
-                let mut end: usize = node.start_byte();
-                for child in node.children(&mut cursor) {
-                    let child_string = self.to_patched_snippet_intl(item, &child)?;
-                    snippet = snippet
-                        + self.str_from_range(end, child.start_byte()).as_str()
-                        + child_string.as_str();
-                    end = child.end_byte();
-                }
-                snippet = snippet + self.str_from_range(end, node.end_byte()).as_str();
-
-                Ok(snippet)
-            }
-        }
-    }
-
-    fn str_from_range(&self, start: usize, end: usize) -> String {
-        String::from_utf8(self.raw[start..end].to_vec()).unwrap()
+        let processor = PatchProcessor {
+            pattern: self,
+            item: item,
+        };
+        let patched_item = processor.walk(&self.tree)?;
+        Ok(patched_item.body)
     }
 }
 
-impl<'a, T> TreeLike<'a> for AutofixPattern<'a, T>
+pub struct PatchProcessor<'tree, T>
 where
     T: Queryable,
 {
-    fn node_as_str(&self, node: &tree_sitter::Node) -> &'a str {
-        node.utf8_text(self.raw).unwrap()
+    pattern: &'tree AutofixPattern<'tree, T>,
+    item: &'tree MatchedItem<'tree>,
+}
+
+impl<'tree, T> PatchProcessor<'tree, T>
+where
+    T: Queryable,
+{
+    fn str_from_range(&self, start: usize, end: usize) -> String {
+        String::from_utf8(self.pattern.raw[start..end].to_vec()).unwrap()
+    }
+}
+
+pub struct PatchedItem {
+    pub body: String,
+    pub start_byte: usize,
+    pub end_byte: usize,
+}
+
+impl<'tree, T> TSTreeVisitor<'tree> for PatchProcessor<'tree, T>
+where
+    T: Queryable,
+{
+    type Output = PatchedItem;
+
+    fn walk_metavariable(
+        &self,
+        node: tree_sitter::Node,
+        variable_name: &str,
+    ) -> Result<Self::Output, anyhow::Error> {
+        let id = MetavariableId(variable_name.into());
+        let value = self
+            .item
+            .get_captured_string(&id)
+            .ok_or(anyhow!("metavariable not found"))?;
+        Ok(PatchedItem {
+            body: value.into(),
+            start_byte: node.start_byte(),
+            end_byte: node.end_byte(),
+        })
+    }
+
+    fn walk_ellipsis(&self, _node: tree_sitter::Node) -> Result<Self::Output, anyhow::Error> {
+        Err(anyhow!(
+            "cannot use ellipsis operator inside the transformation query"
+        ))
+    }
+
+    fn walk_ellipsis_metavariable(
+        &self,
+        _node: tree_sitter::Node,
+        _variable_name: &str,
+    ) -> Result<Self::Output, anyhow::Error> {
+        Err(anyhow!(
+            "cannot use ellipsis operator inside the transformation query"
+        ))
+    }
+
+    fn walk_leaf_node(&self, node: tree_sitter::Node) -> Result<Self::Output, anyhow::Error> {
+        Ok(PatchedItem {
+            body: self.node_as_str(&node).into(),
+            start_byte: node.start_byte(),
+            end_byte: node.end_byte(),
+        })
+    }
+
+    fn flatten_intermediate_node(
+        &self,
+        node: tree_sitter::Node,
+        children: Vec<Self::Output>,
+    ) -> Result<Self::Output, anyhow::Error> {
+        let mut body: String = "".into();
+        let mut end: usize = node.start_byte();
+
+        for child in children {
+            body = body + self.str_from_range(end, child.start_byte).as_str() + child.body.as_str();
+            end = child.end_byte;
+        }
+        body = body + self.str_from_range(end, node.end_byte()).as_str();
+
+        Ok(PatchedItem {
+            body,
+            start_byte: node.start_byte(),
+            end_byte: node.end_byte(),
+        })
+    }
+
+    fn node_as_str(&self, node: &tree_sitter::Node) -> &'tree str {
+        node.utf8_text(self.pattern.raw).unwrap()
     }
 }
 
