@@ -49,3 +49,8 @@ Then you'll see a shisho's executable in `/usr/local/bin`.
 
 Download the prebuild binary from [releases](https://github.com/flatt-security/shisho/releases) and put it into your `%PATH%` directory.
 If you're using [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/install-win10), you can install shisho by `bash <(curl -sL get.shisho.dev/linux)`.
+
+# More
+
+- We're also building [Shisho as a Service](https://shisho.dev) to make Security-as-Code more accessible.
+- If you need direct support, you can contact us at `contact@flatt.tech`.
