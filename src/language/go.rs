@@ -27,6 +27,10 @@ impl Queryable for Go {
     fn is_leaf(_node: &tree_sitter::Node) -> bool {
         false
     }
+
+    fn range_for_view(node: &tree_sitter::Node) -> (tree_sitter::Point, tree_sitter::Point) {
+        (node.start_position(), node.end_position())
+    }
 }
 
 #[cfg(test)]

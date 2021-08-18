@@ -8,16 +8,15 @@ use std::{
     marker::PhantomData,
 };
 
-pub struct AutofixPattern<'pattern, T>
+pub struct AutofixPattern<T>
 where
     T: Queryable,
 {
-    raw: &'pattern [u8],
-    tree: tree_sitter::Tree,
+    pattern: Pattern<T>,
     _marker: PhantomData<T>,
 }
 
-impl<'a, T> AutofixPattern<'a, T>
+impl<T> AutofixPattern<T>
 where
     T: Queryable,
 {
@@ -27,7 +26,8 @@ where
             item,
         };
 
-        let patched_item = T::extract_query_nodes(&self.tree)?;
+        let tree = self.pattern.to_tstree()?;
+        let patched_item = T::extract_query_nodes(&tree)?;
         let patched_item = patched_item
             .into_iter()
             .map(|node| processor.handle_node(node))
@@ -45,7 +45,7 @@ pub struct PatchProcessor<'tree, T>
 where
     T: Queryable,
 {
-    pattern: &'tree AutofixPattern<'tree, T>,
+    pattern: &'tree AutofixPattern<T>,
     item: &'tree MatchedItem<'tree>,
 }
 
@@ -54,11 +54,8 @@ where
     T: Queryable,
 {
     fn str_from_range(&self, start: usize, end: usize) -> String {
-        String::from_utf8(
-            self.pattern.raw[start.min(self.pattern.raw.len())..end.min(self.pattern.raw.len())]
-                .to_vec(),
-        )
-        .unwrap()
+        let raw = self.pattern.pattern.as_ref();
+        String::from_utf8(raw[start..end].to_vec()).unwrap()
     }
 }
 
@@ -137,43 +134,30 @@ where
     }
 
     fn node_as_str(&self, node: &tree_sitter::Node) -> &'tree str {
-        std::str::from_utf8(
-            &self.pattern.raw[node.start_byte().min(self.pattern.raw.len())
-                ..node.end_byte().min(self.pattern.raw.len())],
-        )
-        .unwrap()
+        let raw = self.pattern.pattern.as_ref();
+        std::str::from_utf8(&raw[node.start_byte()..node.end_byte()]).unwrap()
     }
 }
 
-impl<'pattern, T> AsRef<tree_sitter::Tree> for AutofixPattern<'pattern, T>
-where
-    T: Queryable,
-{
-    fn as_ref(&self) -> &tree_sitter::Tree {
-        &self.tree
-    }
-}
-
-impl<'pattern, T> AsRef<[u8]> for AutofixPattern<'pattern, T>
+impl<T> AsRef<[u8]> for AutofixPattern<T>
 where
     T: Queryable,
 {
     fn as_ref(&self) -> &[u8] {
-        &self.raw
+        self.pattern.as_ref()
     }
 }
 
-impl<'a, T> TryFrom<&'a str> for AutofixPattern<'a, T>
+impl<'a, T> TryFrom<&'a str> for AutofixPattern<T>
 where
     T: Queryable,
 {
     type Error = anyhow::Error;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        let tree = Pattern::<T>::from(value).to_tstree()?;
+        let pattern = Pattern::<T>::from(value);
         Ok(Self {
-            tree,
-            raw: value.as_bytes(),
+            pattern,
             _marker: PhantomData,
         })
     }
@@ -184,10 +168,9 @@ where
     T: Queryable,
     Self: Sized,
 {
-    fn transform<'a, P>(self, item: MatchedItem, p: P) -> Result<Self>
+    fn transform<P>(self, item: MatchedItem, p: P) -> Result<Self>
     where
-        P: TryInto<AutofixPattern<'a, T>, Error = anyhow::Error>,
-        P: 'a,
+        P: TryInto<AutofixPattern<T>, Error = anyhow::Error>,
     {
         let query = p.try_into()?;
         self.transform_with_query(item, query)

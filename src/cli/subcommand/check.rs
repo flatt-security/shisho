@@ -130,8 +130,8 @@ pub(crate) fn print_findings<T: Queryable + 'static>(
         // print a finding
         println!("In {}:", target_path);
         println!("{:>8} |", "");
-        let s = mitem.top.start_position();
-        let e = mitem.top.end_position();
+        let (s, e) = mitem.top.range_for_view::<T>();
+
         for line_index in (s.row)..=(e.row) {
             let line_value = lines[line_index];
 

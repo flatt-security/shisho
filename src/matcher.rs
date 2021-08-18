@@ -148,6 +148,13 @@ impl<'tree> CaptureItem<'tree> {
         self.as_vec().last().unwrap().end_position()
     }
 
+    pub fn range_for_view<T: Queryable + 'static>(&self) -> (Point, Point) {
+        (
+            T::range_for_view(self.as_vec().first().unwrap()).0,
+            T::range_for_view(self.as_vec().last().unwrap()).1,
+        )
+    }
+
     pub fn start_byte(&self) -> usize {
         self.as_vec().first().unwrap().start_byte()
     }
@@ -209,7 +216,6 @@ impl<'tree> MatchedItem<'tree> {
                 None => (),
             }
         }
-
 
         top_captures.sort_by(|x, y| x.0.cmp(&y.0));
         let top_captures: Vec<tree_sitter::Node> =

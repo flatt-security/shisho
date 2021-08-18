@@ -12,17 +12,17 @@ use std::{
     marker::PhantomData,
 };
 
-pub struct Tree<'a, T> {
-    raw: &'a [u8],
+pub struct Tree<T> {
+    raw: Vec<u8>,
     tstree: tree_sitter::Tree,
     _marker: PhantomData<T>,
 }
 
-impl<'tree, T> Tree<'tree, T>
+impl<T> Tree<T>
 where
     T: Queryable,
 {
-    pub fn new(tree: tree_sitter::Tree, raw: &'tree [u8]) -> Tree<'tree, T> {
+    pub fn new(tree: tree_sitter::Tree, raw: Vec<u8>) -> Tree<T> {
         Tree {
             tstree: tree,
             raw,
@@ -30,18 +30,18 @@ where
         }
     }
 
-    pub fn to_partial<'node>(&'tree self) -> PartialTree<'tree, 'node, T> {
-        PartialTree::new(self.tstree.root_node(), self.raw)
+    pub fn to_partial<'node, 'tree>(&'tree self) -> PartialTree<'tree, 'node, T> {
+        PartialTree::new(self.tstree.root_node(), self.raw.as_slice())
     }
 }
 
-impl<'a, 'tree, T> AsRef<tree_sitter::Tree> for Tree<'tree, T> {
+impl<'a, 'tree, T> AsRef<tree_sitter::Tree> for Tree<T> {
     fn as_ref(&self) -> &tree_sitter::Tree {
         &self.tstree
     }
 }
 
-impl<'a, 'tree, T> AsRef<[u8]> for Tree<'tree, T> {
+impl<'a, 'tree, T> AsRef<[u8]> for Tree<T> {
     fn as_ref(&self) -> &[u8] {
         &self.raw
     }
@@ -92,53 +92,58 @@ impl<'a, 'tree, 'node, T> AsRef<[u8]> for PartialTree<'tree, 'node, T> {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct RawTree<'a, T>
+pub struct RawTree<T>
 where
     T: Queryable,
 {
-    raw_bytes: &'a [u8],
+    raw_bytes: Vec<u8>,
     _marker: PhantomData<T>,
 }
 
-impl<'a, T> From<&'a str> for RawTree<'a, T>
+impl<'a, T> From<&'a str> for RawTree<T>
 where
     T: Queryable,
 {
     fn from(value: &'a str) -> Self {
+        let value = value.as_bytes().clone();
         RawTree {
-            raw_bytes: value.as_bytes(),
+            raw_bytes: if value[value.len() - 1] != b'\n' {
+                [value, "\n".as_bytes()].concat()
+            } else {
+                value.to_vec()
+            },
             _marker: PhantomData,
         }
     }
 }
 
-impl<'a, T> TryFrom<RawTree<'a, T>> for Tree<'a, T>
+impl<'a, T> TryFrom<RawTree<T>> for Tree<T>
 where
     T: Queryable,
 {
     type Error = anyhow::Error;
 
-    fn try_from(value: RawTree<'a, T>) -> Result<Self, anyhow::Error> {
+    fn try_from(value: RawTree<T>) -> Result<Self, anyhow::Error> {
         let mut parser = tree_sitter::Parser::new();
         parser
             .set_language(T::target_language())
             .expect("Error loading hcl grammar");
 
         let parsed = parser
-            .parse([value.raw_bytes, "\n".as_bytes()].concat(), None)
+            .parse(&value.raw_bytes, None)
             .ok_or(anyhow!("failed to load the code"))?;
 
         Ok(Tree::new(parsed, value.raw_bytes))
     }
 }
 
-impl<'a, T> TryFrom<&'a str> for Tree<'a, T>
+impl<T> TryFrom<&str> for Tree<T>
 where
     T: Queryable,
 {
     type Error = anyhow::Error;
 
-    fn try_from(value: &'a str) -> Result<Self, anyhow::Error> {
+    fn try_from(value: &str) -> Result<Self, anyhow::Error> {
         let r = RawTree::from(value);
         r.try_into()
     }

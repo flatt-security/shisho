@@ -12,4 +12,5 @@ pub trait Queryable {
     fn extract_query_nodes(root: &tree_sitter::Tree) -> Result<Vec<tree_sitter::Node>>;
 
     fn is_leaf(node: &tree_sitter::Node) -> bool;
+    fn range_for_view(node: &tree_sitter::Node) -> (tree_sitter::Point, tree_sitter::Point);
 }
