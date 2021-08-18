@@ -133,6 +133,9 @@ pub(crate) fn print_findings<T: Queryable + 'static>(
         let (s, e) = mitem.top.range_for_view::<T>();
 
         for line_index in (s.row)..=(e.row) {
+            if line_index >= lines.len() {
+                continue;
+            }
             let line_value = lines[line_index];
 
             let v = match line_index {
@@ -177,12 +180,12 @@ pub(crate) fn print_findings<T: Queryable + 'static>(
                 match change.tag() {
                     ChangeTag::Delete => print!(
                         "{} | {}",
-                        Color::Green.paint(format!("{:>8}", "")),
+                        Color::Green.paint(format!("{:>8}", (change.old_index().unwrap() + 1))),
                         Color::Red.paint(format!("-{}", change))
                     ),
                     ChangeTag::Insert => print!(
                         "{} | {}",
-                        Color::Green.paint(format!("{:>8}", "")),
+                        Color::Green.paint(format!("{:>8}", (change.new_index().unwrap() + 1))),
                         Color::Green.paint(format!("+{}", change))
                     ),
                     ChangeTag::Equal => (),
