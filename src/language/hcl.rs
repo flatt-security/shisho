@@ -116,13 +116,6 @@ mod tests {
         }
 
         {
-            let query = Query::<HCL>::try_from(
-                r#"
-                one_attr = :[X]
-                another_attr = :[Y]
-            "#,
-            )
-            .unwrap();
             let tree = Tree::<HCL>::try_from(
                 r#"
                 # should match
@@ -153,8 +146,15 @@ mod tests {
             "#,
             )
             .unwrap();
-
             let ptree = tree.to_partial();
+
+            let query = Query::<HCL>::try_from(
+                r#"
+                one_attr = :[X]
+                another_attr = :[Y]
+            "#,
+            )
+            .unwrap();
             let session = ptree.matches(&query);
             assert_eq!(session.collect().len(), 2);
         }
@@ -208,15 +208,6 @@ mod tests {
             assert_eq!(session.collect().len(), 3);
         }
         {
-            let query = Query::<HCL>::try_from(
-                r#"
-                one_attr = :[X]
-                another_attr = :[X]
-                yetanother_attr = :[X]
-            "#,
-            )
-            .unwrap();
-
             let tree = Tree::<HCL>::try_from(
                 r#"
                 # should match
@@ -238,13 +229,42 @@ mod tests {
                     another_attr = 3
                     test = ""
                 }
+
+                # should NOT match
+                resource "rtype" "rname1" { 
+                    one_attr = "value"
+                    another_attr = "value"
+                    yetanother_attr = "changed"
+                }
             "#,
             )
             .unwrap();
-
             let ptree = tree.to_partial();
-            let session = ptree.matches(&query);
-            assert_eq!(session.collect().len(), 1);
+
+            {
+                let query = Query::<HCL>::try_from(
+                    r#"
+                    one_attr = :[X]
+                    another_attr = :[X]
+                    yetanother_attr = :[X]
+                "#,
+                )
+                .unwrap();
+                let session = ptree.matches(&query);
+                assert_eq!(session.collect().len(), 1);
+            }
+            {
+                let query = Query::<HCL>::try_from(
+                    r#"
+                    one_attr = :[_]
+                    another_attr = :[_]
+                    yetanother_attr = :[_]
+                "#,
+                )
+                .unwrap();
+                let session = ptree.matches(&query);
+                assert_eq!(session.collect().len(), 2);
+            }
         }
     }
 

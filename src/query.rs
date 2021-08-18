@@ -187,9 +187,9 @@ pub trait ToQueryConstraintString {
 impl ToQueryConstraintString for MetavariableTable {
     fn to_query_constraints(&self) -> Vec<String> {
         self.into_iter()
-            .filter_map(|(_k, mvs)| {
+            .filter_map(|(k, mvs)| {
                 let ids: Vec<String> = mvs.iter().map(|id| id.0.clone()).collect();
-                if ids.len() <= 1 {
+                if ids.len() <= 1 || k == &MetavariableId("_".into()) {
                     None
                 } else {
                     let first_capture_id = ids[0].clone();
