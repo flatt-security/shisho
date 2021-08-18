@@ -53,8 +53,11 @@ where
     T: Queryable,
 {
     fn str_from_range(&self, start: usize, end: usize) -> String {
-        String::from_utf8(self.pattern.raw[start..end.min(self.pattern.raw.len())].to_vec())
-            .unwrap()
+        String::from_utf8(
+            self.pattern.raw[start.min(self.pattern.raw.len())..end.min(self.pattern.raw.len())]
+                .to_vec(),
+        )
+        .unwrap()
     }
 }
 
@@ -64,7 +67,7 @@ pub struct PatchedItem {
     pub end_byte: usize,
 }
 
-impl<'tree, T> TSTreeVisitor<'tree> for PatchProcessor<'tree, T>
+impl<'tree, T> TSTreeVisitor<'tree, T> for PatchProcessor<'tree, T>
 where
     T: Queryable,
 {
@@ -133,7 +136,11 @@ where
     }
 
     fn node_as_str(&self, node: &tree_sitter::Node) -> &'tree str {
-        node.utf8_text(self.pattern.raw).unwrap()
+        std::str::from_utf8(
+            &self.pattern.raw[node.start_byte().min(self.pattern.raw.len())
+                ..node.end_byte().min(self.pattern.raw.len())],
+        )
+        .unwrap()
     }
 }
 
