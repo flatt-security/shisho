@@ -1,7 +1,7 @@
 ---
 title: 'Rule Constraint'
 metaTitle: 'Rule Constraint'
-metaDescription: 'TODO'
+metaDescription: 'This page describes details of rule constraints for pattern matching.'
 ---
 
 ## Overview

@@ -1,7 +1,7 @@
 ---
 title: 'Rule'
 metaTitle: 'Rule'
-metaDescription: 'TODO'
+metaDescription: 'This page describes details of rules for pattern matching.'
 ---
 
 ## Overview
