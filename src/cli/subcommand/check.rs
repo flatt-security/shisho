@@ -173,16 +173,16 @@ pub(crate) fn print_findings<T: Queryable + 'static>(
             let new_code = old_code.transform(mitem, rewrite_pattern.as_str())?;
 
             let diff = TextDiff::from_lines(target.body.as_str(), new_code.as_str());
-            for (i, change) in diff.iter_all_changes().enumerate() {
+            for change in diff.iter_all_changes() {
                 match change.tag() {
                     ChangeTag::Delete => print!(
                         "{} | {}",
-                        Color::Green.paint(format!("{:>8}", (i + 1).to_string())),
+                        Color::Green.paint(format!("{:>8}", "")),
                         Color::Red.paint(format!("-{}", change))
                     ),
                     ChangeTag::Insert => print!(
                         "{} | {}",
-                        Color::Green.paint(format!("{:>8}", (i + 1).to_string())),
+                        Color::Green.paint(format!("{:>8}", "")),
                         Color::Green.paint(format!("+{}", change))
                     ),
                     ChangeTag::Equal => (),
