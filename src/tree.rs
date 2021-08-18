@@ -105,12 +105,12 @@ where
     T: Queryable,
 {
     fn from(value: &'a str) -> Self {
-        let value = value.as_bytes().clone();
+        let value = value.to_string();
         RawTree {
-            raw_bytes: if value[value.len() - 1] != b'\n' {
-                [value, "\n".as_bytes()].concat()
+            raw_bytes: if value.as_bytes()[value.as_bytes().len() - 1] != b'\n' {
+                [value.as_bytes(), "\n".as_bytes()].concat()
             } else {
-                value.to_vec()
+                value.into()
             },
             _marker: PhantomData,
         }
