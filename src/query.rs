@@ -174,7 +174,6 @@ where
                 .collect::<Vec<String>>()
                 .join(" "),
         );
-
         Ok(TSQueryString::new(query_string, metavariables))
     }
 }
@@ -226,23 +225,38 @@ where
     }
 }
 
-impl<'a, T> TSTreeVisitor<'a> for RawQueryProcessor<'a, T>
+impl<'a, T> TSTreeVisitor<'a, T> for RawQueryProcessor<'a, T>
 where
     T: Queryable,
 {
     type Output = TSQueryString<T>;
 
     fn walk_leaf_node(&self, node: tree_sitter::Node) -> Result<Self::Output, anyhow::Error> {
-        Ok(TSQueryString::new(
-            format!(
-                r#"(({}) @{} (#eq? @{} "{}"))"#,
-                node.kind(),
-                node.id(),
-                node.id(),
-                self.node_as_str(&node).replace("\"", "\\\"")
-            ),
-            MetavariableTable::new(),
-        ))
+        if node.is_named() {
+            Ok(TSQueryString::new(
+                format!(
+                    r#"(({}) @{} (#eq? @{} "{}"))"#,
+                    node.kind(),
+                    node.id(),
+                    node.id(),
+                    self.node_as_str(&node).replace("\"", "\\\"")
+                ),
+                MetavariableTable::new(),
+            ))
+        } else {
+            let v = self
+                .node_as_str(&node)
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n");
+            Ok(TSQueryString::new(
+                if v == "" {
+                    "".into()
+                } else {
+                    format!(r#""{}""#, v)
+                },
+                MetavariableTable::new(),
+            ))
+        }
     }
 
     fn walk_ellipsis(&self, _node: tree_sitter::Node) -> Result<Self::Output, anyhow::Error> {
@@ -297,7 +311,11 @@ where
     }
 
     fn node_as_str(&self, node: &tree_sitter::Node) -> &'a str {
-        node.utf8_text(self.raw_bytes).unwrap()
+        std::str::from_utf8(
+            &self.raw_bytes[node.start_byte().min(self.raw_bytes.len())
+                ..node.end_byte().min(self.raw_bytes.len())],
+        )
+        .unwrap()
     }
 
     fn flatten_intermediate_node(
@@ -323,6 +341,7 @@ where
             node.kind(),
             child_queries
                 .into_iter()
+                .filter(|x| x != "")
                 .collect::<Vec<String>>()
                 .join(" . "),
         );

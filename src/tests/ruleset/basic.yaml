@@ -3,8 +3,16 @@ rules:
   - id: redundunt-or-expr
     language: go
     message: |
-      There was a redundunt or expression.
+      There was a redundunt "or" expression.
     pattern: |
       :[X] || :[X]
+    rewrite: |
+      :[X]
+  - id: redundunt-and-expr
+    language: go
+    message: |
+      There was a redundunt "and" expression.
+    pattern: |
+      :[X] && :[X]
     rewrite: |
       :[X]

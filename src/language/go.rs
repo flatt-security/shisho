@@ -19,6 +19,10 @@ impl Queryable for Go {
         let mut cursor = source_file.walk();
         source_file.named_children(&mut cursor).collect()
     }
+
+    fn is_leaf(_node: &tree_sitter::Node) -> bool {
+        false
+    }
 }
 
 #[cfg(test)]
@@ -130,15 +134,6 @@ mod tests {
         }
         {
             let query = Query::<Go>::try_from(r#"f("%s%d", :[...X])"#).unwrap();
-            {
-                let tree = Tree::<Go>::try_from(r#"f("%s%d")"#).unwrap();
-                let ptree = tree.to_partial();
-                let session = ptree.matches(&query);
-
-                let c = session.collect();
-                assert_eq!(c.len(), 1);
-                assert_eq!(c[0].get_captured_string(&MetavariableId("X".into())), None);
-            }
             {
                 let tree = Tree::<Go>::try_from(r#"f("%s%d", 1, 2)"#).unwrap();
                 let ptree = tree.to_partial();

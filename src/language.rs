@@ -8,4 +8,6 @@ pub trait Queryable {
     fn query_language() -> tree_sitter::Language;
 
     fn extract_query_nodes(root: &tree_sitter::Tree) -> Vec<tree_sitter::Node>;
+
+    fn is_leaf(node: &tree_sitter::Node) -> bool;
 }

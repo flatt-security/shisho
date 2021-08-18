@@ -109,7 +109,7 @@ pub(crate) fn print_findings<T: Queryable + 'static>(
         println!(
             "{}: {}",
             Color::Red.paint(format!("[{}]", rule.id)),
-            Color::White.bold().paint(rule.message.clone())
+            Color::White.bold().paint(rule.message.clone().trim_end())
         );
 
         // print a finding

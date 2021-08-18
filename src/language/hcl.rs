@@ -22,6 +22,10 @@ impl Queryable for HCL {
         let mut cursor = source_file.walk();
         body.named_children(&mut cursor).collect()
     }
+
+    fn is_leaf(node: &tree_sitter::Node) -> bool {
+        node.kind() == "quoted_template"
+    }
 }
 
 #[cfg(test)]
@@ -509,7 +513,6 @@ mod tests {
         let ptree = tree.to_partial();
 
         let query = Query::<HCL>::try_from(r#"resource "rtype" "rname" { attr = :[_] }"#).unwrap();
-
         let item = {
             let session = ptree.matches(&query);
             let mut items = session.collect();

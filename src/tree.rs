@@ -146,7 +146,10 @@ where
 }
 
 #[allow(unused)]
-pub trait TSTreeVisitor<'tree> {
+pub trait TSTreeVisitor<'tree, T>
+where
+    T: Queryable,
+{
     type Output;
 
     fn walk_leaf_node(&self, node: tree_sitter::Node) -> Result<Self::Output, anyhow::Error> {
@@ -161,7 +164,7 @@ pub trait TSTreeVisitor<'tree> {
     ) -> Result<Self::Output, anyhow::Error> {
         let mut cursor = node.walk();
         let children = node
-            .named_children(&mut cursor)
+            .children(&mut cursor)
             .map(|child| self.handle_node(child))
             .collect::<Result<Vec<Self::Output>, anyhow::Error>>()?;
 
@@ -219,7 +222,7 @@ pub trait TSTreeVisitor<'tree> {
                 ))?;
                 self.walk_metavariable(node, vname)
             }
-            _ if self.child_count(node) == 0 => self.walk_leaf_node(node),
+            _ if self.child_count(node) == 0 || T::is_leaf(&node) => self.walk_leaf_node(node),
             _ => self.walk_intermediate_node(node),
         }
     }
@@ -229,7 +232,7 @@ pub trait TSTreeVisitor<'tree> {
     }
 
     fn child_count(&self, node: tree_sitter::Node) -> usize {
-        node.named_child_count()
+        node.child_count()
     }
 
     fn node_as_str(&self, node: &tree_sitter::Node) -> &'tree str;
