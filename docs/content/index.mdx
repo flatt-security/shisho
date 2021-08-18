@@ -9,7 +9,7 @@ _Shisho_ is a lightweight static code analyzer designed for developers and secur
 
 ![demo](./images/shisho-demo.gif)
 
-It allows us to analyze and transform your source code with handful DSL as follows:
+The key motivation of Shisho is providing a means of **Security-as-Code for Code**. It allows us to analyze and transform your source code with an intuitive DSL. Here's an example of policies for Terraform code:
 
 ```yaml
 version: '1'
@@ -34,7 +34,9 @@ rules:
       }
 ```
 
-It runs offline, so your code won't be transferred anywhere. One can use Shisho inside Continuous Integration (CI) systems like GitHub Actions, as a means of **Security-as-Code for Code**.
+The another key aspect of Shisho is **speed**; it runs so fast with the help of [Rust](https://www.rust-lang.org)! See [Comparison](/comparison) page for further information.
+
+In additition, **Shisho runs everywhere**! You can use this tool offline so that you don't need to transfer your code anywhere. One can use Shisho inside Continuous Integration (CI) systems like GitHub Actions.
 
 ## Getting Started
 

@@ -29,7 +29,7 @@ const config = {
     },
   },
   sidebar: {
-    forcedNavOrder: ['/', '/getting-started', '/key-concepts', '/roadmap'],
+    forcedNavOrder: ['/', '/getting-started', '/learn-shisho', '/roadmap'],
     collapsedNav: [],
     links: [
       { text: 'Shisho as a Service', link: 'https://shisho.dev' },
