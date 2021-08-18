@@ -5,7 +5,9 @@ WORKDIR /build
 # cache dependencies
 COPY ./Cargo.lock ./Cargo.lock
 COPY ./Cargo.toml ./Cargo.toml
-RUN echo "fn main() {}" > src/main.rs && \
+COPY ./third_party ./third_party
+RUN mkdir src && \
+    echo "fn main() {}" > src/main.rs && \
     cargo build --release
 
 # build

@@ -124,8 +124,10 @@ jobs:
     env:
       IMAGE_NAME: shisho-cli
     steps:
-      - name: checkout
-        uses: actions/checkout@v2
+      - name: Checkout HEAD
+        uses: actions/checkout@v1
+        with:
+          submodules: true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
