@@ -13,11 +13,12 @@ Shisho is a lightweight static analyzer for developers. Please see [the usage do
 You can try shisho in your machine as follows:
 
 ```sh
-cat file.go | docker run ghcr.io/flatt-security/shisho-cli find "len(:[...])"
+echo "func test(v []string) int { return len(v) + 1; }" | docker run ghcr.io/flatt-security/shisho-cli:latest find "len(:[...])" --lang=go
 ```
 
 ```sh
-docker run -v $(PWD):/workspace ghcr.io/flatt-security/shisho-cli find "len(:[...])" file.go
+echo "func test(v []string) int { return len(v) + 1; }" > file.go
+docker run -v $(PWD):/workspace ghcr.io/flatt-security/shisho-cli:latest find "len(:[...])" --lang=go
 ```
 
 ## Install with pre-built binaries
