@@ -4,7 +4,9 @@
 
 [![Run tests](https://github.com/flatt-security/shisho/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/flatt-security/shisho/actions/workflows/test.yml) [![Run lint](https://github.com/flatt-security/shisho/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/flatt-security/shisho/actions/workflows/lint.yml)
 
-Shisho is a lightweight static analyzer for developers. Please see [the usage documentation](https://docs.shisho.dev) for further information.
+Shisho is a lightweight static analyzer for developers.
+
+### Please see [the usage documentation](https://docs.shisho.dev) for further information.
 
 ![demo](./docs/content/images/shisho-demo.gif)
 
