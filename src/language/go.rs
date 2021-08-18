@@ -327,19 +327,6 @@ mod tests {
                 Some("a := 2; b := 3")
             );
         }
-
-        {
-            let tree = Tree::<Go>::try_from(
-                r#"if err := nil; true == false { a := 2; b := 3 } else { c := 4 }"#,
-            )
-            .unwrap();
-            let ptree = tree.to_partial();
-            let query = Query::<Go>::try_from(r#"if :[X] { :[...] }"#).unwrap();
-            let session = ptree.matches(&query);
-
-            let c = session.collect();
-            assert_eq!(c.len(), 0);
-        }
     }
 
     #[test]
