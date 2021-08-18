@@ -1,20 +1,66 @@
 ---
-title: "Welcome"
-metaTitle: "Shisho - A lightweight static code analyzer"
+title: 'Welcome'
+metaTitle: 'Shisho - A lightweight static code analyzer'
 ---
 
 ![Shisho - Lightweight Static Code Analyzer](/images/header.png)
 
-Shisho is a lightweight static code analyzers designed for developers.
+_Shisho_ is a lightweight static code analyzer designed for developers and security teams.
+
+![demo](./images/shisho-demo.gif)
+
+The key motivation of Shisho is providing a means of **Security-as-Code for Code**. It allows us to analyze and transform your source code with an intuitive DSL. Here's an example of policies for Terraform code:
+
+```yaml
+version: '1'
+rules:
+  - id: 'unencrypted-ebs-volume'
+    language: hcl
+    message: |
+      There was unencrypted EBS module.
+    pattern: |
+      resource "aws_ebs_volume" :[NAME] {
+        :[...X]
+      }
+    constraints:
+      - target: X
+        should: not-match
+        pattern: |
+          encrypted = true
+    rewrite: |
+      resource "aws_ebs_volume" :[NAME] {
+        :[X]
+        encrypted = true
+      }
+```
+
+The another key aspect of Shisho is **speed**; it runs so fast with the help of [Rust](https://www.rust-lang.org)! See [Comparison](/comparison) page for further information.
+
+In additition, **Shisho runs everywhere**! You can use this tool offline so that you don't need to transfer your code anywhere. One can use Shisho inside Continuous Integration (CI) systems like GitHub Actions.
 
 ## Getting Started
 
-TBD
+Just pull the official docker image and you're ready to use 🎉
+
+```
+docker pull ghcr.io/flatt-security/shisho-cli:latest
+```
+
+See [Getting Started](/getting-started) to learn Shisho more.
+
+## Why Shisho?
+
+We already have `sed` or something like that. There are already several static analysis engines in the world indeed. Now you may wonder why do we need shisho now. See [Comparison](/comparison) page to see why.
 
 ## Language Support
 
-TBD
+As of 2021/08/18, Shisho supports the following languages:
 
-## Key Concepts
+- HCL (Terraform)
+- Go
 
-TBD
+See [the roadmap](/roadmap) for details.
+
+## Feedback
+
+We'd love to hear your feedback! Feel free to ask Shisho team in [GitHub issues](https://github.com/flatt-security/shisho/issues).

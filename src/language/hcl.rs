@@ -32,11 +32,22 @@ impl Queryable for HCL {
     fn is_leaf(node: &tree_sitter::Node) -> bool {
         node.kind() == "quoted_template"
     }
+
+    fn range_for_view(node: &tree_sitter::Node) -> (tree_sitter::Point, tree_sitter::Point) {
+        match node.kind() {
+            "attribute" => {
+                let mut cursor = node.walk();
+                let bracket = node.children(&mut cursor).skip(node.child_count()-2).next().unwrap();
+                (node.start_position(), bracket.end_position())
+            },
+            _ => (node.start_position(), node.end_position()),
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::query::MetavariableId;
+    use crate::query::{MetavariableId, TSQueryString};
     use crate::transform::Transformable;
     use crate::tree::Tree;
     use crate::{code::Code, query::Query};
@@ -560,13 +571,16 @@ mod tests {
 
     #[test]
     fn metavariable_transform() {
-        let code = Code::<HCL>::from("resource \"rtype\" \"rname\" { attr = \"one\" }\nresource \"rtype\" \"another\" { attr = \"two\" }");
+        let code = Code::<HCL>::from("resource \"rtype\" \"rname\" { attr = \"one\" }\nresource \"rtype\" \"another\" { attr = \"two\" }\n");
 
         let tree_base = code.clone();
         let tree = Tree::<HCL>::try_from(tree_base.as_str()).unwrap();
         let ptree = tree.to_partial();
 
-        let query = Query::<HCL>::try_from("resource \"rtype\" \"rname\" { attr = :[X] }\nresource \"rtype\" \"another\" { attr = :[Y] }")        
+        println!("{}",TSQueryString::<HCL>::try_from("resource \"rtype\" \"rname\" { attr = :[X] }\nresource \"rtype\" \"another\" { attr = :[Y] }\n")
+        .unwrap().query_string);
+
+        let query = Query::<HCL>::try_from("resource \"rtype\" \"rname\" { attr = :[X] }\nresource \"rtype\" \"another\" { attr = :[Y] }\n")
             .unwrap();
 
         let item = {
@@ -576,12 +590,12 @@ mod tests {
             items.pop().unwrap()
         };
 
-        let from_code = code.transform(item, "resource \"rtype\" \"rname\" { attr = :[Y] }\nresource \"rtype\" \"another\" { attr = :[X] }", );
+        let from_code = code.transform(item, "resource \"rtype\" \"rname\" { attr = :[Y] }\nresource \"rtype\" \"another\" { attr = :[X] }\n");
         assert!(from_code.is_ok());
 
         assert_eq!(
             from_code.unwrap().as_str(),
-            "resource \"rtype\" \"rname\" { attr = \"two\" }\nresource \"rtype\" \"another\" { attr = \"one\" }",
+            "resource \"rtype\" \"rname\" { attr = \"two\" }\nresource \"rtype\" \"another\" { attr = \"one\" }\n",
         );
     }
 }

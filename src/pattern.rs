@@ -3,36 +3,41 @@ use anyhow::{anyhow, Result};
 use std::marker::PhantomData;
 
 #[derive(Debug, PartialEq)]
-pub struct Pattern<'a, T>
+pub struct Pattern<T>
 where
     T: Queryable,
 {
-    raw_bytes: &'a [u8],
+    raw_bytes: Vec<u8>,
     _marker: PhantomData<T>,
 }
 
-impl<T> AsRef<[u8]> for Pattern<'_, T>
+impl<T> AsRef<[u8]> for Pattern<T>
 where
     T: Queryable,
 {
     fn as_ref(&self) -> &[u8] {
-        self.raw_bytes
+        &self.raw_bytes
     }
 }
 
-impl<'a, T> From<&'a str> for Pattern<'a, T>
+impl<'a, T> From<&'a str> for Pattern<T>
 where
     T: Queryable,
 {
     fn from(value: &'a str) -> Self {
+        let value = value.to_string();
         Pattern {
-            raw_bytes: value.as_bytes(),
+            raw_bytes: if value.as_bytes()[value.as_bytes().len() - 1] != b'\n' {
+                [value.as_bytes(), "\n".as_bytes()].concat()
+            } else {
+                value.into()
+            },
             _marker: PhantomData,
         }
     }
 }
 
-impl<'a, T> Pattern<'a, T>
+impl<'a, T> Pattern<T>
 where
     T: Queryable,
 {
@@ -41,7 +46,7 @@ where
         parser.set_language(T::query_language())?;
 
         parser
-            .parse([self.raw_bytes, "\n".as_bytes()].concat(), None)
+            .parse(&self.raw_bytes, None)
             .ok_or(anyhow!("failed to parse query"))
     }
 }

@@ -81,13 +81,13 @@ where
     }
 }
 
-impl<T> TryFrom<Pattern<'_, T>> for Query<T>
+impl<T> TryFrom<Pattern<T>> for Query<T>
 where
     T: Queryable,
 {
     type Error = anyhow::Error;
 
-    fn try_from(value: Pattern<'_, T>) -> Result<Self, anyhow::Error> {
+    fn try_from(value: Pattern<T>) -> Result<Self, anyhow::Error> {
         let tsq = TSQueryString::try_from(value)?;
 
         let tsquery = tree_sitter::Query::new(T::target_language(), &tsq.query_string)
@@ -133,13 +133,13 @@ where
     }
 }
 
-impl<T> TryFrom<Pattern<'_, T>> for TSQueryString<T>
+impl<T> TryFrom<Pattern<T>> for TSQueryString<T>
 where
     T: Queryable,
 {
     type Error = anyhow::Error;
 
-    fn try_from(value: Pattern<'_, T>) -> Result<Self, anyhow::Error> {
+    fn try_from(value: Pattern<T>) -> Result<Self, anyhow::Error> {
         let query_tree = value.to_tstree()?;
 
         let processor = RawQueryProcessor::<T>::from(value.as_ref());
@@ -313,11 +313,7 @@ where
     }
 
     fn node_as_str(&self, node: &tree_sitter::Node) -> &'a str {
-        std::str::from_utf8(
-            &self.raw_bytes[node.start_byte().min(self.raw_bytes.len())
-                ..node.end_byte().min(self.raw_bytes.len())],
-        )
-        .unwrap()
+        std::str::from_utf8(&self.raw_bytes[node.start_byte()..node.end_byte()]).unwrap()
     }
 
     fn flatten_intermediate_node(
