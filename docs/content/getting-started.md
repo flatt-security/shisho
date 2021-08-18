@@ -15,6 +15,8 @@ You can use Shisho in only two steps:
 
 Shisho runs offline on your machine.
 
+![demo](./images/shisho-demo.gif)
+
 ## Run with Docker
 
 You can try shisho in your machine as follows:
