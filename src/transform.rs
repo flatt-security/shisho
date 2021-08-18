@@ -27,7 +27,8 @@ where
             item,
         };
 
-        let patched_item = T::extract_query_nodes(&self.tree)
+        let patched_item = T::extract_query_nodes(&self.tree)?;
+        let patched_item = patched_item
             .into_iter()
             .map(|node| processor.handle_node(node))
             .collect::<Result<Vec<PatchedItem>>>()?;

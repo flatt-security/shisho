@@ -124,12 +124,11 @@ where
             .set_language(T::target_language())
             .expect("Error loading hcl grammar");
 
-        Ok(Tree::new(
-            parser
-                .parse([value.raw_bytes, "\n".as_bytes()].concat(), None)
-                .unwrap(),
-            value.raw_bytes,
-        ))
+        let parsed = parser
+            .parse([value.raw_bytes, "\n".as_bytes()].concat(), None)
+            .ok_or(anyhow!("failed to load the code"))?;
+
+        Ok(Tree::new(parsed, value.raw_bytes))
     }
 }
 

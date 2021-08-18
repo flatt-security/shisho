@@ -20,9 +20,11 @@ use structopt::StructOpt;
 /// Checks files under the given path with the given rule sets
 #[derive(StructOpt, Debug)]
 pub struct CheckOpts {
+    /// Rule Set for searching
     #[structopt(parse(from_os_str))]
     ruleset_path: PathBuf,
 
+    /// File path to search    
     #[structopt(parse(from_os_str))]
     target_path: Option<PathBuf>,
 }

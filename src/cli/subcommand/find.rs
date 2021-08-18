@@ -15,18 +15,22 @@ use structopt::StructOpt;
 
 use super::check::print_findings;
 
-/// Check files under the given path with the given rule sets
+/// Checks files with a pattern given in command line arguments
 #[derive(StructOpt, Debug)]
 pub struct FindOpts {
+    /// Code pattern for searching
     #[structopt()]
-    rule: String,
+    pattern: String,
 
+    /// File path to search
     #[structopt(parse(from_os_str))]
     target_path: Option<PathBuf>,
 
+    /// Language name to use
     #[structopt(short, long)]
-    lang: String,
+    lang: ruleset::Language,
 
+    /// Rewriting pattern
     #[structopt(long)]
     rewrite: Option<String>,
 }
@@ -42,25 +46,24 @@ pub fn run(common_opts: CommonOpts, opts: FindOpts) -> i32 {
 }
 
 fn run_(_common_opts: CommonOpts, opts: FindOpts) -> Result<()> {
-    let lang = ruleset::Language::from_str(opts.lang.as_str())?;
     let rule = Rule {
         id: "inline".into(),
         message: "matched with the given rule".into(),
-        language: lang,
+        language: opts.lang,
         constraints: vec![],
-        pattern: opts.rule,
+        pattern: opts.pattern,
         rewrite: opts.rewrite,
     };
 
     let target = Target::from(opts.target_path)?;
     if target.is_file() {
         if let Some(target_lang) = target.language() {
-            if lang == target_lang {
-                find(target, rule, &lang)?;
+            if opts.lang == target_lang {
+                find(target, rule, &opts.lang)?;
             }
         }
     } else {
-        find(target, rule, &lang)?;
+        find(target, rule, &opts.lang)?;
     }
 
     Ok(())

@@ -2,6 +2,7 @@ use std::{
     convert::TryFrom,
     fs::File,
     path::{Path, PathBuf},
+    str::FromStr,
 };
 
 use anyhow::Result;
@@ -79,6 +80,14 @@ pub enum RawPredicate {
 pub enum Language {
     HCL,
     Go,
+}
+
+impl FromStr for Language {
+    type Err = serde_yaml::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        serde_yaml::from_str(s)
+    }
 }
 
 impl Language {

@@ -1,3 +1,5 @@
+use anyhow::{anyhow, Result};
+
 use super::Queryable;
 
 #[derive(Debug, Clone)]
@@ -12,15 +14,19 @@ impl Queryable for HCL {
         tree_sitter_hcl_query::language()
     }
 
-    fn extract_query_nodes<'tree>(root: &'tree tree_sitter::Tree) -> Vec<tree_sitter::Node<'tree>> {
+    fn extract_query_nodes<'tree>(
+        root: &'tree tree_sitter::Tree,
+    ) -> Result<Vec<tree_sitter::Node<'tree>>> {
         // TODO (y0n3uchy): this should be done more strictly.
 
         // see `//third_party/tree-sitter-hcl-query/grammar.js`
         let source_file = root.root_node();
-        let body = source_file.child(0).unwrap();
+        let body = source_file
+            .child(0)
+            .ok_or(anyhow!("failed to load the code; no root element"))?;
 
         let mut cursor = source_file.walk();
-        body.named_children(&mut cursor).collect()
+        Ok(body.named_children(&mut cursor).collect())
     }
 
     fn is_leaf(node: &tree_sitter::Node) -> bool {

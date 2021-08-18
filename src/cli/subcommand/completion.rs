@@ -9,8 +9,11 @@ use crate::cli::CommonOpts;
 /// Prints scripts for shell completion.
 #[derive(StructOpt, Debug)]
 pub enum CompletionOpts {
+    /// For zsh
     Zsh,
+    /// For bash
     Bash,
+    /// For fish
     Fish,
 }
 

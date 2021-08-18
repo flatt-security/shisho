@@ -1,5 +1,5 @@
 use crate::{language::Queryable, pattern::Pattern, tree::TSTreeVisitor, util::Merge};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use std::{
     array::IntoIter,
     collections::HashMap,
@@ -90,7 +90,8 @@ where
     fn try_from(value: Pattern<'_, T>) -> Result<Self, anyhow::Error> {
         let tsq = TSQueryString::try_from(value)?;
 
-        let tsquery = tree_sitter::Query::new(T::target_language(), &tsq.query_string)?;
+        let tsquery = tree_sitter::Query::new(T::target_language(), &tsq.query_string)
+            .map_err(|_| anyhow!("failed to load the pattern; invalid pattern was given"))?;
 
         Ok(Query::new(tsquery, tsq.metavariables))
     }
@@ -142,7 +143,8 @@ where
         let query_tree = value.to_tstree()?;
 
         let processor = RawQueryProcessor::<T>::from(value.as_ref());
-        let queries = T::extract_query_nodes(&query_tree)
+        let queries = T::extract_query_nodes(&query_tree)?;
+        let queries = queries
             .into_iter()
             .map(|node| processor.handle_node(node))
             .collect::<Result<Vec<TSQueryString<T>>>>()?;

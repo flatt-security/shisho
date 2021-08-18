@@ -210,6 +210,7 @@ impl<'tree> MatchedItem<'tree> {
             }
         }
 
+
         top_captures.sort_by(|x, y| x.0.cmp(&y.0));
         let top_captures: Vec<tree_sitter::Node> =
             top_captures.into_iter().map(|item| item.1).collect();
