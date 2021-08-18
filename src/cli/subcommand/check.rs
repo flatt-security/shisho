@@ -58,16 +58,29 @@ fn run_(_common_opts: CommonOpts, opts: CheckOpts) -> Result<()> {
     }
 
     // run rules
-    let target = Target::from(opts.target_path)?;
-    if target.is_file() {
-        if let Some(lang) = target.language() {
-            if let Some(rules) = rule_map.get(&lang) {
-                run_rules(&target, rules, &lang)?;
+    match opts.target_path {
+        Some(p) if p.is_dir() => {
+            for target in Target::iter_from(p) {
+                if let Some(lang) = target.language() {
+                    if let Some(rules) = rule_map.get(&lang) {
+                        run_rules(&target, rules, &lang)?;
+                    }
+                }
             }
         }
-    } else {
-        for (lang, rules) in rule_map {
-            run_rules(&target, &rules, &lang)?;
+        Some(p) => {
+            let target = Target::from(Some(p))?;
+            if let Some(lang) = target.language() {
+                if let Some(rules) = rule_map.get(&lang) {
+                    run_rules(&target, rules, &lang)?;
+                }
+            }
+        }
+        _ => {
+            let target = Target::from(None)?;
+            for (lang, rules) in rule_map {
+                run_rules(&target, &rules, &lang)?;
+            }
         }
     }
 

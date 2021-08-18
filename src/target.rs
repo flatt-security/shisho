@@ -1,5 +1,6 @@
 use anyhow::Result;
 use std::{io::Read, path::PathBuf};
+use walkdir::WalkDir;
 
 use crate::ruleset::Language;
 
@@ -22,6 +23,16 @@ impl Target {
             std::io::stdin().read_to_string(&mut body)?;
             Ok(Target { path, body })
         }
+    }
+
+    pub fn iter_from(p: PathBuf) -> impl Iterator<Item = Self> {
+        WalkDir::new(p)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .map(|e| e.into_path())
+            .filter(|p| p.is_file())
+            .map(|p| Target::from(Some(p)))
+            .filter_map(|e| e.ok())
     }
 
     pub fn is_file(&self) -> bool {

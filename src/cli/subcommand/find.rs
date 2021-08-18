@@ -55,33 +55,46 @@ fn run_(_common_opts: CommonOpts, opts: FindOpts) -> Result<()> {
         rewrite: opts.rewrite,
     };
 
-    let target = Target::from(opts.target_path)?;
-    if target.is_file() {
-        if let Some(target_lang) = target.language() {
-            if opts.lang == target_lang {
-                find(target, rule, &opts.lang)?;
+    match opts.target_path {
+        Some(p) if p.is_dir() => {
+            for target in Target::iter_from(p) {
+                if let Some(target_lang) = target.language() {
+                    if opts.lang == target_lang {
+                        run_rule(target, &rule, &opts.lang)?;
+                    }
+                }
             }
         }
-    } else {
-        find(target, rule, &opts.lang)?;
+        Some(p) => {
+            let target = Target::from(Some(p))?;
+            if let Some(target_lang) = target.language() {
+                if opts.lang == target_lang {
+                    run_rule(target, &rule, &opts.lang)?;
+                }
+            }
+        }
+        _ => {
+            let target = Target::from(None)?;
+            run_rule(target, &rule, &opts.lang)?;
+        }
     }
 
     Ok(())
 }
 
-fn find(target: Target, rule: Rule, lang: &ruleset::Language) -> Result<()> {
+fn run_rule(target: Target, rule: &Rule, lang: &ruleset::Language) -> Result<()> {
     match lang {
         ruleset::Language::HCL => find_::<HCL>(target, rule),
         ruleset::Language::Go => find_::<Go>(target, rule),
     }
 }
 
-fn find_<T: Queryable + 'static>(target: Target, rule: Rule) -> Result<()> {
+fn find_<T: Queryable + 'static>(target: Target, rule: &Rule) -> Result<()> {
     let tree = Tree::<T>::try_from(target.body.as_str()).unwrap();
     let ptree = tree.to_partial();
 
     let findings = rule.find::<T>(&ptree)?;
-    let findings = repeat(&rule).zip(findings).collect();
+    let findings = repeat(rule).zip(findings).collect();
     print_findings::<T>(&target, findings)?;
 
     Ok(())
