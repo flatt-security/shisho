@@ -27,7 +27,10 @@ where
         };
 
         let tree = self.pattern.to_tstree()?;
-        let patched_item = T::get_query_nodes(&tree);
+        let patched_item = T::get_query_nodes(&tree)
+            .into_iter()
+            .filter(|x| !T::is_skippable(x))
+            .collect::<Vec<tree_sitter::Node>>();
         let patched_item = patched_item
             .into_iter()
             .map(|node| processor.handle_node(node))
