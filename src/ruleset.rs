@@ -77,6 +77,7 @@ pub enum RawPredicate {
 #[serde(rename_all = "lowercase")]
 pub enum Language {
     HCL,
+    Dockerfile,
     Go,
 }
 

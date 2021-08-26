@@ -2,7 +2,7 @@
 
 use crate::{
     cli::CommonOpts,
-    language::{Go, Queryable, HCL},
+    language::{Dockerfile, Go, Queryable, HCL},
     ruleset::{self, Rule},
     target::Target,
     tree::Tree,
@@ -85,6 +85,7 @@ fn run_(_common_opts: CommonOpts, opts: FindOpts) -> Result<()> {
 fn run_rule(target: Target, rule: &Rule, lang: &ruleset::Language) -> Result<()> {
     match lang {
         ruleset::Language::HCL => find_::<HCL>(target, rule),
+        ruleset::Language::Dockerfile => find_::<Dockerfile>(target, rule),
         ruleset::Language::Go => find_::<Go>(target, rule),
     }
 }

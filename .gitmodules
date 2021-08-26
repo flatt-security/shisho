@@ -10,3 +10,9 @@
 [submodule "third_party/tree-sitter-go-query"]
 	path = third_party/tree-sitter-go-query
 	url = https://github.com/flatt-security/tree-sitter-go-query
+[submodule "third_party/tree-sitter-dockerfile-query"]
+	path = third_party/tree-sitter-dockerfile-query
+	url = https://github.com/flatt-security/tree-sitter-dockerfile-query.git
+[submodule "third_party/tree-sitter-dockerfile"]
+	path = third_party/tree-sitter-dockerfile
+	url = https://github.com/flatt-security/tree-sitter-dockerfile.git

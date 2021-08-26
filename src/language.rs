@@ -1,6 +1,8 @@
+mod docker;
 mod go;
 mod hcl;
 
+pub use self::docker::Dockerfile;
 pub use self::go::Go;
 pub use self::hcl::HCL;
 
