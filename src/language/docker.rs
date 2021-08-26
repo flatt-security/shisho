@@ -36,7 +36,7 @@ impl Queryable for Dockerfile {
 
     fn is_string_literal(node: &tree_sitter::Node) -> bool {
         match node.kind() {
-            "shell_fragment" | "double_quoted_string" | "unquoted_string" => true,
+            "shell_fragment" | "double_quoted_string" | "unquoted_string" | "shell_command" => true,
             _ => false,
         }
     }
@@ -125,6 +125,22 @@ mod tests {
             assert_eq!(
                 c[0].value_of(&MetavariableId("X".into())),
                 Some(r#"echo "hosts: files dns" > /etc/nsswitch.conf"#)
+            );
+        }
+        {
+            let query = Query::<Dockerfile>::try_from(r#"RUN :[X]"#).unwrap();
+            let cmd = r#"RUN apt-get update && apt-get install -y \
+            aufs-tools \
+            automake \
+            && rm -rf /var/lib/apt/lists/*"#;
+            let tree = Tree::<Dockerfile>::try_from(cmd).unwrap();
+            let ptree = tree.to_partial();
+            let session = ptree.matches(&query);
+            let c = session.collect::<Vec<MatchedItem>>();
+            assert_eq!(c.len(), 1);
+            assert_eq!(
+                c[0].value_of(&MetavariableId("X".into())),
+                Some(cmd[4..].to_string().as_str())
             );
         }
     }

@@ -42,9 +42,13 @@ fn to_regex(q: &str) -> String {
     let escaped_qvalue = regex::escape(q);
     let p = regex::Regex::new(r":\\\[([A-Z_][A-Z_0-9]*)\\\]").unwrap();
     format!(
-        "^{}$",
+        "(?s-m)\\A{}\\z",
         p.replace_all(escaped_qvalue.as_str(), |caps: &Captures| {
-            format!("(?P<{}>.*)", &caps[1])
+            if &caps[1] == "_" {
+                format!("(.*)")
+            } else {
+                format!("(?P<{}>.*)", &caps[1])
+            }
         })
     )
 }
@@ -55,9 +59,12 @@ mod tests {
 
     #[test]
     fn test_to_regex() {
-        assert_eq!(to_regex("test"), "^test$");
-        assert_eq!(to_regex("te:[X]st"), "^te(?P<X>.*)st$");
-        assert_eq!(to_regex("te:[X]s:[Y]t"), "^te(?P<X>.*)s(?P<Y>.*)t$");
+        assert_eq!(to_regex("test"), "(?s-m)\\Atest\\z");
+        assert_eq!(to_regex("te:[X]st"), "(?s-m)\\Ate(?P<X>.*)st\\z");
+        assert_eq!(
+            to_regex("te:[X]s:[Y]t"),
+            "(?s-m)\\Ate(?P<X>.*)s(?P<Y>.*)t\\z"
+        );
     }
 
     #[test]
@@ -75,6 +82,14 @@ mod tests {
             vec![vec![(
                 MetavariableId("X".into()),
                 CaptureItem::Literal("test".into())
+            )]]
+        );
+
+        assert_eq!(
+            match_string_pattern("hello\ntestgoodbye", "hello:[X]goodbye"),
+            vec![vec![(
+                MetavariableId("X".into()),
+                CaptureItem::Literal("\ntest".into())
             )]]
         );
 
