@@ -130,7 +130,7 @@ pub(crate) fn print_findings<T: Queryable + 'static>(
         // print a finding
         println!("In {}:", target_path);
         println!("{:>8} |", "");
-        let (s, e) = mitem.top.range_for_view::<T>();
+        let (s, e) = mitem.area.range_for_view::<T>();
 
         for line_index in (s.row)..=(e.row) {
             if line_index >= lines.len() {

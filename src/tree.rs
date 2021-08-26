@@ -1,9 +1,9 @@
 use crate::{
     language::Queryable,
-    matcher::QueryMatcher,
+    matcher::{MatchedItem, QueryMatcher},
     query::{
-        CaptureId, Query, SHISHO_NODE_ELLIPSIS, SHISHO_NODE_ELLIPSIS_METAVARIABLE,
-        SHISHO_NODE_METAVARIABLE, SHISHO_NODE_METAVARIABLE_NAME,
+        Query, SHISHO_NODE_ELLIPSIS, SHISHO_NODE_ELLIPSIS_METAVARIABLE, SHISHO_NODE_METAVARIABLE,
+        SHISHO_NODE_METAVARIABLE_NAME,
     },
 };
 use anyhow::{anyhow, Result};
@@ -13,8 +13,9 @@ use std::{
 };
 
 pub struct Tree<T> {
+    pub(crate) tstree: tree_sitter::Tree,
+
     raw: Vec<u8>,
-    tstree: tree_sitter::Tree,
     _marker: PhantomData<T>,
 }
 
@@ -30,39 +31,25 @@ where
         }
     }
 
-    pub fn to_partial<'node, 'tree>(&'tree self) -> PartialTree<'tree, 'node, T> {
+    pub fn to_partial<'tree>(&'tree self) -> PartialTree<'tree, T> {
         PartialTree::new(self.tstree.root_node(), self.raw.as_slice())
     }
 }
 
-impl<'a, 'tree, T> AsRef<tree_sitter::Tree> for Tree<T> {
-    fn as_ref(&self) -> &tree_sitter::Tree {
-        &self.tstree
-    }
-}
+pub struct PartialTree<'tree, T> {
+    pub(crate) root: tree_sitter::Node<'tree>,
 
-impl<'a, 'tree, T> AsRef<[u8]> for Tree<T> {
-    fn as_ref(&self) -> &[u8] {
-        &self.raw
-    }
-}
-
-pub struct PartialTree<'tree, 'node, T>
-where
-    'tree: 'node,
-{
     raw: &'tree [u8],
-    top: tree_sitter::Node<'node>,
     _marker: PhantomData<T>,
 }
 
-impl<'tree, 'node, T> PartialTree<'tree, 'node, T>
+impl<'tree, T> PartialTree<'tree, T>
 where
     T: Queryable,
 {
-    pub fn new(top: tree_sitter::Node<'node>, raw: &'tree [u8]) -> PartialTree<'tree, 'node, T> {
+    pub fn new(top: tree_sitter::Node<'tree>, raw: &'tree [u8]) -> PartialTree<'tree, T> {
         PartialTree {
-            top,
+            root: top,
             raw,
             _marker: PhantomData,
         }
@@ -71,23 +58,24 @@ where
     pub fn matches<'query>(
         &'tree self,
         query: &'query Query<T>,
-    ) -> QueryMatcher<'tree, 'node, 'query, T>
+    ) -> impl Iterator<Item = MatchedItem<'tree>> + 'query
     where
         'tree: 'query,
     {
-        QueryMatcher::new(self, query)
+        QueryMatcher::new(self, query).into_iter()
+    }
+
+    pub fn value_of(&self, node: &tree_sitter::Node<'tree>) -> &str {
+        node.utf8_text(self.raw).unwrap()
     }
 }
 
-impl<'a, 'tree, 'node, T> AsRef<tree_sitter::Node<'node>> for PartialTree<'tree, 'node, T> {
-    fn as_ref(&self) -> &tree_sitter::Node<'node> {
-        &self.top
-    }
-}
-
-impl<'a, 'tree, 'node, T> AsRef<[u8]> for PartialTree<'tree, 'node, T> {
+impl<'tree, T> AsRef<[u8]> for PartialTree<'tree, T>
+where
+    T: Queryable,
+{
     fn as_ref(&self) -> &[u8] {
-        &self.raw
+        self.raw
     }
 }
 
@@ -107,7 +95,9 @@ where
     fn from(value: &'a str) -> Self {
         let value = value.to_string();
         RawTree {
-            raw_bytes: if value.as_bytes()[value.as_bytes().len() - 1] != b'\n' {
+            raw_bytes: if value.as_bytes().len() != 0
+                && value.as_bytes()[value.as_bytes().len() - 1] != b'\n'
+            {
                 [value.as_bytes(), "\n".as_bytes()].concat()
             } else {
                 value.into()
@@ -156,11 +146,12 @@ where
 {
     type Output;
 
-    fn walk_leaf_node(&self, node: tree_sitter::Node) -> Result<Self::Output, anyhow::Error> {
-        Err(anyhow!(
-            "internal error: walker function for leaf nodes is undefined"
-        ))
-    }
+    fn walk_leaf_named_node(&self, node: tree_sitter::Node) -> Result<Self::Output, anyhow::Error>;
+
+    fn walk_leaf_unnamed_node(
+        &self,
+        node: tree_sitter::Node,
+    ) -> Result<Self::Output, anyhow::Error>;
 
     fn walk_intermediate_node(
         &self,
@@ -181,52 +172,48 @@ where
         children: Vec<Self::Output>,
     ) -> Result<Self::Output, anyhow::Error>;
 
-    fn walk_ellipsis(&self, node: tree_sitter::Node) -> Result<Self::Output, anyhow::Error> {
-        Err(anyhow!(
-            "internal error: walker function for ellipsis operators is undefined"
-        ))
-    }
+    fn walk_ellipsis(&self, node: tree_sitter::Node) -> Result<Self::Output, anyhow::Error>;
 
     fn walk_ellipsis_metavariable(
         &self,
         node: tree_sitter::Node,
         variable_name: &str,
-    ) -> Result<Self::Output, anyhow::Error> {
-        Err(anyhow!(
-            "internal error: walker function for ellipsis metavariables is undefined"
-        ))
-    }
+    ) -> Result<Self::Output, anyhow::Error>;
 
     fn walk_metavariable(
         &self,
         node: tree_sitter::Node,
         variable_name: &str,
-    ) -> Result<Self::Output, anyhow::Error> {
-        Err(anyhow!(
-            "internal error: walker function for metavariables is undefined"
-        ))
-    }
+    ) -> Result<Self::Output, anyhow::Error>;
 
     fn handle_node(&self, node: tree_sitter::Node) -> Result<Self::Output, anyhow::Error> {
         match node.kind() {
             SHISHO_NODE_ELLIPSIS => self.walk_ellipsis(node),
-            SHISHO_NODE_ELLIPSIS_METAVARIABLE => {
-                let vname = self.extract_vname_from_node(&node).ok_or(anyhow!(
-                    "{} did not have {}",
-                    SHISHO_NODE_ELLIPSIS_METAVARIABLE,
-                    SHISHO_NODE_METAVARIABLE_NAME
-                ))?;
-                self.walk_ellipsis_metavariable(node, vname)
+            s if s == SHISHO_NODE_ELLIPSIS_METAVARIABLE || s == SHISHO_NODE_METAVARIABLE => {
+                let variable_name = node
+                    .named_children(&mut node.walk())
+                    .find(|child| child.kind() == SHISHO_NODE_METAVARIABLE_NAME)
+                    .map(|child| self.value_of(&child))
+                    .ok_or(anyhow!(
+                        "{} did not have {}",
+                        SHISHO_NODE_ELLIPSIS_METAVARIABLE,
+                        SHISHO_NODE_METAVARIABLE_NAME
+                    ))?;
+                if s == SHISHO_NODE_ELLIPSIS_METAVARIABLE {
+                    self.walk_ellipsis_metavariable(node, variable_name)
+                } else if s == SHISHO_NODE_METAVARIABLE {
+                    self.walk_metavariable(node, variable_name)
+                } else {
+                    panic!("invalid state")
+                }
             }
-            SHISHO_NODE_METAVARIABLE => {
-                let vname = self.extract_vname_from_node(&node).ok_or(anyhow!(
-                    "{} did not have {}",
-                    SHISHO_NODE_METAVARIABLE,
-                    SHISHO_NODE_METAVARIABLE_NAME
-                ))?;
-                self.walk_metavariable(node, vname)
+            _ if (self.children_of(node) == 0 || T::is_leaf_like(&node)) => {
+                if node.is_named() {
+                    self.walk_leaf_named_node(node)
+                } else {
+                    self.walk_leaf_unnamed_node(node)
+                }
             }
-            _ if self.child_count(node) == 0 || T::is_leaf(&node) => self.walk_leaf_node(node),
             _ => self.walk_intermediate_node(node),
         }
     }
@@ -235,22 +222,9 @@ where
         self.handle_node(tree.root_node())
     }
 
-    fn child_count(&self, node: tree_sitter::Node) -> usize {
+    fn value_of(&self, node: &tree_sitter::Node) -> &'tree str;
+
+    fn children_of(&self, node: tree_sitter::Node) -> usize {
         node.child_count()
-    }
-
-    fn node_as_str(&self, node: &tree_sitter::Node) -> &'tree str;
-
-    fn extract_vname_from_node(&self, node: &tree_sitter::Node) -> Option<&'tree str> {
-        let mut cursor = node.walk();
-        let r = node
-            .named_children(&mut cursor)
-            .find(|child| child.kind() == SHISHO_NODE_METAVARIABLE_NAME)
-            .map(|child| self.node_as_str(&child));
-        r
-    }
-
-    fn node_as_capture_id(&self, node: &tree_sitter::Node) -> CaptureId {
-        CaptureId(format!("{}", node.id()))
     }
 }
