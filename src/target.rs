@@ -40,15 +40,17 @@ impl Target {
     }
 
     pub fn language(&self) -> Option<Language> {
-        if let Some(p) = self.path.as_ref().and_then(|p| p.canonicalize().ok()) {
-            let ext = p.extension()?;
-            match ext.to_str() {
-                Some("go") => Some(Language::Go),
-                Some("tf") => Some(Language::HCL),
-                _ => None,
-            }
+        let p = self.path.as_ref().and_then(|p| p.canonicalize().ok())?;
+        let ext = if let Some(ext) = p.extension() {
+            Some(ext)
         } else {
-            None
+            p.file_name()
+        }?;
+
+        match ext.to_str() {
+            Some("go") => Some(Language::Go),
+            Some("tf") => Some(Language::HCL),
+            _ => None,
         }
     }
 }

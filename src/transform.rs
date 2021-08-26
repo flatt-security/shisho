@@ -27,7 +27,10 @@ where
         };
 
         let tree = self.pattern.to_tstree()?;
-        let patched_item = T::extract_query_nodes(&tree)?;
+        let patched_item = T::get_query_nodes(&tree)
+            .into_iter()
+            .filter(|x| !T::is_skippable(x))
+            .collect::<Vec<tree_sitter::Node>>();
         let patched_item = patched_item
             .into_iter()
             .map(|node| processor.handle_node(node))
@@ -38,6 +41,15 @@ where
             .map(|item| item.body)
             .collect::<Vec<String>>()
             .join(""))
+    }
+}
+
+impl<T> AsRef<[u8]> for AutofixPattern<T>
+where
+    T: Queryable,
+{
+    fn as_ref(&self) -> &[u8] {
+        self.pattern.as_ref()
     }
 }
 
@@ -54,7 +66,7 @@ where
     T: Queryable,
 {
     fn str_from_range(&self, start: usize, end: usize) -> String {
-        let raw = self.pattern.pattern.as_ref();
+        let raw = self.pattern.as_ref();
         String::from_utf8(raw[start..end].to_vec()).unwrap()
     }
 }
@@ -77,10 +89,8 @@ where
         variable_name: &str,
     ) -> Result<Self::Output, anyhow::Error> {
         let id = MetavariableId(variable_name.into());
-        let value = self
-            .item
-            .get_captured_string(&id)
-            .ok_or(anyhow!("metavariable not found"))?;
+        let value = self.item.value_of(&id).unwrap_or_default();
+        // .ok_or(anyhow!("metavariable not found"))?;
         Ok(PatchedItem {
             body: value.into(),
             start_byte: node.start_byte(),
@@ -104,9 +114,20 @@ where
         ))
     }
 
-    fn walk_leaf_node(&self, node: tree_sitter::Node) -> Result<Self::Output, anyhow::Error> {
+    fn walk_leaf_named_node(&self, node: tree_sitter::Node) -> Result<Self::Output, anyhow::Error> {
         Ok(PatchedItem {
-            body: self.node_as_str(&node).into(),
+            body: self.value_of(&node).into(),
+            start_byte: node.start_byte(),
+            end_byte: node.end_byte(),
+        })
+    }
+
+    fn walk_leaf_unnamed_node(
+        &self,
+        node: tree_sitter::Node,
+    ) -> Result<Self::Output, anyhow::Error> {
+        Ok(PatchedItem {
+            body: self.value_of(&node).into(),
             start_byte: node.start_byte(),
             end_byte: node.end_byte(),
         })
@@ -133,18 +154,9 @@ where
         })
     }
 
-    fn node_as_str(&self, node: &tree_sitter::Node) -> &'tree str {
-        let raw = self.pattern.pattern.as_ref();
+    fn value_of(&self, node: &tree_sitter::Node) -> &'tree str {
+        let raw = self.pattern.as_ref();
         std::str::from_utf8(&raw[node.start_byte()..node.end_byte()]).unwrap()
-    }
-}
-
-impl<T> AsRef<[u8]> for AutofixPattern<T>
-where
-    T: Queryable,
-{
-    fn as_ref(&self) -> &[u8] {
-        self.pattern.as_ref()
     }
 }
 
@@ -186,10 +198,10 @@ where
     fn transform_with_query(self, item: MatchedItem, query: AutofixPattern<T>) -> Result<Self> {
         let current_code = self.as_str().as_bytes();
 
-        let before_snippet = String::from_utf8(current_code[0..item.top.start_byte()].to_vec())?;
+        let before_snippet = String::from_utf8(current_code[0..item.area.start_byte()].to_vec())?;
         let snippet = query.to_patched_snippet(&item)?;
         let after_snippet = String::from_utf8(
-            current_code[item.top.end_byte().min(current_code.len())..current_code.len()].to_vec(),
+            current_code[item.area.end_byte().min(current_code.len())..current_code.len()].to_vec(),
         )?;
 
         Ok(Code::from(format!(

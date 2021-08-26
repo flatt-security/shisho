@@ -1,5 +1,3 @@
-use anyhow::Result;
-
 use super::Queryable;
 
 #[derive(Debug, Clone)]
@@ -14,18 +12,16 @@ impl Queryable for Go {
         tree_sitter_go_query::language()
     }
 
-    fn extract_query_nodes<'tree>(
-        root: &'tree tree_sitter::Tree,
-    ) -> Result<Vec<tree_sitter::Node<'tree>>> {
+    fn get_query_nodes<'tree>(root: &'tree tree_sitter::Tree) -> Vec<tree_sitter::Node<'tree>> {
         // see `//third_party/tree-sitter-go-query/grammar.js`
         let source_file = root.root_node();
 
         let mut cursor = source_file.walk();
-        Ok(source_file.named_children(&mut cursor).collect())
+        source_file.children(&mut cursor).collect()
     }
 
-    fn is_leaf(_node: &tree_sitter::Node) -> bool {
-        false
+    fn is_skippable(node: &tree_sitter::Node) -> bool {
+        node.kind() == "\n"
     }
 
     fn range_for_view(node: &tree_sitter::Node) -> (tree_sitter::Point, tree_sitter::Point) {
@@ -35,6 +31,7 @@ impl Queryable for Go {
 
 #[cfg(test)]
 mod tests {
+    use crate::matcher::MatchedItem;
     use crate::transform::Transformable;
     use crate::{
         code::Code,
@@ -55,7 +52,7 @@ mod tests {
 
             let ptree = tree.to_partial();
             let session = ptree.matches(&query);
-            assert_eq!(session.collect().len(), 1);
+            assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 1);
         }
 
         {
@@ -67,7 +64,7 @@ mod tests {
 
             let ptree = tree.to_partial();
             let session = ptree.matches(&query);
-            assert_eq!(session.collect().len(), 1);
+            assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 1);
         }
     }
 
@@ -97,7 +94,7 @@ mod tests {
 
             let ptree = tree.to_partial();
             let session = ptree.matches(&query);
-            assert_eq!(session.collect().len(), 1);
+            assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 1);
         }
 
         {
@@ -121,7 +118,7 @@ mod tests {
 
             let ptree = tree.to_partial();
             let session = ptree.matches(&query);
-            assert_eq!(session.collect().len(), 1);
+            assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 1);
         }
     }
 
@@ -133,12 +130,9 @@ mod tests {
             let ptree = tree.to_partial();
             let session = ptree.matches(&query);
 
-            let c = session.collect();
+            let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
-            assert_eq!(
-                c[0].get_captured_string(&MetavariableId("X".into())),
-                Some("\"test\"")
-            );
+            assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("\"test\""));
         }
         {
             let query = Query::<Go>::try_from(r#"f("%s%d", :[...X])"#).unwrap();
@@ -147,12 +141,9 @@ mod tests {
                 let ptree = tree.to_partial();
                 let session = ptree.matches(&query);
 
-                let c = session.collect();
+                let c = session.collect::<Vec<MatchedItem>>();
                 assert_eq!(c.len(), 1);
-                assert_eq!(
-                    c[0].get_captured_string(&MetavariableId("X".into())),
-                    Some("1, 2")
-                );
+                assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("1, 2"));
             }
         }
 
@@ -162,12 +153,9 @@ mod tests {
             let ptree = tree.to_partial();
             let session = ptree.matches(&query);
 
-            let c = session.collect();
+            let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
-            assert_eq!(
-                c[0].get_captured_string(&MetavariableId("X".into())),
-                Some("1, 2")
-            );
+            assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("1, 2"));
         }
     }
 
@@ -180,22 +168,19 @@ mod tests {
                 let query = Query::<Go>::try_from(r#":[X].Printf("%s%d", :[...])"#).unwrap();
                 let session = ptree.matches(&query);
 
-                let c = session.collect();
+                let c = session.collect::<Vec<MatchedItem>>();
                 assert_eq!(c.len(), 1);
-                assert_eq!(
-                    c[0].get_captured_string(&MetavariableId("X".into())),
-                    Some("fmt")
-                );
+                assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("fmt"));
             }
 
             {
                 let query = Query::<Go>::try_from(r#":[X]("%s%d", :[...])"#).unwrap();
                 let session = ptree.matches(&query);
 
-                let c = session.collect();
+                let c = session.collect::<Vec<MatchedItem>>();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
-                    c[0].get_captured_string(&MetavariableId("X".into())),
+                    c[0].value_of(&MetavariableId("X".into())),
                     Some("fmt.Printf")
                 );
             }
@@ -218,12 +203,9 @@ mod tests {
                 .unwrap();
                 let session = ptree.matches(&query);
 
-                let c = session.collect();
+                let c = session.collect::<Vec<MatchedItem>>();
                 assert_eq!(c.len(), 1);
-                assert_eq!(
-                    c[0].get_captured_string(&MetavariableId("X".into())),
-                    Some("r")
-                );
+                assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("r"));
             }
             {
                 let query =
@@ -231,10 +213,10 @@ mod tests {
                         .unwrap();
                 let session = ptree.matches(&query);
 
-                let c = session.collect();
+                let c = session.collect::<Vec<MatchedItem>>();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
-                    c[0].get_captured_string(&MetavariableId("X".into())),
+                    c[0].value_of(&MetavariableId("X".into())),
                     Some("a int, b string, c int")
                 );
             }
@@ -245,12 +227,9 @@ mod tests {
                 .unwrap();
                 let session = ptree.matches(&query);
 
-                let c = session.collect();
+                let c = session.collect::<Vec<MatchedItem>>();
                 assert_eq!(c.len(), 1);
-                assert_eq!(
-                    c[0].get_captured_string(&MetavariableId("X".into())),
-                    Some("b string")
-                );
+                assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("b string"));
             }
         }
     }
@@ -264,27 +243,18 @@ mod tests {
                 let query = Query::<Go>::try_from(r#"[] :[X] {1, 2, :[Y], 4, 5}"#).unwrap();
                 let session = ptree.matches(&query);
 
-                let c = session.collect();
+                let c = session.collect::<Vec<MatchedItem>>();
                 assert_eq!(c.len(), 1);
-                assert_eq!(
-                    c[0].get_captured_string(&MetavariableId("X".into())),
-                    Some("int")
-                );
-                assert_eq!(
-                    c[0].get_captured_string(&MetavariableId("Y".into())),
-                    Some("3")
-                );
+                assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("int"));
+                assert_eq!(c[0].value_of(&MetavariableId("Y".into())), Some("3"));
             }
             {
                 let query = Query::<Go>::try_from(r#"[] int {1, 2, :[...Y], 5}"#).unwrap();
                 let session = ptree.matches(&query);
 
-                let c = session.collect();
+                let c = session.collect::<Vec<MatchedItem>>();
                 assert_eq!(c.len(), 1);
-                assert_eq!(
-                    c[0].get_captured_string(&MetavariableId("Y".into())),
-                    Some("3, 4")
-                );
+                assert_eq!(c[0].value_of(&MetavariableId("Y".into())), Some("3, 4"));
             }
         }
     }
@@ -299,14 +269,14 @@ mod tests {
                 let query = Query::<Go>::try_from(r#"if :[X] { :[...Y] }"#).unwrap();
                 let session = ptree.matches(&query);
 
-                let c = session.collect();
+                let c = session.collect::<Vec<MatchedItem>>();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
-                    c[0].get_captured_string(&MetavariableId("X".into())),
+                    c[0].value_of(&MetavariableId("X".into())),
                     Some("true == false")
                 );
                 assert_eq!(
-                    c[0].get_captured_string(&MetavariableId("Y".into())),
+                    c[0].value_of(&MetavariableId("Y".into())),
                     Some("a := 2; b := 3")
                 );
             }
@@ -320,20 +290,32 @@ mod tests {
             let query = Query::<Go>::try_from(r#"if :[X]; :[Y] { :[...Z] }"#).unwrap();
             let session = ptree.matches(&query);
 
-            let c = session.collect();
+            let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
             assert_eq!(
-                c[0].get_captured_string(&MetavariableId("X".into())),
+                c[0].value_of(&MetavariableId("X".into())),
                 Some("err := nil")
             );
             assert_eq!(
-                c[0].get_captured_string(&MetavariableId("Y".into())),
+                c[0].value_of(&MetavariableId("Y".into())),
                 Some("true == false")
             );
             assert_eq!(
-                c[0].get_captured_string(&MetavariableId("Z".into())),
+                c[0].value_of(&MetavariableId("Z".into())),
                 Some("a := 2; b := 3")
             );
+        }
+
+        {
+            let tree = Tree::<Go>::try_from(
+                r#"if err := nil; true == false { a := 2; b := 3 } else { c := 4 }"#,
+            )
+            .unwrap();
+            let ptree = tree.to_partial();
+            let query = Query::<Go>::try_from(r#"if :[X] { :[...] }"#).unwrap();
+            let session = ptree.matches(&query);
+            let c = session.collect::<Vec<MatchedItem>>();
+            assert_eq!(c.len(), 0);
         }
     }
 
@@ -347,14 +329,11 @@ mod tests {
 
         let query = Query::<Go>::try_from(r#":[X] || :[X]"#).unwrap();
 
-        let item = {
-            let session = ptree.matches(&query);
-            let mut items = session.collect();
-            assert_eq!(items.len(), 1);
-            items.pop().unwrap()
-        };
+        let session = ptree.matches(&query);
+        let mut c = session.collect::<Vec<MatchedItem>>();
+        assert_eq!(c.len(), 1);
 
-        let from_code = code.transform(item, ":[X]");
+        let from_code = code.transform(c.pop().unwrap(), ":[X]");
         assert!(from_code.is_ok());
 
         assert_eq!(from_code.unwrap().as_str(), "func a() { b := 1 }",);
