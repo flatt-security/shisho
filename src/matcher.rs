@@ -200,7 +200,22 @@ where
                 })
                 .collect()
         } else {
-            if self.tree.value_of(tnode) == self.query.value_of(qnode) {
+            if tnode.kind() != qnode.kind() {
+                return vec![];
+            }
+
+            let (tvalue, qvalue) = if tnode.is_named() {
+                (
+                    self.tree.value_of(tnode).to_string(),
+                    self.query.value_of(qnode).to_string(),
+                )
+            } else {
+                (
+                    T::normalize_annonymous_leaf(self.tree.value_of(tnode)),
+                    T::normalize_annonymous_leaf(self.query.value_of(qnode)),
+                )
+            };
+            if tvalue == qvalue {
                 vec![MatcherState {
                     subtree: Some(ConsecutiveNodes::from(vec![tnode.clone()])),
                     captures: vec![],

@@ -50,6 +50,7 @@ impl Target {
         match ext.to_str() {
             Some("go") => Some(Language::Go),
             Some("tf") => Some(Language::HCL),
+            Some("Dockerfile") => Some(Language::Dockerfile),
             _ => None,
         }
     }

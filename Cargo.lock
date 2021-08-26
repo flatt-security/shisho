@@ -277,6 +277,8 @@ dependencies = [
  "structopt",
  "thiserror",
  "tree-sitter",
+ "tree-sitter-dockerfile",
+ "tree-sitter-dockerfile-query",
  "tree-sitter-go",
  "tree-sitter-go-query",
  "tree-sitter-hcl",
@@ -368,6 +370,22 @@ checksum = "ad726ec26496bf4c083fff0f43d4eb3a2ad1bba305323af5ff91383c0b6ecac0"
 dependencies = [
  "cc",
  "regex",
+]
+
+[[package]]
+name = "tree-sitter-dockerfile"
+version = "0.0.1"
+dependencies = [
+ "cc",
+ "tree-sitter",
+]
+
+[[package]]
+name = "tree-sitter-dockerfile-query"
+version = "0.0.1"
+dependencies = [
+ "cc",
+ "tree-sitter",
 ]
 
 [[package]]

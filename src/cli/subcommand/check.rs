@@ -3,7 +3,7 @@
 use crate::{
     cli::CommonOpts,
     code::Code,
-    language::{Go, Queryable, HCL},
+    language::{Dockerfile, Go, Queryable, HCL},
     matcher::MatchedItem,
     ruleset::{self, Rule},
     target::Target,
@@ -90,6 +90,7 @@ fn run_(_common_opts: CommonOpts, opts: CheckOpts) -> Result<()> {
 fn run_rules(target: &Target, rules: &Vec<Rule>, lang: &ruleset::Language) -> Result<()> {
     match lang {
         ruleset::Language::HCL => run_rules_::<HCL>(&target, rules),
+        ruleset::Language::Dockerfile => run_rules_::<Dockerfile>(&target, rules),
         ruleset::Language::Go => run_rules_::<Go>(&target, rules),
     }
 }

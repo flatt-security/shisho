@@ -36,3 +36,9 @@ path = "./third_party/tree-sitter-go"
 
 [dependencies.tree-sitter-go-query]
 path = "./third_party/tree-sitter-go-query"
+
+[dependencies.tree-sitter-dockerfile]
+path = "./third_party/tree-sitter-dockerfile"
+
+[dependencies.tree-sitter-dockerfile-query]
+path = "./third_party/tree-sitter-dockerfile-query"
