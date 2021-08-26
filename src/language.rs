@@ -21,7 +21,11 @@ pub trait Queryable {
         false
     }
 
-    fn normalize_leaf(s: &str) -> String {
+    fn is_string_literal(_node: &tree_sitter::Node) -> bool {
+        false
+    }
+
+    fn normalize_annonymous_leaf(s: &str) -> String {
         s.to_string()
     }
 }

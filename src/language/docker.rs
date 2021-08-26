@@ -30,7 +30,18 @@ impl Queryable for Dockerfile {
         node.kind() == "\n"
     }
 
-    fn normalize_leaf(s: &str) -> String {
+    fn is_leaf_like(node: &tree_sitter::Node) -> bool {
+        Self::is_string_literal(node)
+    }
+
+    fn is_string_literal(node: &tree_sitter::Node) -> bool {
+        match node.kind() {
+            "shell_fragment" | "double_quoted_string" | "unquoted_string" => true,
+            _ => false,
+        }
+    }
+
+    fn normalize_annonymous_leaf(s: &str) -> String {
         s.to_ascii_uppercase()
     }
 }

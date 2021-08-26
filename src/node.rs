@@ -1,6 +1,6 @@
 use crate::language::Queryable;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ConsecutiveNodes<'tree>(Vec<tree_sitter::Node<'tree>>);
 
 impl<'tree> From<Vec<tree_sitter::Node<'tree>>> for ConsecutiveNodes<'tree> {
