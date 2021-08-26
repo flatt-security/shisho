@@ -1,6 +1,5 @@
 mod go;
 mod hcl;
-
 pub use self::go::Go;
 pub use self::hcl::HCL;
 
@@ -19,7 +18,7 @@ pub trait Queryable {
         false
     }
 
-    fn normalize_leaf(s: &str) -> String {
-        s.to_string()
+    fn is_string_literal(_node: &tree_sitter::Node) -> bool {
+        false
     }
 }

@@ -26,7 +26,14 @@ impl Queryable for HCL {
     }
 
     fn is_leaf_like(node: &tree_sitter::Node) -> bool {
-        node.kind() == "quoted_template"
+        Self::is_string_literal(node)
+    }
+
+    fn is_string_literal(node: &tree_sitter::Node) -> bool {
+        match node.kind() {
+            "string_literal" | "quoted_template" => true,
+            _ => false,
+        }
     }
 
     fn is_skippable(node: &tree_sitter::Node) -> bool {
@@ -458,6 +465,47 @@ mod tests {
                     key4 = value4"#
                 )
             );
+        }
+    }
+
+    #[test]
+    fn test_string() {
+        {
+            let tree = Tree::<HCL>::try_from(
+                r#"
+                resource "rtype" "rname1" { 
+                    attr = "sample-0012-foo"
+                }                
+            "#,
+            )
+            .unwrap();
+            let ptree = tree.to_partial();
+            {
+                let query = Query::<HCL>::try_from(
+                    r#"
+                attr = "sample-:[X]-foo"
+            "#,
+                )
+                .unwrap();
+                let session = ptree.matches(&query);
+                let c = session.collect::<Vec<MatchedItem>>();
+                assert_eq!(c.len(), 1);
+                assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("0012"));
+            }
+
+            {
+                let query = Query::<HCL>::try_from(
+                    r#"
+                attr = "sample-:[X]:[Y]-foo"
+            "#,
+                )
+                .unwrap();
+                let session = ptree.matches(&query);
+                let c = session.collect::<Vec<MatchedItem>>();
+                assert_eq!(c.len(), 1);
+                assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("0012"));
+                assert_eq!(c[0].value_of(&MetavariableId("Y".into())), Some(""));
+            }
         }
     }
 

@@ -24,6 +24,17 @@ impl Queryable for Go {
         node.kind() == "\n"
     }
 
+    fn is_leaf_like(node: &tree_sitter::Node) -> bool {
+        Self::is_string_literal(node)
+    }
+
+    fn is_string_literal(node: &tree_sitter::Node) -> bool {
+        match node.kind() {
+            "interpreted_string_literal" | "raw_string_literal" => true,
+            _ => false,
+        }
+    }
+
     fn range_for_view(node: &tree_sitter::Node) -> (tree_sitter::Point, tree_sitter::Point) {
         (node.start_position(), node.end_position())
     }
@@ -256,6 +267,30 @@ mod tests {
                 assert_eq!(c.len(), 1);
                 assert_eq!(c[0].value_of(&MetavariableId("Y".into())), Some("3, 4"));
             }
+        }
+    }
+
+    #[test]
+    fn test_string() {
+        {
+            let tree = Tree::<Go>::try_from(r#"a := "xoxp-test""#).unwrap();
+            let ptree = tree.to_partial();
+            let query = Query::<Go>::try_from(r#""xoxp-:[X]""#).unwrap();
+            let session = ptree.matches(&query);
+
+            let c = session.collect::<Vec<MatchedItem>>();
+            assert_eq!(c.len(), 1);
+            assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("test"));
+        }
+        {
+            let tree = Tree::<Go>::try_from(r#"a := `xoxp-test`"#).unwrap();
+            let ptree = tree.to_partial();
+            let query = Query::<Go>::try_from(r#"`xoxp-:[X]`"#).unwrap();
+            let session = ptree.matches(&query);
+
+            let c = session.collect::<Vec<MatchedItem>>();
+            assert_eq!(c.len(), 1);
+            assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("test"));
         }
     }
 

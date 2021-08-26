@@ -6,6 +6,7 @@ use crate::{
         MetavariableId, Query, SHISHO_NODE_ELLIPSIS, SHISHO_NODE_ELLIPSIS_METAVARIABLE,
         SHISHO_NODE_METAVARIABLE, SHISHO_NODE_METAVARIABLE_NAME,
     },
+    string::match_string_pattern,
     tree::PartialTree,
 };
 use anyhow::{anyhow, Result};
@@ -23,12 +24,12 @@ where
     query: &'query Query<T>,
 }
 
-type UnverifiedMetavariable<'tree> = (MetavariableId, CaptureItem<'tree>);
+pub type UnverifiedMetavariable<'tree> = (MetavariableId, CaptureItem<'tree>);
 
 #[derive(Debug, Default, Clone)]
 pub struct MatcherState<'tree> {
-    subtree: Option<ConsecutiveNodes<'tree>>,
-    captures: Vec<UnverifiedMetavariable<'tree>>,
+    pub(crate) subtree: Option<ConsecutiveNodes<'tree>>,
+    pub(crate) captures: Vec<UnverifiedMetavariable<'tree>>,
 }
 
 impl<'tree, 'query, T> QueryMatcher<'tree, 'query, T>
@@ -141,58 +142,72 @@ where
             (None, None) => {
                 vec![Default::default()]
             }
-            (Some(tnode), Some(qnode)) => {
-                let subtree = ConsecutiveNodes::from(vec![tnode]);
-                match qnode.kind() {
-                    s if s == SHISHO_NODE_METAVARIABLE => {
-                        let mid = MetavariableId(self.variable_name_of(&qnode).to_string());
-                        let item = CaptureItem::from(vec![tnode]);
-                        vec![MatcherState {
-                            subtree: Some(subtree),
-                            captures: vec![(mid, item)],
-                        }]
-                    }
-                    _ if qnode.child_count() == 0 || T::is_leaf_like(&qnode) => {
-                        // TODO: care about patterns in string especially if string constraint
-                        if self.tree.value_of(&tnode) == self.query.value_of(&qnode) {
-                            vec![MatcherState {
-                                subtree: Some(subtree),
-                                captures: vec![],
-                            }]
-                        } else {
-                            vec![]
-                        }
-                    }
-                    _ => {
-                        if tnode.kind() != qnode.kind() {
-                            return vec![];
-                        }
-
-                        let tchildren = tnode
-                            .children(&mut tnode.walk())
-                            .filter(|n| !T::is_skippable(n))
-                            .collect();
-                        let qchildren = qnode
-                            .children(&mut qnode.walk())
-                            .filter(|n| !T::is_skippable(n))
-                            .collect();
-                        self.match_sibillings(tchildren, qchildren)
-                            .into_iter()
-                            .filter_map(|(submatch, trailling)| {
-                                if trailling.is_none() {
-                                    Some(MatcherState {
-                                        subtree: Some(subtree.clone()),
-                                        captures: submatch.captures,
-                                    })
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect()
-                    }
+            (Some(tnode), Some(qnode)) => match qnode.kind() {
+                s if s == SHISHO_NODE_METAVARIABLE => {
+                    let mid = MetavariableId(self.variable_name_of(&qnode).to_string());
+                    let item = CaptureItem::from(vec![tnode]);
+                    vec![MatcherState {
+                        subtree: Some(ConsecutiveNodes::from(vec![tnode])),
+                        captures: vec![(mid, item)],
+                    }]
                 }
-            }
+                _ if qnode.child_count() == 0 || T::is_leaf_like(&qnode) => {
+                    self.match_leaf(&tnode, &qnode)
+                }
+                _ => {
+                    if tnode.kind() != qnode.kind() {
+                        return vec![];
+                    }
+
+                    let tchildren = tnode
+                        .children(&mut tnode.walk())
+                        .filter(|n| !T::is_skippable(n))
+                        .collect();
+                    let qchildren = qnode
+                        .children(&mut qnode.walk())
+                        .filter(|n| !T::is_skippable(n))
+                        .collect();
+                    self.match_sibillings(tchildren, qchildren)
+                        .into_iter()
+                        .filter_map(|(submatch, trailling)| {
+                            if trailling.is_none() {
+                                Some(MatcherState {
+                                    subtree: Some(ConsecutiveNodes::from(vec![tnode])),
+                                    captures: submatch.captures,
+                                })
+                            } else {
+                                None
+                            }
+                        })
+                        .collect()
+                }
+            },
             _ => vec![],
+        }
+    }
+
+    fn match_leaf(
+        &self,
+        tnode: &tree_sitter::Node<'tree>,
+        qnode: &tree_sitter::Node<'query>,
+    ) -> Vec<MatcherState<'tree>> {
+        if T::is_string_literal(tnode) && T::is_string_literal(qnode) {
+            match_string_pattern(self.tree.value_of(tnode), self.query.value_of(qnode))
+                .into_iter()
+                .map(|captures| MatcherState {
+                    subtree: Some(ConsecutiveNodes::from(vec![tnode.clone()])),
+                    captures,
+                })
+                .collect()
+        } else {
+            if self.tree.value_of(tnode) == self.query.value_of(qnode) {
+                vec![MatcherState {
+                    subtree: Some(ConsecutiveNodes::from(vec![tnode.clone()])),
+                    captures: vec![],
+                }]
+            } else {
+                vec![]
+            }
         }
     }
 
@@ -361,7 +376,7 @@ impl<'tree> MatchedItem<'tree> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum CaptureItem<'tree> {
     Empty,
     Literal(String),

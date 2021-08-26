@@ -7,6 +7,7 @@ pub mod node;
 pub mod pattern;
 pub mod query;
 pub mod ruleset;
+pub mod string;
 pub mod target;
 pub mod transform;
 pub mod tree;
