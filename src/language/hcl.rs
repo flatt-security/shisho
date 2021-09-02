@@ -188,6 +188,26 @@ mod tests {
     fn test_query_with_ellipsis_opearator() {
         {
             let query = Query::<HCL>::try_from(
+                r#"resource :[X] :[Y] {
+                :[...]
+               }"#,
+            )
+            .unwrap();
+            let tree = Tree::<HCL>::try_from(
+                r#"
+                resource "hoge" "foo" {
+                    xx = 1
+                }
+            "#,
+            )
+            .unwrap();
+
+            let ptree = tree.to_partial();
+            let session = ptree.matches(&query);
+            assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 1);
+        }
+        {
+            let query = Query::<HCL>::try_from(
                 r#"
                 one_attr = :[X]
                 :[...]

@@ -77,19 +77,23 @@ where
 
         while let Some((tidx, qidx, captures)) = queue.pop() {
             match (tsibilings.get(tidx), qsibilings.get(qidx)) {
-                (t, None) => result.push((
-                    MatcherState {
-                        subtree: Some(ConsecutiveNodes::from(
-                            tsibilings[..tidx.min(tsibilings.len())].to_vec(),
-                        )),
-                        captures,
-                    },
-                    t.map(|t| t.clone()),
-                )),
-
+                (t, None) => {
+                    let nodes = tsibilings[..tidx.min(tsibilings.len())].to_vec();
+                    result.push((
+                        MatcherState {
+                            subtree: if nodes.len() > 0 {
+                                Some(ConsecutiveNodes::from(nodes))
+                            } else {
+                                None
+                            },
+                            captures,
+                        },
+                        t.map(|t| t.clone()),
+                    ))
+                }
                 (Some(_tchild), Some(qchild)) if qchild.kind() == SHISHO_NODE_ELLIPSIS => {
                     let mut captured_nodes = vec![];
-                    for tcidx in tidx..(tsibilings.len() + 1) {
+                    for tcidx in tidx..=tsibilings.len() {
                         queue.push((tcidx, qidx + 1, captures.clone()));
                         if let Some(tchild) = tsibilings.get(tcidx) {
                             captured_nodes.push(tchild.clone());
