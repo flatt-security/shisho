@@ -6,7 +6,7 @@ metaDescription: "This page describes details of Shisho's DSL for pattern matchi
 
 ## Overview
 
-_A pattern_ describes the code to search. The following string is an example of patterns for HCL which matches any `aws_ebs_volume` resource with any name and any configuration arguments:
+_A pattern_ describes the code to search for. The following string is an example of patterns for HCL which matches any `aws_ebs_volume` resource with any name and any configuration arguments:
 
 ```
 resource "aws_ebs_volume" :[NAME] {
@@ -47,11 +47,11 @@ resource "hoge" "foo" {
 }
 ```
 
-> 📝 Tips: `:[_]` is called _anonnymous metavariable_. The equality of the matched parts for `:[_]` will NOT be guaranteed; the following pattern matches both of (1) and (2).
+> 📝 Tips: `:[_]` is called _anonymous metavariable_. The equality of the matched parts for `:[_]` will NOT be guaranteed; the following pattern matches both of (1) and (2).
 >
 > ```
 > attr1 = :[_]
 > attr2 = :[_]
 > ```
 >
-> Similarly, `:[...]` is called _anonnymous ellipsis metavariable_, whose matched parts won't be tested for equivalence.
+> Similarly, `:[...]` is called _anonymous ellipsis metavariable_, whose matched parts won't be tested for equivalence.

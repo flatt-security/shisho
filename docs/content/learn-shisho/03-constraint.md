@@ -11,7 +11,7 @@ _A rule constraint_ is an additional constraint on pattern matching. This kind o
 - Pattern-based rule constraint
 - Regex-based rule constraint
 
-The remained section describes what they are and how they behave with the following Terraform code example:
+The remaining section describes what they are and how they behave with the following Terraform code example:
 
 ```
 // (R1)
