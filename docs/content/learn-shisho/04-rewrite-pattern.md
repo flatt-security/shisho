@@ -54,9 +54,9 @@ Suggested changes:
        3 | +  another = 3
 ```
 
-## Refer Metavariables
+## Refer to Metavariables
 
-You can refer the metavariable value captured in the pattern like this:
+You can refer to the metavariable value captured in the pattern like this:
 
 ```yaml
 version: '1'
@@ -109,4 +109,4 @@ Suggested changes:
        6 | +}
 ```
 
-> 📝 Tips: You can't use ellipsis metavariables in rewrite patterns. Howeverm you can refer ellipsis metavariable `:[...X]` in a pattern with `:[X]` in a rewrite pattern.
+> 📝 Tips: You can't use ellipsis metavariables in rewrite patterns. However, you can refer to ellipsis metavariable `:[...X]` in a pattern with `:[X]` in a rewrite pattern.
