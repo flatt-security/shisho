@@ -20,24 +20,30 @@ use super::check::print_findings;
 pub struct FindOpts {
     /// Code pattern for searching
     #[structopt()]
-    pattern: String,
+    pub pattern: String,
 
     /// File path to search
     #[structopt(parse(from_os_str))]
-    target_path: Option<PathBuf>,
+    pub target_path: Option<PathBuf>,
 
     /// Language name to use
     #[structopt(short, long)]
-    lang: ruleset::Language,
+    pub lang: ruleset::Language,
 
     /// Rewriting pattern
     #[structopt(long)]
-    rewrite: Option<String>,
+    pub rewrite: Option<String>,
 }
 
 pub fn run(common_opts: CommonOpts, opts: FindOpts) -> i32 {
     match run_(common_opts, opts) {
-        Ok(_) => 0,
+        Ok(total_findings) => {
+            if total_findings > 0 {
+                1
+            } else {
+                0
+            }
+        }
         Err(e) => {
             eprintln!("{}: {}", Color::Red.paint("error"), e);
             1
@@ -45,7 +51,7 @@ pub fn run(common_opts: CommonOpts, opts: FindOpts) -> i32 {
     }
 }
 
-fn run_(_common_opts: CommonOpts, opts: FindOpts) -> Result<()> {
+fn run_(_common_opts: CommonOpts, opts: FindOpts) -> Result<usize> {
     let rule = Rule {
         id: "inline".into(),
         message: "matched with the given rule".into(),
@@ -55,12 +61,13 @@ fn run_(_common_opts: CommonOpts, opts: FindOpts) -> Result<()> {
         rewrite: opts.rewrite,
     };
 
+    let mut total_findings = 0;
     match opts.target_path {
         Some(p) if p.is_dir() => {
             for target in Target::iter_from(p) {
                 if let Some(target_lang) = target.language() {
                     if opts.lang == target_lang {
-                        run_rule(target, &rule, &opts.lang)?;
+                        total_findings += run_rule(target, &rule, &opts.lang)?;
                     }
                 }
             }
@@ -69,20 +76,20 @@ fn run_(_common_opts: CommonOpts, opts: FindOpts) -> Result<()> {
             let target = Target::from(Some(p))?;
             if let Some(target_lang) = target.language() {
                 if opts.lang == target_lang {
-                    run_rule(target, &rule, &opts.lang)?;
+                    total_findings += run_rule(target, &rule, &opts.lang)?;
                 }
             }
         }
         _ => {
             let target = Target::from(None)?;
-            run_rule(target, &rule, &opts.lang)?;
+            total_findings += run_rule(target, &rule, &opts.lang)?;
         }
     }
 
-    Ok(())
+    Ok(total_findings)
 }
 
-fn run_rule(target: Target, rule: &Rule, lang: &ruleset::Language) -> Result<()> {
+fn run_rule(target: Target, rule: &Rule, lang: &ruleset::Language) -> Result<usize> {
     match lang {
         ruleset::Language::HCL => find_::<HCL>(target, rule),
         ruleset::Language::Dockerfile => find_::<Dockerfile>(target, rule),
@@ -90,13 +97,13 @@ fn run_rule(target: Target, rule: &Rule, lang: &ruleset::Language) -> Result<()>
     }
 }
 
-fn find_<T: Queryable + 'static>(target: Target, rule: &Rule) -> Result<()> {
+fn find_<T: Queryable + 'static>(target: Target, rule: &Rule) -> Result<usize> {
     let tree = Tree::<T>::try_from(target.body.as_str()).unwrap();
     let ptree = tree.to_partial();
 
     let findings = rule.find::<T>(&ptree)?;
-    let findings = repeat(rule).zip(findings).collect();
-    print_findings::<T>(&target, findings)?;
+    let length = findings.len();
+    print_findings::<T>(&target, repeat(rule).zip(findings).collect())?;
 
-    Ok(())
+    Ok(length)
 }

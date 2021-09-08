@@ -71,6 +71,16 @@ mod tests {
     fn test_basic_query() {
         {
             let query =
+                Query::<HCL>::try_from(r#"encrypted = true"#).unwrap();
+            let tree =
+                Tree::<HCL>::try_from(r#"encrypted = true"#).unwrap();
+
+            let ptree = tree.to_partial();
+            let session = ptree.matches(&query);
+            assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 1);
+        }
+        {
+            let query =
                 Query::<HCL>::try_from(r#"resource "rtype" "rname" { attr = "value" }"#).unwrap();
             let tree =
                 Tree::<HCL>::try_from(r#"resource "rtype" "rname" { attr = "value" }"#).unwrap();

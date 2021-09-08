@@ -1,0 +1,20 @@
+version: "1"
+rules:
+  - id: "unencrypted-ebs-volume"
+    language: hcl
+    message: |
+      There was unencrypted EBS module.
+    pattern: |
+      resource  "aws_ebs_volume" :[NAME] {
+        :[...X]
+      }
+    constraints:
+      - target: X
+        should: not-match
+        pattern: |
+          encrypted = true
+    rewrite: |
+      resource "aws_ebs_volume" :[NAME] {
+        :[X]
+        encrypted = true
+      }
