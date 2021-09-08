@@ -9,6 +9,7 @@ pub mod query;
 pub mod ruleset;
 pub mod string;
 pub mod target;
+pub mod tests;
 pub mod transform;
 pub mod tree;
 pub mod util;
