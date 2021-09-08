@@ -38,13 +38,25 @@ where
 {
     fn yield_next_sibilings(&mut self) -> Option<Vec<tree_sitter::Node<'tree>>> {
         if let Some(cursor) = self.cursor.as_mut() {
-            let nodes = cursor.node().children(&mut cursor.node().walk()).collect();
-            if !cursor.goto_first_child() && !cursor.goto_next_sibling() {
-                while cursor.goto_parent() {
-                    if cursor.goto_next_sibling() {
-                        return Some(nodes);
+            // collect sibilings
+            let nodes = if let Some(parent) = cursor.node().parent() {
+                parent.children(&mut parent.walk()).collect()
+            } else {
+                vec![cursor.node()]
+            };
+
+            // move to next leftmost child
+            let got_root = 'o: loop {
+                if cursor.goto_first_child() {
+                    break 'o false;
+                }
+                while !cursor.goto_next_sibling() {
+                    if !cursor.goto_parent() {
+                        break 'o true;
                     }
                 }
+            };
+            if got_root {
                 self.cursor = None;
             }
             Some(nodes)
