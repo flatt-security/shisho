@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
     use crate::cli::opts;
+    use crate::cli::reporter::ReporterType;
     use crate::cli::subcommand;
-    use crate::reporter::ReporterType;
     use clap_verbosity_flag::Verbosity;
     use std::path::PathBuf;
 

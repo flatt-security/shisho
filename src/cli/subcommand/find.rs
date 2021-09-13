@@ -1,9 +1,8 @@
 //! This module defines `check` subcommand.
 
+use crate::cli::reporter::{ConsoleReporter, JSONReporter, Reporter, ReporterType};
 use crate::cli::{subcommand::check::handle_rulemap, CommonOpts, ReportOpts};
 use crate::core::ruleset::{self, Rule};
-use crate::reporter::ConsoleReporter;
-use crate::reporter::{JSONReporter, Reporter, ReporterType};
 use ansi_term::Color;
 use anyhow::Result;
 use std::{array::IntoIter, collections::HashMap, path::PathBuf};

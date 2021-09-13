@@ -3,4 +3,5 @@
 pub mod opts;
 pub use self::opts::*;
 
+pub mod reporter;
 pub mod subcommand;
