@@ -2,7 +2,7 @@
 
 use crate::reporter::{JSONReporter, Reporter, ReporterType};
 use crate::{
-    cli::{subcommand::check::run_with_rulemap, CommonOpts, ReportOpts},
+    cli::{subcommand::check::handle_rulemap, CommonOpts, ReportOpts},
     reporter::ConsoleReporter,
     ruleset::{self, Rule},
 };
@@ -38,7 +38,7 @@ pub struct FindOpts {
 }
 
 pub fn run(opts: FindOpts) -> i32 {
-    match run_with_opts(opts) {
+    match handle_opts(opts) {
         Ok(total_findings) => {
             if total_findings > 0 {
                 1
@@ -53,7 +53,7 @@ pub fn run(opts: FindOpts) -> i32 {
     }
 }
 
-fn run_with_opts(opts: FindOpts) -> Result<usize> {
+fn handle_opts(opts: FindOpts) -> Result<usize> {
     let rule = Rule {
         id: "inline".into(),
         message: "matched with the given rule".into(),
@@ -70,9 +70,9 @@ fn run_with_opts(opts: FindOpts) -> Result<usize> {
     let mut stdout = stdout.lock();
     match opts.report.format {
         ReporterType::JSON => {
-            run_with_rulemap(JSONReporter::new(&mut stdout), opts.target_path, rule_map)
+            handle_rulemap(JSONReporter::new(&mut stdout), opts.target_path, rule_map)
         }
-        ReporterType::Console => run_with_rulemap(
+        ReporterType::Console => handle_rulemap(
             ConsoleReporter::new(&mut stdout),
             opts.target_path,
             rule_map,

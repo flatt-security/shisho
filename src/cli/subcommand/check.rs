@@ -33,7 +33,7 @@ pub struct CheckOpts {
 }
 
 pub fn run(opts: CheckOpts) -> i32 {
-    match run_with_opts(opts) {
+    match handle_opts(opts) {
         Ok(total_findings) => {
             if total_findings > 0 {
                 1
@@ -48,7 +48,7 @@ pub fn run(opts: CheckOpts) -> i32 {
     }
 }
 
-fn run_with_opts(opts: CheckOpts) -> Result<usize> {
+fn handle_opts(opts: CheckOpts) -> Result<usize> {
     let mut rule_map = HashMap::<ruleset::Language, Vec<Rule>>::new();
     let ruleset = ruleset::from_reader(&opts.ruleset_path).map_err(|e| {
         anyhow!(
@@ -69,9 +69,9 @@ fn run_with_opts(opts: CheckOpts) -> Result<usize> {
     let mut stdout = stdout.lock();
     match opts.report.format {
         ReporterType::JSON => {
-            run_with_rulemap(JSONReporter::new(&mut stdout), opts.target_path, rule_map)
+            handle_rulemap(JSONReporter::new(&mut stdout), opts.target_path, rule_map)
         }
-        ReporterType::Console => run_with_rulemap(
+        ReporterType::Console => handle_rulemap(
             ConsoleReporter::new(&mut stdout),
             opts.target_path,
             rule_map,
@@ -79,7 +79,7 @@ fn run_with_opts(opts: CheckOpts) -> Result<usize> {
     }
 }
 
-pub(crate) fn run_with_rulemap<'a>(
+pub(crate) fn handle_rulemap<'a>(
     mut reporter: impl Reporter<'a>,
     target_path: Option<PathBuf>,
     rule_map: HashMap<ruleset::Language, Vec<Rule>>,
