@@ -1,13 +1,13 @@
 //! This module defines `check` subcommand.
 
-use crate::{
-    cli::{CommonOpts, ReportOpts},
+use crate::cli::{CommonOpts, ReportOpts};
+use crate::core::{
     language::{Dockerfile, Go, Queryable, HCL},
-    reporter::{ConsoleReporter, JSONReporter, Reporter, ReporterType},
     ruleset::{self, Rule},
     target::Target,
     tree::Tree,
 };
+use crate::reporter::{ConsoleReporter, JSONReporter, Reporter, ReporterType};
 use ansi_term::Color;
 use anyhow::{anyhow, Result};
 use std::{collections::HashMap, convert::TryFrom};

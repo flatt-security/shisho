@@ -2,7 +2,7 @@ use anyhow::Result;
 use regex::Regex;
 use std::convert::{TryFrom, TryInto};
 
-use crate::{
+use crate::core::{
     language::Queryable,
     query::{MetavariableId, Query},
     ruleset::{RawConstraint, RawPredicate},

@@ -8,7 +8,7 @@ use std::{
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use crate::{
+use crate::core::{
     constraint::Constraint, language::Queryable, matcher::MatchedItem, query::Query,
     tree::PartialTree,
 };
@@ -120,16 +120,5 @@ impl<'a> TryFrom<PathBuf> for RuleSet {
 
     fn try_from(value: PathBuf) -> Result<Self, Self::Error> {
         from_reader(value)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_load() {
-        let rs = RuleSet::try_from(include_str!("./tests/ruleset/basic.yaml"));
-        assert!(rs.is_ok());
     }
 }

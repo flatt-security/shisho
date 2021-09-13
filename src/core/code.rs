@@ -1,4 +1,4 @@
-use crate::language::Queryable;
+use crate::core::language::Queryable;
 use std::marker::PhantomData;
 
 #[derive(Clone)]

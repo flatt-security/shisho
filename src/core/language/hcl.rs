@@ -58,11 +58,11 @@ impl Queryable for HCL {
 
 #[cfg(test)]
 mod tests {
-    use crate::matcher::MatchedItem;
-    use crate::query::MetavariableId;
-    use crate::transform::Transformable;
-    use crate::tree::Tree;
-    use crate::{code::Code, query::Query};
+    use crate::core::matcher::MatchedItem;
+    use crate::core::query::MetavariableId;
+    use crate::core::transform::Transformable;
+    use crate::core::tree::Tree;
+    use crate::core::{code::Code, query::Query};
     use std::convert::TryFrom;
 
     use super::*;
@@ -70,10 +70,8 @@ mod tests {
     #[test]
     fn test_basic_query() {
         {
-            let query =
-                Query::<HCL>::try_from(r#"encrypted = true"#).unwrap();
-            let tree =
-                Tree::<HCL>::try_from(r#"encrypted = true"#).unwrap();
+            let query = Query::<HCL>::try_from(r#"encrypted = true"#).unwrap();
+            let tree = Tree::<HCL>::try_from(r#"encrypted = true"#).unwrap();
 
             let ptree = tree.to_partial();
             let session = ptree.matches(&query);

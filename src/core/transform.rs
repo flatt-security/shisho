@@ -1,6 +1,6 @@
-use crate::tree::TSTreeVisitor;
-use crate::{
+use crate::core::{
     code::Code, language::Queryable, matcher::MatchedItem, pattern::Pattern, query::MetavariableId,
+    tree::TSTreeVisitor,
 };
 use anyhow::{anyhow, Result};
 use std::{
