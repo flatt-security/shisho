@@ -1,12 +1,12 @@
 pub mod cli;
 pub mod code;
 pub mod constraint;
-pub mod exporter;
 pub mod language;
 pub mod matcher;
 pub mod node;
 pub mod pattern;
 pub mod query;
+pub mod reporter;
 pub mod ruleset;
 pub mod string;
 pub mod target;

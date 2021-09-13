@@ -1,7 +1,9 @@
 //! This module defines `check` subcommand.
 
+use crate::reporter::{JSONReporter, Reporter, ReporterType};
 use crate::{
-    cli::{subcommand::check::run_with_rulemap, CommonOpts},
+    cli::{subcommand::check::run_with_rulemap, CommonOpts, ReportOpts},
+    reporter::ConsoleReporter,
     ruleset::{self, Rule},
 };
 use ansi_term::Color;
@@ -27,10 +29,16 @@ pub struct FindOpts {
     /// Rewriting pattern
     #[structopt(long)]
     pub rewrite: Option<String>,
+
+    #[structopt(flatten)]
+    pub common: CommonOpts,
+
+    #[structopt(flatten)]
+    pub report: ReportOpts,
 }
 
-pub fn run(common_opts: CommonOpts, opts: FindOpts) -> i32 {
-    match run_with_opts(common_opts, opts) {
+pub fn run(opts: FindOpts) -> i32 {
+    match run_with_opts(opts) {
         Ok(total_findings) => {
             if total_findings > 0 {
                 1
@@ -45,7 +53,7 @@ pub fn run(common_opts: CommonOpts, opts: FindOpts) -> i32 {
     }
 }
 
-fn run_with_opts(_common_opts: CommonOpts, opts: FindOpts) -> Result<usize> {
+fn run_with_opts(opts: FindOpts) -> Result<usize> {
     let rule = Rule {
         id: "inline".into(),
         message: "matched with the given rule".into(),
@@ -58,5 +66,16 @@ fn run_with_opts(_common_opts: CommonOpts, opts: FindOpts) -> Result<usize> {
     let rule_map =
         IntoIter::new([(opts.lang, vec![rule])]).collect::<HashMap<ruleset::Language, Vec<Rule>>>();
 
-    run_with_rulemap(opts.target_path, rule_map)
+    let stdout = std::io::stdout();
+    let mut stdout = stdout.lock();
+    match opts.report.format {
+        ReporterType::JSON => {
+            run_with_rulemap(JSONReporter::new(&mut stdout), opts.target_path, rule_map)
+        }
+        ReporterType::Console => run_with_rulemap(
+            ConsoleReporter::new(&mut stdout),
+            opts.target_path,
+            rule_map,
+        ),
+    }
 }

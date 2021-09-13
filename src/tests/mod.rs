@@ -2,6 +2,7 @@
 mod tests {
     use crate::cli::opts;
     use crate::cli::subcommand;
+    use crate::reporter::ReporterType;
     use clap_verbosity_flag::Verbosity;
     use std::path::PathBuf;
 
@@ -23,7 +24,9 @@ mod tests {
                     target.push(stringify!($name));
                     target.push(rvalue);
 
-                    let r = subcommand::check::run(opts::CommonOpts { verbose: Verbosity::new(0, 0, 0) }, subcommand::check::CheckOpts{
+                    let r = subcommand::check::run( subcommand::check::CheckOpts{
+                        common: opts::CommonOpts { verbose: Verbosity::new(0, 0, 0) },
+                        report: opts::ReportOpts { format: ReporterType::Console, },
                         ruleset_path: ruleset,
                         target_path: Some(target),
                     });

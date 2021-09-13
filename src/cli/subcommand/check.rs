@@ -1,9 +1,9 @@
 //! This module defines `check` subcommand.
 
 use crate::{
-    cli::CommonOpts,
-    exporter::{ConsoleExporter, Exporter},
+    cli::{CommonOpts, ReportOpts},
     language::{Dockerfile, Go, Queryable, HCL},
+    reporter::{ConsoleReporter, JSONReporter, Reporter, ReporterType},
     ruleset::{self, Rule},
     target::Target,
     tree::Tree,
@@ -24,10 +24,16 @@ pub struct CheckOpts {
     /// File path to search    
     #[structopt(parse(from_os_str))]
     pub target_path: Option<PathBuf>,
+
+    #[structopt(flatten)]
+    pub common: CommonOpts,
+
+    #[structopt(flatten)]
+    pub report: ReportOpts,
 }
 
-pub fn run(common_opts: CommonOpts, opts: CheckOpts) -> i32 {
-    match run_with_opts(common_opts, opts) {
+pub fn run(opts: CheckOpts) -> i32 {
+    match run_with_opts(opts) {
         Ok(total_findings) => {
             if total_findings > 0 {
                 1
@@ -42,7 +48,7 @@ pub fn run(common_opts: CommonOpts, opts: CheckOpts) -> i32 {
     }
 }
 
-fn run_with_opts(_common_opts: CommonOpts, opts: CheckOpts) -> Result<usize> {
+fn run_with_opts(opts: CheckOpts) -> Result<usize> {
     let mut rule_map = HashMap::<ruleset::Language, Vec<Rule>>::new();
     let ruleset = ruleset::from_reader(&opts.ruleset_path).map_err(|e| {
         anyhow!(
@@ -59,26 +65,32 @@ fn run_with_opts(_common_opts: CommonOpts, opts: CheckOpts) -> Result<usize> {
         }
     }
 
-    run_with_rulemap(opts.target_path, rule_map)
+    let stdout = std::io::stdout();
+    let mut stdout = stdout.lock();
+    match opts.report.format {
+        ReporterType::JSON => {
+            run_with_rulemap(JSONReporter::new(&mut stdout), opts.target_path, rule_map)
+        }
+        ReporterType::Console => run_with_rulemap(
+            ConsoleReporter::new(&mut stdout),
+            opts.target_path,
+            rule_map,
+        ),
+    }
 }
 
-pub(crate) fn run_with_rulemap(
+pub(crate) fn run_with_rulemap<'a>(
+    mut reporter: impl Reporter<'a>,
     target_path: Option<PathBuf>,
     rule_map: HashMap<ruleset::Language, Vec<Rule>>,
 ) -> Result<usize> {
-    // TODO: prepare exporter
-    let stdout = std::io::stdout();
-    let mut stdout = stdout.lock();
-    let mut exporter = ConsoleExporter::new(&mut stdout);
-
-    // run rules
     let mut total_findings = 0;
     match target_path {
         Some(p) if p.is_dir() => {
             for target in Target::iter_from(p) {
                 if let Some(lang) = target.language() {
                     if let Some(rules) = rule_map.get(&lang) {
-                        total_findings += handle_rules(&mut exporter, &target, rules, &lang)?;
+                        total_findings += handle_rules(&mut reporter, &target, rules, &lang)?;
                     }
                 }
             }
@@ -87,39 +99,39 @@ pub(crate) fn run_with_rulemap(
             let target = Target::from(Some(p))?;
             if let Some(lang) = target.language() {
                 if let Some(rules) = rule_map.get(&lang) {
-                    total_findings += handle_rules(&mut exporter, &target, rules, &lang)?;
+                    total_findings += handle_rules(&mut reporter, &target, rules, &lang)?;
                 }
             }
         }
         _ => {
             let target = Target::from(None)?;
             for (lang, rules) in rule_map {
-                total_findings += handle_rules(&mut exporter, &target, &rules, &lang)?;
+                total_findings += handle_rules(&mut reporter, &target, &rules, &lang)?;
             }
         }
     }
 
-    exporter.flush()?;
+    reporter.report()?;
     Ok(total_findings)
 }
 
-fn handle_rules<'a, E: Exporter<'a>>(
-    exporter: &mut E,
+fn handle_rules<'a, E: Reporter<'a>>(
+    reporter: &mut E,
     target: &Target,
     rules: &Vec<Rule>,
     as_lang: &ruleset::Language,
 ) -> Result<usize> {
     match as_lang {
-        ruleset::Language::HCL => handle_typed_rules::<E, HCL>(exporter, &target, rules),
+        ruleset::Language::HCL => handle_typed_rules::<E, HCL>(reporter, &target, rules),
         ruleset::Language::Dockerfile => {
-            handle_typed_rules::<E, Dockerfile>(exporter, &target, rules)
+            handle_typed_rules::<E, Dockerfile>(reporter, &target, rules)
         }
-        ruleset::Language::Go => handle_typed_rules::<E, Go>(exporter, &target, rules),
+        ruleset::Language::Go => handle_typed_rules::<E, Go>(reporter, &target, rules),
     }
 }
 
-fn handle_typed_rules<'a, E: Exporter<'a>, Lang: Queryable + 'static>(
-    exporter: &mut E,
+fn handle_typed_rules<'a, E: Reporter<'a>, Lang: Queryable + 'static>(
+    reporter: &mut E,
     target: &Target,
     rules: &Vec<Rule>,
 ) -> Result<usize> {
@@ -130,7 +142,7 @@ fn handle_typed_rules<'a, E: Exporter<'a>, Lang: Queryable + 'static>(
     for rule in rules {
         let findings = rule.find::<Lang>(&ptree)?;
         total_findings += findings.len();
-        exporter.run::<Lang>(target, repeat(rule).zip(findings).collect())?;
+        reporter.add_entry::<Lang>(target, repeat(rule).zip(findings).collect())?;
     }
 
     Ok(total_findings)

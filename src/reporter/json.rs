@@ -1,17 +1,17 @@
-use super::Exporter;
+use super::Reporter;
 use crate::code::Code;
 use crate::transform::Transformable;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use similar::TextDiff;
 
-pub struct JSONExporter<'a, Writer: std::io::Write> {
+pub struct JSONReporter<'a, Writer: std::io::Write> {
     writer: &'a mut Writer,
-    buffer: Vec<JSONResult>,
+    entries: Vec<Entry>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct JSONResult {
+struct Entry {
     pub id: String,
     pub file: String,
     pub rewrite: Vec<JSONPatch>,
@@ -22,16 +22,16 @@ struct JSONPatch {
     pub diff: String,
 }
 
-impl<'a, W: std::io::Write> Exporter<'a> for JSONExporter<'a, W> {
+impl<'a, W: std::io::Write> Reporter<'a> for JSONReporter<'a, W> {
     type Writer = W;
     fn new(writer: &'a mut Self::Writer) -> Self {
         Self {
             writer,
-            buffer: vec![],
+            entries: vec![],
         }
     }
 
-    fn run<T: crate::language::Queryable + 'static>(
+    fn add_entry<T: crate::language::Queryable + 'static>(
         &mut self,
         target: &crate::target::Target,
         items: Vec<(&crate::ruleset::Rule, crate::matcher::MatchedItem)>,
@@ -44,7 +44,7 @@ impl<'a, W: std::io::Write> Exporter<'a> for JSONExporter<'a, W> {
         };
 
         for (rule, mitem) in items {
-            let mut r = JSONResult {
+            let mut r = Entry {
                 id: rule.id.clone(),
                 file: target_path.clone(),
                 rewrite: vec![],
@@ -59,14 +59,16 @@ impl<'a, W: std::io::Write> Exporter<'a> for JSONExporter<'a, W> {
                     .to_string();
                 r.rewrite.push(JSONPatch { diff });
             }
+
+            self.entries.push(r);
         }
 
         Ok(())
     }
 
-    fn flush(&mut self) -> Result<()> {
-        let s = serde_json::to_string(&self.buffer)?;
-        self.buffer = vec![];
+    fn report(&mut self) -> Result<()> {
+        let s = serde_json::to_string(&self.entries)?;
+        self.entries = vec![];
         write!(self.writer, "{}", s)?;
         Ok(())
     }

@@ -1,21 +1,21 @@
-use super::Exporter;
+use super::Reporter;
 use crate::code::Code;
 use crate::transform::Transformable;
 use ansi_term::Color;
 use anyhow::Result;
 use similar::{ChangeTag, TextDiff};
 
-pub struct ConsoleExporter<'a, Writer: std::io::Write> {
+pub struct ConsoleReporter<'a, Writer: std::io::Write> {
     writer: &'a mut Writer,
 }
 
-impl<'a, W: std::io::Write> Exporter<'a> for ConsoleExporter<'a, W> {
+impl<'a, W: std::io::Write> Reporter<'a> for ConsoleReporter<'a, W> {
     type Writer = W;
     fn new(writer: &'a mut Self::Writer) -> Self {
         Self { writer }
     }
 
-    fn run<T: crate::language::Queryable + 'static>(
+    fn add_entry<T: crate::language::Queryable + 'static>(
         &mut self,
         target: &crate::target::Target,
         items: Vec<(&crate::ruleset::Rule, crate::matcher::MatchedItem)>,
@@ -108,6 +108,10 @@ impl<'a, W: std::io::Write> Exporter<'a> for ConsoleExporter<'a, W> {
             writeln!(self.writer, "")?;
         }
 
+        Ok(())
+    }
+
+    fn report(&mut self) -> Result<()> {
         Ok(())
     }
 }
