@@ -30,7 +30,7 @@ pub struct FindOpts {
 }
 
 pub fn run(common_opts: CommonOpts, opts: FindOpts) -> i32 {
-    match run_(common_opts, opts) {
+    match run_with_opts(common_opts, opts) {
         Ok(total_findings) => {
             if total_findings > 0 {
                 1
@@ -45,7 +45,7 @@ pub fn run(common_opts: CommonOpts, opts: FindOpts) -> i32 {
     }
 }
 
-fn run_(_common_opts: CommonOpts, opts: FindOpts) -> Result<usize> {
+fn run_with_opts(_common_opts: CommonOpts, opts: FindOpts) -> Result<usize> {
     let rule = Rule {
         id: "inline".into(),
         message: "matched with the given rule".into(),
