@@ -2,6 +2,7 @@
 
 use crate::{
     cli::CommonOpts,
+    exporter::{Exporter, StdoutExporter},
     language::{Dockerfile, Go, Queryable, HCL},
     ruleset::{self, Rule},
     target::Target,
@@ -12,8 +13,6 @@ use anyhow::Result;
 use std::path::PathBuf;
 use std::{convert::TryFrom, iter::repeat};
 use structopt::StructOpt;
-
-use super::check::print_findings;
 
 /// Checks files with a pattern given in command line arguments
 #[derive(StructOpt, Debug)]
@@ -101,9 +100,12 @@ fn find_<T: Queryable + 'static>(target: Target, rule: &Rule) -> Result<usize> {
     let tree = Tree::<T>::try_from(target.body.as_str()).unwrap();
     let ptree = tree.to_partial();
 
+    // TODO
+    let exporter = StdoutExporter {};
+
     let findings = rule.find::<T>(&ptree)?;
     let length = findings.len();
-    print_findings::<T>(&target, repeat(rule).zip(findings).collect())?;
+    exporter.run::<T>(&target, repeat(rule).zip(findings).collect())?;
 
     Ok(length)
 }
