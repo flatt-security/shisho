@@ -27,7 +27,7 @@ pub struct CheckOpts {
 }
 
 pub fn run(common_opts: CommonOpts, opts: CheckOpts) -> i32 {
-    match run_(common_opts, opts) {
+    match run_with_opts(common_opts, opts) {
         Ok(total_findings) => {
             if total_findings > 0 {
                 1
@@ -42,8 +42,7 @@ pub fn run(common_opts: CommonOpts, opts: CheckOpts) -> i32 {
     }
 }
 
-fn run_(_common_opts: CommonOpts, opts: CheckOpts) -> Result<usize> {
-    // load rules
+fn run_with_opts(_common_opts: CommonOpts, opts: CheckOpts) -> Result<usize> {
     let mut rule_map = HashMap::<ruleset::Language, Vec<Rule>>::new();
     let ruleset = ruleset::from_reader(&opts.ruleset_path).map_err(|e| {
         anyhow!(
@@ -60,14 +59,26 @@ fn run_(_common_opts: CommonOpts, opts: CheckOpts) -> Result<usize> {
         }
     }
 
+    run_with_rulemap(opts.target_path, rule_map)
+}
+
+pub(crate) fn run_with_rulemap(
+    target_path: Option<PathBuf>,
+    rule_map: HashMap<ruleset::Language, Vec<Rule>>,
+) -> Result<usize> {
+    // TODO: prepare exporter
+    let stdout = std::io::stdout();
+    let mut stdout = stdout.lock();
+    let mut exporter = ConsoleExporter::new(&mut stdout);
+
     // run rules
     let mut total_findings = 0;
-    match opts.target_path {
+    match target_path {
         Some(p) if p.is_dir() => {
             for target in Target::iter_from(p) {
                 if let Some(lang) = target.language() {
                     if let Some(rules) = rule_map.get(&lang) {
-                        total_findings += run_rules(&target, rules, &lang)?;
+                        total_findings += handle_rules(&mut exporter, &target, rules, &lang)?;
                     }
                 }
             }
@@ -76,43 +87,50 @@ fn run_(_common_opts: CommonOpts, opts: CheckOpts) -> Result<usize> {
             let target = Target::from(Some(p))?;
             if let Some(lang) = target.language() {
                 if let Some(rules) = rule_map.get(&lang) {
-                    total_findings += run_rules(&target, rules, &lang)?;
+                    total_findings += handle_rules(&mut exporter, &target, rules, &lang)?;
                 }
             }
         }
         _ => {
             let target = Target::from(None)?;
             for (lang, rules) in rule_map {
-                total_findings += run_rules(&target, &rules, &lang)?;
+                total_findings += handle_rules(&mut exporter, &target, &rules, &lang)?;
             }
         }
     }
 
+    exporter.flush()?;
     Ok(total_findings)
 }
 
-fn run_rules(target: &Target, rules: &Vec<Rule>, lang: &ruleset::Language) -> Result<usize> {
-    match lang {
-        ruleset::Language::HCL => run_rules_::<HCL>(&target, rules),
-        ruleset::Language::Dockerfile => run_rules_::<Dockerfile>(&target, rules),
-        ruleset::Language::Go => run_rules_::<Go>(&target, rules),
+fn handle_rules<'a, E: Exporter<'a>>(
+    exporter: &mut E,
+    target: &Target,
+    rules: &Vec<Rule>,
+    as_lang: &ruleset::Language,
+) -> Result<usize> {
+    match as_lang {
+        ruleset::Language::HCL => handle_typed_rules::<E, HCL>(exporter, &target, rules),
+        ruleset::Language::Dockerfile => {
+            handle_typed_rules::<E, Dockerfile>(exporter, &target, rules)
+        }
+        ruleset::Language::Go => handle_typed_rules::<E, Go>(exporter, &target, rules),
     }
 }
 
-fn run_rules_<T: Queryable + 'static>(target: &Target, rules: &Vec<Rule>) -> Result<usize> {
-    let tree = Tree::<T>::try_from(target.body.as_str()).unwrap();
+fn handle_typed_rules<'a, E: Exporter<'a>, Lang: Queryable + 'static>(
+    exporter: &mut E,
+    target: &Target,
+    rules: &Vec<Rule>,
+) -> Result<usize> {
+    let tree = Tree::<Lang>::try_from(target.body.as_str()).unwrap();
     let ptree = tree.to_partial();
-
-    // TODO
-    let stdout = std::io::stdout();
-    let mut stdout = stdout.lock();
-    let mut exporter = ConsoleExporter::new(&mut stdout);
 
     let mut total_findings = 0;
     for rule in rules {
-        let findings = rule.find::<T>(&ptree)?;
+        let findings = rule.find::<Lang>(&ptree)?;
         total_findings += findings.len();
-        exporter.run::<T>(target, repeat(rule).zip(findings).collect())?;
+        exporter.run::<Lang>(target, repeat(rule).zip(findings).collect())?;
     }
 
     Ok(total_findings)

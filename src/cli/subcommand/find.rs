@@ -1,17 +1,12 @@
 //! This module defines `check` subcommand.
 
 use crate::{
-    cli::CommonOpts,
-    exporter::{ConsoleExporter, Exporter},
-    language::{Dockerfile, Go, Queryable, HCL},
+    cli::{subcommand::check::run_with_rulemap, CommonOpts},
     ruleset::{self, Rule},
-    target::Target,
-    tree::Tree,
 };
 use ansi_term::Color;
 use anyhow::Result;
-use std::path::PathBuf;
-use std::{convert::TryFrom, iter::repeat};
+use std::{array::IntoIter, collections::HashMap, path::PathBuf};
 use structopt::StructOpt;
 
 /// Checks files with a pattern given in command line arguments
@@ -60,54 +55,8 @@ fn run_(_common_opts: CommonOpts, opts: FindOpts) -> Result<usize> {
         rewrite: opts.rewrite,
     };
 
-    let mut total_findings = 0;
-    match opts.target_path {
-        Some(p) if p.is_dir() => {
-            for target in Target::iter_from(p) {
-                if let Some(target_lang) = target.language() {
-                    if opts.lang == target_lang {
-                        total_findings += run_rule(target, &rule, &opts.lang)?;
-                    }
-                }
-            }
-        }
-        Some(p) => {
-            let target = Target::from(Some(p))?;
-            if let Some(target_lang) = target.language() {
-                if opts.lang == target_lang {
-                    total_findings += run_rule(target, &rule, &opts.lang)?;
-                }
-            }
-        }
-        _ => {
-            let target = Target::from(None)?;
-            total_findings += run_rule(target, &rule, &opts.lang)?;
-        }
-    }
+    let rule_map =
+        IntoIter::new([(opts.lang, vec![rule])]).collect::<HashMap<ruleset::Language, Vec<Rule>>>();
 
-    Ok(total_findings)
-}
-
-fn run_rule(target: Target, rule: &Rule, lang: &ruleset::Language) -> Result<usize> {
-    match lang {
-        ruleset::Language::HCL => find_::<HCL>(target, rule),
-        ruleset::Language::Dockerfile => find_::<Dockerfile>(target, rule),
-        ruleset::Language::Go => find_::<Go>(target, rule),
-    }
-}
-
-fn find_<T: Queryable + 'static>(target: Target, rule: &Rule) -> Result<usize> {
-    let tree = Tree::<T>::try_from(target.body.as_str()).unwrap();
-    let ptree = tree.to_partial();
-
-    // TODO
-    let stdout = std::io::stdout();
-    let mut stdout = stdout.lock();
-    let mut exporter = ConsoleExporter::new(&mut stdout);
-
-    let findings = rule.find::<T>(&ptree)?;
-    let length = findings.len();
-    exporter.run::<T>(&target, repeat(rule).zip(findings).collect())?;
-
-    Ok(length)
+    run_with_rulemap(opts.target_path, rule_map)
 }
