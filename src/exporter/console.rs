@@ -5,11 +5,18 @@ use ansi_term::Color;
 use anyhow::Result;
 use similar::{ChangeTag, TextDiff};
 
-pub struct StdoutExporter {}
+pub struct ConsoleExporter<'a, Writer: std::io::Write> {
+    writer: &'a mut Writer,
+}
 
-impl Exporter for StdoutExporter {
+impl<'a, W: std::io::Write> Exporter<'a> for ConsoleExporter<'a, W> {
+    type Writer = W;
+    fn new(writer: &'a mut Self::Writer) -> Self {
+        Self { writer }
+    }
+
     fn run<T: crate::language::Queryable + 'static>(
-        &self,
+        &mut self,
         target: &crate::target::Target,
         items: Vec<(&crate::ruleset::Rule, crate::matcher::MatchedItem)>,
     ) -> Result<()> {
@@ -23,15 +30,16 @@ impl Exporter for StdoutExporter {
 
         for (rule, mitem) in items {
             // print metadata of the matched items
-            println!(
+            writeln!(
+                self.writer,
                 "{}: {}",
                 Color::Red.paint(format!("[{}]", rule.id)),
                 Color::White.bold().paint(rule.message.clone().trim_end())
-            );
+            )?;
 
             // print a finding
-            println!("In {}:", target_path);
-            println!("{:>8} |", "");
+            writeln!(self.writer, "In {}:", target_path)?;
+            writeln!(self.writer, "{:>8} |", "")?;
             let (s, e) = mitem.area.range_for_view::<T>();
 
             for line_index in (s.row)..=(e.row) {
@@ -63,17 +71,18 @@ impl Exporter for StdoutExporter {
                     _ => vec![Color::Yellow.paint(line_value).to_string()],
                 };
 
-                println!(
+                writeln!(
+                    self.writer,
                     "{} | {}",
                     Color::Green.paint(format!("{:>8}", (line_index + 1).to_string())),
                     v.join("")
-                );
+                )?;
             }
-            println!("{:>8} |", "");
+            writeln!(self.writer, "{:>8} |", "")?;
 
             // print suggested changes
             if let Some(ref rewrite_pattern) = rule.rewrite {
-                println!("Suggested changes:");
+                writeln!(self.writer, "Suggested changes:")?;
                 let old_code: Code<T> = target.body.clone().into();
                 let new_code = old_code.transform(mitem, rewrite_pattern.as_str())?;
 
@@ -96,7 +105,7 @@ impl Exporter for StdoutExporter {
             }
 
             // print a separator between matched items
-            println!("");
+            writeln!(self.writer, "")?;
         }
 
         Ok(())

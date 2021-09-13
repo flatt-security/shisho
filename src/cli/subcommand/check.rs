@@ -2,7 +2,7 @@
 
 use crate::{
     cli::CommonOpts,
-    exporter::{Exporter, StdoutExporter},
+    exporter::{ConsoleExporter, Exporter},
     language::{Dockerfile, Go, Queryable, HCL},
     ruleset::{self, Rule},
     target::Target,
@@ -102,7 +102,11 @@ fn run_rules(target: &Target, rules: &Vec<Rule>, lang: &ruleset::Language) -> Re
 fn run_rules_<T: Queryable + 'static>(target: &Target, rules: &Vec<Rule>) -> Result<usize> {
     let tree = Tree::<T>::try_from(target.body.as_str()).unwrap();
     let ptree = tree.to_partial();
-    let exporter = StdoutExporter {};
+
+    // TODO
+    let stdout = std::io::stdout();
+    let mut stdout = stdout.lock();
+    let mut exporter = ConsoleExporter::new(&mut stdout);
 
     let mut total_findings = 0;
     for rule in rules {

@@ -2,7 +2,7 @@
 
 use crate::{
     cli::CommonOpts,
-    exporter::{Exporter, StdoutExporter},
+    exporter::{ConsoleExporter, Exporter},
     language::{Dockerfile, Go, Queryable, HCL},
     ruleset::{self, Rule},
     target::Target,
@@ -101,7 +101,9 @@ fn find_<T: Queryable + 'static>(target: Target, rule: &Rule) -> Result<usize> {
     let ptree = tree.to_partial();
 
     // TODO
-    let exporter = StdoutExporter {};
+    let stdout = std::io::stdout();
+    let mut stdout = stdout.lock();
+    let mut exporter = ConsoleExporter::new(&mut stdout);
 
     let findings = rule.find::<T>(&ptree)?;
     let length = findings.len();
