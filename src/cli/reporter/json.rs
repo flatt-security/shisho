@@ -1,9 +1,8 @@
 use super::Reporter;
-use crate::core::matcher::MatchedItem;
-use crate::core::ruleset::Rule;
-use crate::core::target::Target;
-use crate::core::transform::Transformable;
-use crate::core::{code::Code, language::Queryable};
+use crate::core::{
+    code::Code, language::Queryable, matcher::MatchedItem, ruleset::Rule, target::Target,
+    transform::Transformable,
+};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use similar::TextDiff;

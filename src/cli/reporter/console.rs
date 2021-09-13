@@ -1,9 +1,8 @@
 use super::Reporter;
-use crate::core::matcher::MatchedItem;
-use crate::core::ruleset::Rule;
-use crate::core::target::Target;
-use crate::core::transform::Transformable;
-use crate::core::{code::Code, language::Queryable};
+use crate::core::{
+    code::Code, language::Queryable, matcher::MatchedItem, ruleset::Rule, target::Target,
+    transform::Transformable,
+};
 use ansi_term::Color;
 use anyhow::Result;
 use similar::{ChangeTag, TextDiff};

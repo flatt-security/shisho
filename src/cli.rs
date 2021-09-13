@@ -5,3 +5,5 @@ pub use self::opts::*;
 
 pub mod reporter;
 pub mod subcommand;
+
+mod tests;
