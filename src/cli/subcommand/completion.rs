@@ -4,8 +4,6 @@ use std::io;
 use structopt::clap::Shell;
 use structopt::StructOpt;
 
-use crate::cli::CommonOpts;
-
 /// Prints scripts for shell completion.
 #[derive(StructOpt, Debug)]
 pub enum CompletionOpts {
@@ -17,7 +15,7 @@ pub enum CompletionOpts {
     Fish,
 }
 
-pub fn run(_common_opts: CommonOpts, opts: CompletionOpts) -> i32 {
+pub fn run(opts: CompletionOpts) -> i32 {
     match opts {
         CompletionOpts::Bash => completion(Shell::Bash),
         CompletionOpts::Zsh => completion(Shell::Zsh),
