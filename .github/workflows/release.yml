@@ -4,6 +4,10 @@ on:
   push:
     tags:
       - "v*"
+    paths-ignore:
+      - "docs"
+      - ".vscode"
+
 jobs:
   build:
     name: Build all
