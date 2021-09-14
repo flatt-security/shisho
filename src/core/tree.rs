@@ -1,4 +1,4 @@
-use crate::{
+use crate::core::{
     language::Queryable,
     matcher::{MatchedItem, QueryMatcher},
     query::{

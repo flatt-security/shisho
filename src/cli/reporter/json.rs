@@ -1,6 +1,8 @@
 use super::Reporter;
-use crate::code::Code;
-use crate::transform::Transformable;
+use crate::core::{
+    code::Code, language::Queryable, matcher::MatchedItem, ruleset::Rule, target::Target,
+    transform::Transformable,
+};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use similar::TextDiff;
@@ -31,10 +33,10 @@ impl<'a, W: std::io::Write> Reporter<'a> for JSONReporter<'a, W> {
         }
     }
 
-    fn add_entry<T: crate::language::Queryable + 'static>(
+    fn add_entry<T: Queryable + 'static>(
         &mut self,
-        target: &crate::target::Target,
-        items: Vec<(&crate::ruleset::Rule, crate::matcher::MatchedItem)>,
+        target: &Target,
+        items: Vec<(&Rule, MatchedItem)>,
     ) -> Result<()> {
         let target_path = if let Some(ref p) = target.path {
             let p = p.canonicalize()?;

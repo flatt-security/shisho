@@ -1,4 +1,4 @@
-use crate::language::Queryable;
+use crate::core::language::Queryable;
 use anyhow::{anyhow, Result};
 use std::marker::PhantomData;
 

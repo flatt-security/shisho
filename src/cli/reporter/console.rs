@@ -1,6 +1,8 @@
 use super::Reporter;
-use crate::code::Code;
-use crate::transform::Transformable;
+use crate::core::{
+    code::Code, language::Queryable, matcher::MatchedItem, ruleset::Rule, target::Target,
+    transform::Transformable,
+};
 use ansi_term::Color;
 use anyhow::Result;
 use similar::{ChangeTag, TextDiff};
@@ -15,10 +17,10 @@ impl<'a, W: std::io::Write> Reporter<'a> for ConsoleReporter<'a, W> {
         Self { writer }
     }
 
-    fn add_entry<T: crate::language::Queryable + 'static>(
+    fn add_entry<T: Queryable + 'static>(
         &mut self,
-        target: &crate::target::Target,
-        items: Vec<(&crate::ruleset::Rule, crate::matcher::MatchedItem)>,
+        target: &Target,
+        items: Vec<(&Rule, MatchedItem)>,
     ) -> Result<()> {
         let target_path = if let Some(ref p) = target.path {
             let p = p.canonicalize()?;

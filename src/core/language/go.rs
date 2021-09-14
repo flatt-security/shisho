@@ -42,9 +42,9 @@ impl Queryable for Go {
 
 #[cfg(test)]
 mod tests {
-    use crate::matcher::MatchedItem;
-    use crate::transform::Transformable;
-    use crate::{
+    use crate::core::matcher::MatchedItem;
+    use crate::core::transform::Transformable;
+    use crate::core::{
         code::Code,
         query::{MetavariableId, Query},
         tree::Tree,

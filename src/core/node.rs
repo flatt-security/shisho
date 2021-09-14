@@ -1,4 +1,4 @@
-use crate::language::Queryable;
+use crate::core::language::Queryable;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConsecutiveNodes<'tree>(Vec<tree_sitter::Node<'tree>>);

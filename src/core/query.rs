@@ -1,4 +1,4 @@
-use crate::{language::Queryable, pattern::Pattern};
+use crate::core::{language::Queryable, pattern::Pattern};
 use anyhow::Result;
 use std::{
     convert::{TryFrom, TryInto},

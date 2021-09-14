@@ -1,12 +1,12 @@
-use crate::{
+use crate::core::{
     constraint::{Constraint, Predicate},
     language::Queryable,
+    literal::match_string_pattern,
     node::ConsecutiveNodes,
     query::{
         MetavariableId, Query, SHISHO_NODE_ELLIPSIS, SHISHO_NODE_ELLIPSIS_METAVARIABLE,
         SHISHO_NODE_METAVARIABLE, SHISHO_NODE_METAVARIABLE_NAME,
     },
-    string::match_string_pattern,
     tree::PartialTree,
 };
 use anyhow::{anyhow, Result};

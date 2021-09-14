@@ -6,7 +6,7 @@ pub use self::console::*;
 mod json;
 pub use self::json::*;
 
-use crate::{language::Queryable, matcher::MatchedItem, ruleset::Rule, target::Target};
+use crate::core::{language::Queryable, matcher::MatchedItem, ruleset::Rule, target::Target};
 use anyhow::Result;
 
 pub trait Reporter<'a> {

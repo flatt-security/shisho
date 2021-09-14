@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::{io::Read, path::PathBuf};
 use walkdir::WalkDir;
 
-use crate::ruleset::Language;
+use crate::core::ruleset::Language;
 
 #[derive(Debug)]
 pub struct Target {

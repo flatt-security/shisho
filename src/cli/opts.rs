@@ -1,8 +1,7 @@
 //! This module defines options of `shisho` command.
 
-use crate::reporter::ReporterType;
-
 use super::subcommand::*;
+use crate::cli::reporter::ReporterType;
 use clap_verbosity_flag::Verbosity;
 use structopt::StructOpt;
 

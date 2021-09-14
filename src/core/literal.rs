@@ -1,7 +1,7 @@
 use regex::Captures;
 
-use crate::matcher::{CaptureItem, UnverifiedMetavariable};
-use crate::query::MetavariableId;
+use crate::core::matcher::{CaptureItem, UnverifiedMetavariable};
+use crate::core::query::MetavariableId;
 
 pub fn match_string_pattern<'tree, 'query>(
     tvalue: &'tree str,

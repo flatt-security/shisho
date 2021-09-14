@@ -1,9 +1,9 @@
 //! This module defines `check` subcommand.
 
-use crate::{
-    cli::{CommonOpts, ReportOpts},
+use crate::cli::reporter::{ConsoleReporter, JSONReporter, Reporter, ReporterType};
+use crate::cli::{CommonOpts, ReportOpts};
+use crate::core::{
     language::{Dockerfile, Go, Queryable, HCL},
-    reporter::{ConsoleReporter, JSONReporter, Reporter, ReporterType},
     ruleset::{self, Rule},
     target::Target,
     tree::Tree,
