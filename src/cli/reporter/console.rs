@@ -1,7 +1,7 @@
 use super::Reporter;
 use crate::core::{
-    code::Code, language::Queryable, matcher::MatchedItem, ruleset::Rule, target::Target,
-    transform::Transformable,
+    code::Code, language::Queryable, matcher::MatchedItem, node::Range, ruleset::Rule,
+    target::Target, transform::Transformable,
 };
 use ansi_term::Color;
 use anyhow::Result;
@@ -42,32 +42,35 @@ impl<'a, W: std::io::Write> Reporter<'a> for ConsoleReporter<'a, W> {
             // print a finding
             writeln!(self.writer, "In {}:", target_path)?;
             writeln!(self.writer, "{:>8} |", "")?;
-            let (s, e) = mitem.area.range_for_view::<T>();
+            let Range { start: s, end: e } = mitem.area.range::<T>(target.body.as_ref());
 
             for line_index in (s.row)..=(e.row) {
-                if line_index >= lines.len() {
+                if line_index > lines.len() || (line_index == e.row && e.column == 0) {
                     continue;
                 }
-                let line_value = lines[line_index];
+
+                let line_value = lines[line_index - 1]; // since `Range.row` is 1-indexed
 
                 let v = match line_index {
                     line if line == s.row && line == e.row => vec![
-                        line_value[..s.column].to_string(),
+                        line_value[..(s.column - 1)].to_string(),
                         Color::Yellow
-                            .paint(&line_value[s.column..e.column])
+                            .paint(&line_value[(s.column - 1)..(e.column - 1)])
                             .to_string(),
-                        line_value[e.column..line_value.len()].to_string(),
+                        line_value[(e.column - 1)..line_value.len()].to_string(),
                     ],
                     line if line == s.row => vec![
-                        line_value[..s.column].to_string(),
+                        line_value[..(s.column - 1)].to_string(),
                         Color::Yellow
-                            .paint(&line_value[s.column..line_value.len()])
+                            .paint(&line_value[(s.column - 1)..line_value.len()])
                             .to_string(),
                     ],
 
                     line if line == e.row => vec![
-                        Color::Yellow.paint(&line_value[..e.column]).to_string(),
-                        line_value[e.column..line_value.len()].to_string(),
+                        Color::Yellow
+                            .paint(&line_value[..(e.column - 1)])
+                            .to_string(),
+                        line_value[(e.column - 1)..line_value.len()].to_string(),
                     ],
 
                     _ => vec![Color::Yellow.paint(line_value).to_string()],
@@ -76,7 +79,7 @@ impl<'a, W: std::io::Write> Reporter<'a> for ConsoleReporter<'a, W> {
                 writeln!(
                     self.writer,
                     "{} | {}",
-                    Color::Green.paint(format!("{:>8}", (line_index + 1).to_string())),
+                    Color::Green.paint(format!("{:>8}", line_index.to_string())),
                     v.join("")
                 )?;
             }
