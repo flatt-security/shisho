@@ -54,9 +54,9 @@ impl<'a, W: std::io::Write> Reporter<'a> for JSONReporter<'a, W> {
                 rewrite: vec![],
             };
 
-            if let Some(ref rewrite_pattern) = rule.rewrite {
+            for rewrite in rule.get_rewrite_options()? {
                 let old_code: Code<T> = target.body.clone().into();
-                let new_code = old_code.transform(mitem, rewrite_pattern.as_str())?;
+                let new_code = old_code.transform(&mitem, rewrite)?;
 
                 let diff = TextDiff::from_lines(target.body.as_str(), new_code.as_str())
                     .unified_diff()

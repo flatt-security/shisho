@@ -1,0 +1,33 @@
+version: "1"
+rules:
+  - id: "uncontrolled-ebs-encryption-key"
+    language: hcl
+    message: |
+      To increase control of the encryption of EBS volume and manage factors like rotation, you can use customer managed keys.
+    pattern: |
+      resource  "aws_ebs_volume" :[NAME] {
+        :[...X]
+      }
+    constraints:
+      - target: X
+        should: not-match
+        pattern: |
+          kms_key_id = :[_]
+    rewrite_options:
+      - |
+        resource "aws_kms_key" "ebs_encryption" {
+          enable_key_rotation = true
+        }
+
+        resource "aws_ebs_volume" :[NAME] {
+          :[X]
+          kms_key_id = aws_kms_key.ebs_encryption.arn
+        }
+      - |
+        resource "aws_kms_key" "ebs_encryption" {          
+        }
+
+        resource "aws_ebs_volume" :[NAME] {
+          :[X]
+          kms_key_id = aws_kms_key.ebs_encryption.arn
+        }

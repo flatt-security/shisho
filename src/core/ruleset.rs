@@ -48,6 +48,7 @@ impl Rule {
         patterns: Vec<String>,
         constraints: Vec<RawConstraint>,
         rewrite_options: Vec<String>,
+        tags: Vec<Tag>,
     ) -> Self {
         Rule {
             id,
@@ -60,6 +61,8 @@ impl Rule {
 
             rewrite_options,
             rewrite: None,
+
+            tags,
         }
     }
 

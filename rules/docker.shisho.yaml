@@ -4,5 +4,6 @@ rules:
     language: dockerfile
     message: |
       `latest` tag is used. Consider to use more concrete tag.
-    pattern: |
-      FROM :[_]:latest
+    patterns:
+      - FROM :[_]:latest
+      - FROM :[_]:latest as :[_]

@@ -28,8 +28,8 @@ jobs:
         run: cargo build
       - name: Run tests
         run: |
-          # TODO: this is dummy as of now
-          cargo run -- find "RUN :[X]" --lang dockerfile --format sarif ./Dockerfile > ./results.sarif || true
+          # TODO: replace this with Shisho docker image
+          cargo run -- check ./rules/docker.shisho.yaml --format sarif ./ > ./results.sarif || true
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@v1
         with:
