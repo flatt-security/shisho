@@ -26,6 +26,8 @@ pub struct Rule {
     pub message: String,
     pub pattern: String,
 
+    pub tags: Vec<Tag>,
+
     #[serde(default)]
     pub constraints: Vec<RawConstraint>,
 
@@ -53,6 +55,39 @@ impl Rule {
         Ok(session
             .filter(|x| x.satisfies_all(&constraints).unwrap_or(false))
             .collect())
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct Tag(String);
+
+impl Tag {
+    pub fn into_inner(self) -> String {
+        self.0
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub enum Severity {
+    Low,
+    Medium,
+    High,
+    Critical,
+    Unknown,
+}
+
+impl Rule {
+    pub fn get_level(&self) -> Severity {
+        self.tags
+            .iter()
+            .find_map(|t| match t.clone().into_inner().to_lowercase().as_str() {
+                "low" => Some(Severity::Low),
+                "medium" => Some(Severity::Medium),
+                "high" => Some(Severity::High),
+                "critical" => Some(Severity::Critical),
+                _ => None,
+            })
+            .unwrap_or(Severity::Unknown)
     }
 }
 

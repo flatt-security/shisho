@@ -41,6 +41,22 @@ impl Target {
             })
         }
     }
+    pub fn canonicalized_path(&self) -> String {
+        if let Some(ref p) = self.path {
+            let p = p.canonicalize().unwrap();
+            p.to_string_lossy().to_string()
+        } else {
+            "/dev/stdin".to_string()
+        }
+    }
+
+    pub fn relative_path(&self) -> String {
+        if let Some(ref p) = self.path {
+            p.to_string_lossy().to_string()
+        } else {
+            "/dev/stdin".to_string()
+        }
+    }
 
     pub fn iter_from(
         p: PathBuf,
