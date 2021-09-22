@@ -22,10 +22,6 @@ impl Queryable for Dockerfile {
         source_file.children(&mut cursor).collect()
     }
 
-    fn range_for_view(node: &tree_sitter::Node) -> (tree_sitter::Point, tree_sitter::Point) {
-        (node.start_position(), node.end_position())
-    }
-
     fn is_skippable(node: &tree_sitter::Node) -> bool {
         node.kind() == "\n"
     }

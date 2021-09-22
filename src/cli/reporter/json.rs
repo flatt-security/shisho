@@ -1,7 +1,7 @@
 use super::Reporter;
 use crate::core::{
-    code::Code, language::Queryable, matcher::MatchedItem, ruleset::Rule, target::Target,
-    transform::Transformable,
+    code::Code, language::Queryable, matcher::MatchedItem, node::Range, ruleset::Rule,
+    target::Target, transform::Transformable,
 };
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -15,8 +15,14 @@ pub struct JSONReporter<'a, Writer: std::io::Write> {
 #[derive(Debug, Serialize, Deserialize)]
 struct Entry {
     pub id: String,
-    pub file: String,
+    pub location: Location,
     pub rewrite: Vec<JSONPatch>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Location {
+    file: String,
+    range: Range,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -48,7 +54,10 @@ impl<'a, W: std::io::Write> Reporter<'a> for JSONReporter<'a, W> {
         for (rule, mitem) in items {
             let mut r = Entry {
                 id: rule.id.clone(),
-                file: target_path.clone(),
+                location: Location {
+                    file: target_path.clone(),
+                    range: mitem.area.range::<T>(target.body.as_ref()),
+                },
                 rewrite: vec![],
             };
 

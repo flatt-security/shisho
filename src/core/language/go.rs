@@ -34,10 +34,6 @@ impl Queryable for Go {
             _ => false,
         }
     }
-
-    fn range_for_view(node: &tree_sitter::Node) -> (tree_sitter::Point, tree_sitter::Point) {
-        (node.start_position(), node.end_position())
-    }
 }
 
 #[cfg(test)]

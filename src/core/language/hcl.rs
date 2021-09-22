@@ -1,3 +1,5 @@
+use crate::core::node::Range;
+
 use super::Queryable;
 
 #[derive(Debug, Clone)]
@@ -40,18 +42,29 @@ impl Queryable for HCL {
         node.kind() == "\n"
     }
 
-    fn range_for_view(node: &tree_sitter::Node) -> (tree_sitter::Point, tree_sitter::Point) {
+    fn range(node: &tree_sitter::Node, source: &[u8]) -> Range {
         match node.kind() {
             "attribute" => {
-                let mut cursor = node.walk();
                 let bracket = node
-                    .children(&mut cursor)
+                    .children(&mut node.walk())
                     .skip(node.child_count() - 2)
                     .next()
                     .unwrap();
-                (node.start_position(), bracket.end_position())
+                let start = Self::default_range(node, source).start;
+                let end = Self::range(&bracket, source).end;
+                Range { start, end }
             }
-            _ => (node.start_position(), node.end_position()),
+            "block" => {
+                let bracket = node
+                    .children(&mut node.walk())
+                    .skip(node.child_count() - 2)
+                    .next()
+                    .unwrap();
+                let start = Self::default_range(node, source).start;
+                let end = Self::range(&bracket, source).end;
+                Range { start, end }
+            }
+            _ => Self::default_range(node, source),
         }
     }
 }

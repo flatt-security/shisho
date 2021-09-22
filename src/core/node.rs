@@ -1,7 +1,20 @@
 use crate::core::language::Queryable;
-
+use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConsecutiveNodes<'tree>(Vec<tree_sitter::Node<'tree>>);
+
+/// `Range` describes a range over a source code in a same manner as [Language Server Protocol](https://microsoft.github.io/language-server-protocol/specifications/specification-current/#range).
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Range {
+    pub start: Position,
+    pub end: Position,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Position {
+    pub row: usize,
+    pub column: usize,
+}
 
 impl<'tree> From<Vec<tree_sitter::Node<'tree>>> for ConsecutiveNodes<'tree> {
     fn from(value: Vec<tree_sitter::Node<'tree>>) -> Self {
@@ -35,13 +48,11 @@ impl<'tree> ConsecutiveNodes<'tree> {
         self.as_vec().last().unwrap().end_position()
     }
 
-    pub fn range_for_view<T: Queryable + 'static>(
-        &self,
-    ) -> (tree_sitter::Point, tree_sitter::Point) {
-        (
-            T::range_for_view(self.as_vec().first().unwrap()).0,
-            T::range_for_view(self.as_vec().last().unwrap()).1,
-        )
+    pub fn range<T: Queryable + 'static>(&self, source: &[u8]) -> Range {
+        Range {
+            start: T::range(self.as_vec().first().unwrap(), source).start,
+            end: T::range(self.as_vec().last().unwrap(), source).end,
+        }
     }
 
     pub fn start_byte(&self) -> usize {
