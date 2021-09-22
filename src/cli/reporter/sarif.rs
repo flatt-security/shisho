@@ -57,7 +57,9 @@ impl<'a, W: std::io::Write> Reporter<'a> for SARIFReporter<'a, W> {
                         )
                         .build()?;
                     self.descriptors.push(descriptor);
-                    self.descriptors.len() - 1
+                    let idx = self.descriptors.len() - 1;
+                    self.descriptors_idx_map.insert(rule.id.clone(), idx);
+                    idx
                 }
             };
 
@@ -134,6 +136,7 @@ impl<'a, W: std::io::Write> Reporter<'a> for SARIFReporter<'a, W> {
 
         self.results = vec![];
         self.descriptors = vec![];
+        self.descriptors_idx_map = HashMap::new();
         Ok(())
     }
 }
