@@ -627,7 +627,7 @@ mod tests {
         assert_eq!(c.len(), 1);
 
         let from_code = code.transform(
-            c.pop().unwrap(),
+            &c.pop().unwrap(),
             "resource \"rtype\" \"rname\" { attr = \"changed\" }\n",
         );
         assert!(from_code.is_ok());
@@ -653,7 +653,7 @@ mod tests {
         let mut c = session.collect::<Vec<MatchedItem>>();
         assert_eq!(c.len(), 1);
 
-        let from_code = code.transform(c.pop().unwrap(), "resource \"rtype\" \"rname\" { attr = :[Y] }\nresource \"rtype\" \"another\" { attr = :[X] }\n");
+        let from_code = code.transform(&c.pop().unwrap(), "resource \"rtype\" \"rname\" { attr = :[Y] }\nresource \"rtype\" \"another\" { attr = :[X] }\n");
         assert!(from_code.is_ok());
 
         assert_eq!(

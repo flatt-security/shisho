@@ -180,7 +180,7 @@ where
     T: Queryable,
     Self: Sized,
 {
-    fn transform<P>(self, item: MatchedItem, p: P) -> Result<Self>
+    fn transform<P>(self, item: &MatchedItem, p: P) -> Result<Self>
     where
         P: TryInto<AutofixPattern<T>, Error = anyhow::Error>,
     {
@@ -188,14 +188,14 @@ where
         self.transform_with_query(item, query)
     }
 
-    fn transform_with_query(self, item: MatchedItem, query: AutofixPattern<T>) -> Result<Self>;
+    fn transform_with_query(self, item: &MatchedItem, query: AutofixPattern<T>) -> Result<Self>;
 }
 
 impl<T> Transformable<T> for Code<T>
 where
     T: Queryable,
 {
-    fn transform_with_query(self, item: MatchedItem, query: AutofixPattern<T>) -> Result<Self> {
+    fn transform_with_query(self, item: &MatchedItem, query: AutofixPattern<T>) -> Result<Self> {
         let current_code = self.as_str().as_bytes();
 
         let before_snippet = String::from_utf8(current_code[0..item.area.start_byte()].to_vec())?;
