@@ -19,7 +19,7 @@ pub struct CommonOpts {
 
 #[derive(StructOpt, Debug)]
 pub struct ReportOpts {
-    #[structopt(long, default_value = "console")]
+    #[structopt(long, default_value = "console", possible_values(&ReporterType::variants()))]
     pub format: ReporterType,
 }
 

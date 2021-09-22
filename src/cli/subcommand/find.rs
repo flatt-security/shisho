@@ -1,10 +1,12 @@
 //! This module defines `check` subcommand.
 
+use crate::cli::encoding::{parse_encoding, LABELS_SORTED};
 use crate::cli::reporter::{ConsoleReporter, JSONReporter, Reporter, ReporterType};
 use crate::cli::{subcommand::check::handle_rulemap, CommonOpts, ReportOpts};
 use crate::core::ruleset::{self, Rule};
 use ansi_term::Color;
 use anyhow::Result;
+use encoding_rs::Encoding;
 use std::{array::IntoIter, collections::HashMap, path::PathBuf};
 use structopt::StructOpt;
 
@@ -29,6 +31,9 @@ pub struct FindOpts {
 
     #[structopt(flatten)]
     pub common: CommonOpts,
+
+    #[structopt(short, long, parse(try_from_str = parse_encoding), possible_values(&LABELS_SORTED))]
+    pub encoding: Option<&'static Encoding>,
 
     #[structopt(flatten)]
     pub report: ReportOpts,
@@ -66,12 +71,16 @@ fn handle_opts(opts: FindOpts) -> Result<usize> {
     let stdout = std::io::stdout();
     let mut stdout = stdout.lock();
     match opts.report.format {
-        ReporterType::JSON => {
-            handle_rulemap(JSONReporter::new(&mut stdout), opts.target_path, rule_map)
-        }
+        ReporterType::JSON => handle_rulemap(
+            JSONReporter::new(&mut stdout),
+            opts.target_path,
+            opts.encoding,
+            rule_map,
+        ),
         ReporterType::Console => handle_rulemap(
             ConsoleReporter::new(&mut stdout),
             opts.target_path,
+            opts.encoding,
             rule_map,
         ),
     }

@@ -41,3 +41,9 @@ impl FromStr for ReporterType {
         }
     }
 }
+
+impl ReporterType {
+    pub fn variants() -> [&'static str; 2] {
+        ["json", "console"]
+    }
+}
