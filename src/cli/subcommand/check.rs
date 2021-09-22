@@ -1,7 +1,7 @@
 //! This module defines `check` subcommand.
 
 use crate::cli::encoding::{parse_encoding, LABELS_SORTED};
-use crate::cli::reporter::{ConsoleReporter, JSONReporter, Reporter, ReporterType};
+use crate::cli::reporter::{ConsoleReporter, JSONReporter, Reporter, ReporterType, SARIFReporter};
 use crate::cli::{CommonOpts, ReportOpts};
 use crate::core::{
     language::{Dockerfile, Go, Queryable, HCL},
@@ -81,6 +81,12 @@ pub(crate) fn handle_opts(opts: CheckOpts) -> Result<usize> {
         ),
         ReporterType::Console => handle_rulemap(
             ConsoleReporter::new(&mut stdout),
+            opts.target_path,
+            opts.encoding,
+            rule_map,
+        ),
+        ReporterType::SARIF => handle_rulemap(
+            SARIFReporter::new(&mut stdout),
             opts.target_path,
             opts.encoding,
             rule_map,

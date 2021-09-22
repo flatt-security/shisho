@@ -30,6 +30,9 @@ pub struct Rule {
     pattern: Option<String>,
 
     #[serde(default)]
+    pub tags: Vec<Tag>,
+
+    #[serde(default)]
     pub constraints: Vec<RawConstraint>,
 
     #[serde(default)]
@@ -45,6 +48,7 @@ impl Rule {
         patterns: Vec<String>,
         constraints: Vec<RawConstraint>,
         rewrite_options: Vec<String>,
+        tags: Vec<Tag>,
     ) -> Self {
         Rule {
             id,
@@ -57,6 +61,8 @@ impl Rule {
 
             rewrite_options,
             rewrite: None,
+
+            tags,
         }
     }
 
@@ -106,6 +112,39 @@ impl Rule {
                 "You can use only one of `rewrite` or `rewrite_options`."
             )),
         }
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct Tag(String);
+
+impl Tag {
+    pub fn into_inner(self) -> String {
+        self.0
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub enum Severity {
+    Low,
+    Medium,
+    High,
+    Critical,
+    Unknown,
+}
+
+impl Rule {
+    pub fn get_level(&self) -> Severity {
+        self.tags
+            .iter()
+            .find_map(|t| match t.clone().into_inner().to_lowercase().as_str() {
+                "low" => Some(Severity::Low),
+                "medium" => Some(Severity::Medium),
+                "high" => Some(Severity::High),
+                "critical" => Some(Severity::Critical),
+                _ => None,
+            })
+            .unwrap_or(Severity::Unknown)
     }
 }
 
