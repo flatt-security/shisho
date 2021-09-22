@@ -1,5 +1,6 @@
 FROM rust:latest AS builder
 RUN rustup target add x86_64-unknown-linux-gnu
+RUN rustup component add rustfmt
 WORKDIR /build
 
 # cache dependencies
