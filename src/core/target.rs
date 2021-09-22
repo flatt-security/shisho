@@ -1,4 +1,6 @@
 use anyhow::Result;
+use encoding_rs::Encoding;
+use encoding_rs_io::DecodeReaderBytesBuilder;
 use std::{io::Read, path::PathBuf};
 use walkdir::WalkDir;
 
@@ -11,27 +13,45 @@ pub struct Target {
 }
 
 impl Target {
-    pub fn from(path: Option<PathBuf>) -> Result<Self> {
+    pub fn from(path: Option<PathBuf>, encoding: Option<&'static Encoding>) -> Result<Self> {
         if let Some(path) = path {
-            let body = std::fs::read_to_string(&path)?;
+            let body_bytes = std::fs::read(&path)?;
+            let mut decoder = DecodeReaderBytesBuilder::new()
+                .encoding(encoding)
+                .build(&body_bytes[..]);
+
+            let mut body_string = String::new();
+            decoder.read_to_string(&mut body_string)?;
+
             Ok(Target {
                 path: Some(path),
-                body,
+                body: body_string,
             })
         } else {
-            let mut body = String::new();
-            std::io::stdin().read_to_string(&mut body)?;
-            Ok(Target { path, body })
+            let mut decoder = DecodeReaderBytesBuilder::new()
+                .encoding(encoding)
+                .build(std::io::stdin());
+
+            let mut body_string = String::new();
+            decoder.read_to_string(&mut body_string)?;
+
+            Ok(Target {
+                path,
+                body: body_string,
+            })
         }
     }
 
-    pub fn iter_from(p: PathBuf) -> impl Iterator<Item = Self> {
+    pub fn iter_from(
+        p: PathBuf,
+        encoding: Option<&'static Encoding>,
+    ) -> impl Iterator<Item = Self> {
         WalkDir::new(p)
             .into_iter()
             .filter_map(|e| e.ok())
             .map(|e| e.into_path())
             .filter(|p| p.is_file())
-            .map(|p| Target::from(Some(p)))
+            .map(move |p| Target::from(Some(p), encoding.clone()))
             .filter_map(|e| e.ok())
     }
 

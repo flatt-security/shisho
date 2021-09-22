@@ -1,0 +1,8 @@
+version: "1"
+rules:
+  - id: "encoding"
+    language: go
+    message: |
+      testing
+    pattern: |
+      fmt.Sprintf("abテストcd")

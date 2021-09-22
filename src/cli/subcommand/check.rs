@@ -1,5 +1,6 @@
 //! This module defines `check` subcommand.
 
+use crate::cli::encoding::{parse_encoding, LABELS_SORTED};
 use crate::cli::reporter::{ConsoleReporter, JSONReporter, Reporter, ReporterType};
 use crate::cli::{CommonOpts, ReportOpts};
 use crate::core::{
@@ -10,11 +11,12 @@ use crate::core::{
 };
 use ansi_term::Color;
 use anyhow::{anyhow, Result};
+use encoding_rs::Encoding;
 use std::{collections::HashMap, convert::TryFrom};
 use std::{iter::repeat, path::PathBuf};
 use structopt::StructOpt;
 
-/// Checks files under the given path with the given rule sets
+// Checks files under the given path with the given rule sets
 #[derive(StructOpt, Debug)]
 pub struct CheckOpts {
     /// Rule Set for searching
@@ -27,6 +29,9 @@ pub struct CheckOpts {
 
     #[structopt(flatten)]
     pub common: CommonOpts,
+
+    #[structopt(short, long, parse(try_from_str = parse_encoding), possible_values(&LABELS_SORTED))]
+    pub encoding: Option<&'static Encoding>,
 
     #[structopt(flatten)]
     pub report: ReportOpts,
@@ -48,7 +53,7 @@ pub fn run(opts: CheckOpts) -> i32 {
     }
 }
 
-fn handle_opts(opts: CheckOpts) -> Result<usize> {
+pub(crate) fn handle_opts(opts: CheckOpts) -> Result<usize> {
     let mut rule_map = HashMap::<ruleset::Language, Vec<Rule>>::new();
     let ruleset = ruleset::from_reader(&opts.ruleset_path).map_err(|e| {
         anyhow!(
@@ -68,12 +73,16 @@ fn handle_opts(opts: CheckOpts) -> Result<usize> {
     let stdout = std::io::stdout();
     let mut stdout = stdout.lock();
     match opts.report.format {
-        ReporterType::JSON => {
-            handle_rulemap(JSONReporter::new(&mut stdout), opts.target_path, rule_map)
-        }
+        ReporterType::JSON => handle_rulemap(
+            JSONReporter::new(&mut stdout),
+            opts.target_path,
+            opts.encoding,
+            rule_map,
+        ),
         ReporterType::Console => handle_rulemap(
             ConsoleReporter::new(&mut stdout),
             opts.target_path,
+            opts.encoding,
             rule_map,
         ),
     }
@@ -82,12 +91,13 @@ fn handle_opts(opts: CheckOpts) -> Result<usize> {
 pub(crate) fn handle_rulemap<'a>(
     mut reporter: impl Reporter<'a>,
     target_path: Option<PathBuf>,
+    encoding: Option<&'static Encoding>,
     rule_map: HashMap<ruleset::Language, Vec<Rule>>,
 ) -> Result<usize> {
     let mut total_findings = 0;
     match target_path {
         Some(p) if p.is_dir() => {
-            for target in Target::iter_from(p) {
+            for target in Target::iter_from(p, encoding) {
                 if let Some(lang) = target.language() {
                     if let Some(rules) = rule_map.get(&lang) {
                         total_findings += handle_rules(&mut reporter, &target, rules, &lang)?;
@@ -96,7 +106,7 @@ pub(crate) fn handle_rulemap<'a>(
             }
         }
         Some(p) => {
-            let target = Target::from(Some(p))?;
+            let target = Target::from(Some(p), encoding)?;
             if let Some(lang) = target.language() {
                 if let Some(rules) = rule_map.get(&lang) {
                     total_findings += handle_rules(&mut reporter, &target, rules, &lang)?;
@@ -104,7 +114,7 @@ pub(crate) fn handle_rulemap<'a>(
             }
         }
         _ => {
-            let target = Target::from(None)?;
+            let target = Target::from(None, encoding)?;
             for (lang, rules) in rule_map {
                 total_findings += handle_rules(&mut reporter, &target, &rules, &lang)?;
             }
