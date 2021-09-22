@@ -54,7 +54,6 @@ pub fn run(opts: CheckOpts) -> i32 {
 }
 
 pub(crate) fn handle_opts(opts: CheckOpts) -> Result<usize> {
-    println!("{:?}", opts.target_path);
     let mut rule_map = HashMap::<ruleset::Language, Vec<Rule>>::new();
     let ruleset = ruleset::from_reader(&opts.ruleset_path).map_err(|e| {
         anyhow!(

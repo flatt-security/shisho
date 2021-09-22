@@ -55,6 +55,12 @@ impl<'a, W: std::io::Write> Reporter<'a> for SARIFReporter<'a, W> {
                                 .text(rule.message.clone())
                                 .build()?,
                         )
+                        .help(
+                            sarif::MultiformatMessageStringBuilder::default()
+                                .markdown(rule.message.clone())
+                                .text(rule.message.clone())
+                                .build()?,
+                        )
                         .build()?;
                     self.descriptors.push(descriptor);
                     let idx = self.descriptors.len() - 1;
