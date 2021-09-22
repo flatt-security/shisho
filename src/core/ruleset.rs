@@ -1,12 +1,11 @@
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::{
     convert::TryFrom,
     fs::File,
     path::{Path, PathBuf},
     str::FromStr,
 };
-
-use anyhow::Result;
-use serde::{Deserialize, Serialize};
 
 use crate::core::{
     constraint::Constraint, language::Queryable, matcher::MatchedItem, query::Query,
@@ -22,17 +21,48 @@ pub struct RuleSet {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Rule {
     pub id: String,
+
     pub language: Language,
     pub message: String,
-    pub pattern: String,
+
+    #[serde(default)]
+    patterns: Vec<String>,
+    pattern: Option<String>,
+
+    #[serde(default)]
+    pub tags: Vec<Tag>,
 
     #[serde(default)]
     pub constraints: Vec<RawConstraint>,
 
-    pub rewrite: Option<String>,
+    #[serde(default)]
+    rewrite_options: Vec<String>,
+    rewrite: Option<String>,
 }
 
 impl Rule {
+    pub fn new(
+        id: String,
+        language: Language,
+        message: String,
+        patterns: Vec<String>,
+        constraints: Vec<RawConstraint>,
+        rewrite_options: Vec<String>,
+    ) -> Self {
+        Rule {
+            id,
+            message,
+            language,
+            constraints,
+
+            patterns,
+            pattern: None,
+
+            rewrite_options,
+            rewrite: None,
+        }
+    }
+
     pub fn find<'tree, 'item, T: 'static>(
         &self,
         tree: &'tree PartialTree<'tree, T>,
@@ -47,12 +77,71 @@ impl Rule {
             .map(|x| Constraint::try_from(x.clone()))
             .collect::<Result<Vec<Constraint<T>>>>()?;
 
-        let query = Query::<T>::try_from(self.pattern.as_str())?;
-        let session = tree.matches(&query);
+        let patterns = self.get_patterns()?;
+        let mut matches = vec![];
+        for p in patterns {
+            let query = Query::<T>::try_from(p)?;
+            matches.extend(
+                tree.matches(&query)
+                    .filter(|x| x.satisfies_all(&constraints).unwrap_or(false)),
+            );
+        }
+        Ok(matches)
+    }
 
-        Ok(session
-            .filter(|x| x.satisfies_all(&constraints).unwrap_or(false))
-            .collect())
+    pub fn get_patterns(&self) -> Result<Vec<&str>> {
+        match (&self.pattern, &self.patterns) {
+            (Some(p), patterns) if patterns.len() == 0 => Ok(vec![&p]),
+            (None, patterns) if patterns.len() > 0 => {
+                Ok(patterns.iter().map(|x| x.as_str()).collect())
+            }
+            _ => Err(anyhow::anyhow!(
+                "You can use only one of `pattern` or `patterns`."
+            )),
+        }
+    }
+
+    pub fn get_rewrite_options(&self) -> Result<Vec<&str>> {
+        match (&self.rewrite, &self.rewrite_options) {
+            (Some(p), patterns) if patterns.len() == 0 => Ok(vec![&p]),
+            (None, patterns) => Ok(patterns.iter().map(|x| x.as_str()).collect()),
+            _ => Err(anyhow::anyhow!(
+                "You can use only one of `rewrite` or `rewrite_options`."
+            )),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct Tag(String);
+
+impl Tag {
+    pub fn into_inner(self) -> String {
+        self.0
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub enum Severity {
+    Low,
+    Medium,
+    High,
+    Critical,
+    Unknown,
+}
+
+impl Rule {
+    pub fn get_level(&self) -> Severity {
+        self.tags
+            .iter()
+            .find_map(|t| match t.clone().into_inner().to_lowercase().as_str() {
+                "low" => Some(Severity::Low),
+                "medium" => Some(Severity::Medium),
+                "high" => Some(Severity::High),
+                "critical" => Some(Severity::Critical),
+                _ => None,
+            })
+            .unwrap_or(Severity::Unknown)
     }
 }
 

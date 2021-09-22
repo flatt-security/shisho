@@ -1,13 +1,15 @@
 mod console;
-use std::str::FromStr;
-
 pub use self::console::*;
 
 mod json;
 pub use self::json::*;
 
+mod sarif;
+pub use self::sarif::*;
+
 use crate::core::{language::Queryable, matcher::MatchedItem, ruleset::Rule, target::Target};
 use anyhow::Result;
+use std::str::FromStr;
 
 pub trait Reporter<'a> {
     type Writer: std::io::Write;
@@ -28,6 +30,7 @@ pub trait Reporter<'a> {
 pub enum ReporterType {
     JSON,
     Console,
+    SARIF,
 }
 
 impl FromStr for ReporterType {
@@ -37,13 +40,14 @@ impl FromStr for ReporterType {
         match input {
             "json" => Ok(ReporterType::JSON),
             "console" => Ok(ReporterType::Console),
+            "sarif" => Ok(ReporterType::SARIF),
             _ => Err("".into()),
         }
     }
 }
 
 impl ReporterType {
-    pub fn variants() -> [&'static str; 2] {
-        ["json", "console"]
+    pub fn variants() -> [&'static str; 3] {
+        ["json", "console", "sarif"]
     }
 }

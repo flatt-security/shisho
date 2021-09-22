@@ -22,12 +22,6 @@ impl<'a, W: std::io::Write> Reporter<'a> for ConsoleReporter<'a, W> {
         target: &Target,
         items: Vec<(&Rule, MatchedItem)>,
     ) -> Result<()> {
-        let target_path = if let Some(ref p) = target.path {
-            let p = p.canonicalize()?;
-            p.to_string_lossy().to_string()
-        } else {
-            "/dev/stdin".to_string()
-        };
         let lines = target.body.split("\n").collect::<Vec<&str>>();
 
         for (rule, mitem) in items {
@@ -40,7 +34,7 @@ impl<'a, W: std::io::Write> Reporter<'a> for ConsoleReporter<'a, W> {
             )?;
 
             // print a finding
-            writeln!(self.writer, "In {}:", target_path)?;
+            writeln!(self.writer, "In {}:", target.canonicalized_path())?;
             writeln!(self.writer, "{:>8} |", "")?;
             let Range { start: s, end: e } = mitem.area.range::<T>(target.body.as_ref());
 

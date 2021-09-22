@@ -44,18 +44,11 @@ impl<'a, W: std::io::Write> Reporter<'a> for JSONReporter<'a, W> {
         target: &Target,
         items: Vec<(&Rule, MatchedItem)>,
     ) -> Result<()> {
-        let target_path = if let Some(ref p) = target.path {
-            let p = p.canonicalize()?;
-            p.to_string_lossy().to_string()
-        } else {
-            "/dev/stdin".to_string()
-        };
-
         for (rule, mitem) in items {
             let mut r = Entry {
                 id: rule.id.clone(),
                 location: Location {
-                    file: target_path.clone(),
+                    file: target.canonicalized_path(),
                     range: mitem.area.range::<T>(target.body.as_ref()),
                 },
                 rewrite: vec![],

@@ -364,7 +364,7 @@ mod tests {
         let mut c = session.collect::<Vec<MatchedItem>>();
         assert_eq!(c.len(), 1);
 
-        let from_code = code.transform(c.pop().unwrap(), ":[X]");
+        let from_code = code.transform(&c.pop().unwrap(), ":[X]");
         assert!(from_code.is_ok());
 
         assert_eq!(from_code.unwrap().as_str(), "func a() { b := 1 }",);

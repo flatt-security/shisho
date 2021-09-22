@@ -1,7 +1,7 @@
 //! This module defines `check` subcommand.
 
 use crate::cli::encoding::{parse_encoding, LABELS_SORTED};
-use crate::cli::reporter::{ConsoleReporter, JSONReporter, Reporter, ReporterType};
+use crate::cli::reporter::{ConsoleReporter, JSONReporter, Reporter, ReporterType, SARIFReporter};
 use crate::cli::{subcommand::check::handle_rulemap, CommonOpts, ReportOpts};
 use crate::core::ruleset::{self, Rule};
 use ansi_term::Color;
@@ -62,6 +62,7 @@ fn handle_opts(opts: FindOpts) -> Result<usize> {
         language: opts.lang,
         constraints: vec![],
         pattern: opts.pattern,
+        tags: vec![],
         rewrite: opts.rewrite,
     };
 
@@ -79,6 +80,12 @@ fn handle_opts(opts: FindOpts) -> Result<usize> {
         ),
         ReporterType::Console => handle_rulemap(
             ConsoleReporter::new(&mut stdout),
+            opts.target_path,
+            opts.encoding,
+            rule_map,
+        ),
+        ReporterType::SARIF => handle_rulemap(
+            SARIFReporter::new(&mut stdout),
             opts.target_path,
             opts.encoding,
             rule_map,
