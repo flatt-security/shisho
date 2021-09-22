@@ -29,7 +29,7 @@ jobs:
       - name: Run tests
         run: |
           # TODO: this is dummy as of now
-          cargo run -- find "RUN :[X]" --lang dockerfile --format sarif ./Dockerfile > ./results.sarif
+          cargo run -- find "RUN :[X]" --lang dockerfile --format sarif ./Dockerfile > ./results.sarif || true
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@v1
         with:
