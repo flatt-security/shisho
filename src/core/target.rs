@@ -22,6 +22,7 @@ impl Target {
 
             let mut body_string = String::new();
             decoder.read_to_string(&mut body_string)?;
+
             Ok(Target {
                 path: Some(path),
                 body: body_string,

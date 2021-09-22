@@ -53,7 +53,7 @@ pub fn run(opts: CheckOpts) -> i32 {
     }
 }
 
-fn handle_opts(opts: CheckOpts) -> Result<usize> {
+pub(crate) fn handle_opts(opts: CheckOpts) -> Result<usize> {
     let mut rule_map = HashMap::<ruleset::Language, Vec<Rule>>::new();
     let ruleset = ruleset::from_reader(&opts.ruleset_path).map_err(|e| {
         anyhow!(

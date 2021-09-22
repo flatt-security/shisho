@@ -3,6 +3,7 @@ mod tests {
     use crate::cli::opts;
     use crate::cli::reporter::ReporterType;
     use crate::cli::subcommand;
+    use anyhow::Result;
     use clap_verbosity_flag::Verbosity;
     use std::path::PathBuf;
 
@@ -11,7 +12,7 @@ mod tests {
         $(
             #[test]
             fn $name() {
-                for (lvalue, rvalue, mnum) in $value {
+                for (lvalue, rvalue, mitem_num, encoding) in $value {
                     let mut ruleset = PathBuf::from(file!());
                     ruleset.pop();
                     ruleset.push("ruleset");
@@ -24,13 +25,19 @@ mod tests {
                     target.push(stringify!($name));
                     target.push(rvalue);
 
-                    let r = subcommand::check::run( subcommand::check::CheckOpts{
+                    let mitem_num: Result<usize> = mitem_num;
+                    let r = subcommand::check::handle_opts(subcommand::check::CheckOpts{
                         common: opts::CommonOpts { verbose: Verbosity::new(0, 0, 0) },
                         report: opts::ReportOpts { format: ReporterType::Console, },
                         ruleset_path: ruleset,
+                        encoding: encoding,
                         target_path: Some(target),
                     });
-                    assert_eq!(r, mnum);
+                    match (r, mitem_num) {
+                        (Ok(x), Ok(y)) if x == y => (),
+                        (Err(x), Err(y)) if x.to_string() == y.to_string() => (),
+                        (x, y) => panic!("[{}] {} + {}: expected {:?}, got {:?}", stringify!($name), lvalue, rvalue, y, x),
+                    }
                 }
             }
         )*
@@ -38,6 +45,10 @@ mod tests {
     }
 
     ruleset_test! {
-        unencrypted_ebs: [("ruleset.yaml", "match.tf", 1), ("ruleset.yaml", "unmatch.tf", 0)],
+        unencrypted_ebs: [("ruleset.yaml", "match.tf", Ok(2), None), ("ruleset.yaml", "unmatch.tf", Ok(0), None)],
+        encoding: [
+            ("ruleset.yaml", "shift_jis.go", Result::Ok(3), Some(encoding_rs::SHIFT_JIS)),
+            ("ruleset.yaml", "utf_16le.go", Result::Ok(3), Some(encoding_rs::UTF_16LE)),
+        ],
     }
 }
