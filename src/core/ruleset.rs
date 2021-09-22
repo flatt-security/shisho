@@ -26,6 +26,7 @@ pub struct Rule {
     pub message: String,
     pub pattern: String,
 
+    #[serde(default)]
     pub tags: Vec<Tag>,
 
     #[serde(default)]
