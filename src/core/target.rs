@@ -1,7 +1,7 @@
 use anyhow::Result;
 use encoding_rs::Encoding;
 use encoding_rs_io::DecodeReaderBytesBuilder;
-use std::{io::Read, path::PathBuf};
+use std::{env, io::Read, path::PathBuf};
 use walkdir::WalkDir;
 
 use crate::core::ruleset::Language;
@@ -52,6 +52,8 @@ impl Target {
 
     pub fn relative_path(&self) -> String {
         if let Some(ref p) = self.path {
+            let p = p.canonicalize().unwrap();
+            let p = p.strip_prefix(env::current_dir().unwrap()).unwrap();
             p.to_string_lossy().to_string()
         } else {
             "/dev/stdin".to_string()
