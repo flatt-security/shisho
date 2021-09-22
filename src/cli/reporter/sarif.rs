@@ -1,11 +1,9 @@
 use super::Reporter;
 use crate::core::{
-    code::Code,
     language::Queryable,
     matcher::MatchedItem,
     ruleset::{Rule, Severity},
     target::Target,
-    transform::Transformable,
 };
 use anyhow::Result;
 use serde_sarif::sarif;
