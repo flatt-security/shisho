@@ -56,14 +56,14 @@ pub fn run(opts: FindOpts) -> i32 {
 }
 
 fn handle_opts(opts: FindOpts) -> Result<usize> {
-    let rule = Rule {
-        id: "inline".into(),
-        message: "matched with the given rule".into(),
-        language: opts.lang,
-        constraints: vec![],
-        pattern: opts.pattern,
-        rewrite: opts.rewrite,
-    };
+    let rule = Rule::new(
+        "inline".into(),
+        opts.lang,
+        "matched with the given rule".into(),
+        vec![opts.pattern],
+        vec![],
+        opts.rewrite.map_or(vec![], |x| vec![x]),
+    );
 
     let rule_map =
         IntoIter::new([(opts.lang, vec![rule])]).collect::<HashMap<ruleset::Language, Vec<Rule>>>();

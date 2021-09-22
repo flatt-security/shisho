@@ -3,7 +3,7 @@ use crate::core::{
     code::Code, language::Queryable, matcher::MatchedItem, node::Range, ruleset::Rule,
     target::Target, transform::Transformable,
 };
-use ansi_term::Color;
+use ansi_term::{Color, Style};
 use anyhow::Result;
 use similar::{ChangeTag, TextDiff};
 
@@ -86,26 +86,67 @@ impl<'a, W: std::io::Write> Reporter<'a> for ConsoleReporter<'a, W> {
             writeln!(self.writer, "{:>8} |", "")?;
 
             // print suggested changes
-            if let Some(ref rewrite_pattern) = rule.rewrite {
-                writeln!(self.writer, "Suggested changes:")?;
+
+            for (idx, rewrite) in rule.get_rewrite_options()?.into_iter().enumerate() {
+                if idx > 0 {
+                    writeln!(self.writer)?;
+                }
+                writeln!(self.writer, "Suggested changes ({}):", idx + 1)?;
                 let old_code: Code<T> = target.body.clone().into();
-                let new_code = old_code.transform(mitem, rewrite_pattern.as_str())?;
+                let new_code = old_code.transform(&mitem, rewrite)?;
 
                 let diff = TextDiff::from_lines(target.body.as_str(), new_code.as_str());
-                for change in diff.iter_all_changes() {
-                    match change.tag() {
-                        ChangeTag::Delete => print!(
-                            "{} | {}",
-                            Color::Green.paint(format!("{:>8}", (change.old_index().unwrap() + 1))),
-                            Color::Red.paint(format!("-{}", change))
-                        ),
-                        ChangeTag::Insert => print!(
-                            "{} | {}",
-                            Color::Green.paint(format!("{:>8}", (change.new_index().unwrap() + 1))),
-                            Color::Green.paint(format!("+{}", change))
-                        ),
-                        ChangeTag::Equal => (),
-                    };
+                for (group_idx, group) in diff.grouped_ops(1).iter().enumerate() {
+                    if group_idx > 0 {
+                        writeln!(self.writer)?;
+                        writeln!(
+                            self.writer,
+                            "{:<2} {} {:<2} | {}",
+                            "",
+                            Style::default().dimmed().paint("..."),
+                            "",
+                            Style::default().dimmed().paint("...")
+                        )?;
+                        writeln!(self.writer)?;
+                    }
+                    for op in group {
+                        for change in diff.iter_inline_changes(op) {
+                            let (sign, s): (&str, Style) = match change.tag() {
+                                ChangeTag::Delete => ("-", Color::Red.into()),
+                                ChangeTag::Insert => ("+", Color::Green.into()),
+                                ChangeTag::Equal => (" ", Style::default()),
+                            };
+                            write!(
+                                self.writer,
+                                "{} {} | {} ",
+                                Style::default().dimmed().paint(format!(
+                                    "{:<4}",
+                                    change
+                                        .old_index()
+                                        .map(|x| (x + 1).to_string())
+                                        .unwrap_or_default()
+                                )),
+                                Style::default().dimmed().paint(format!(
+                                    "{:<4}",
+                                    change
+                                        .new_index()
+                                        .map(|x| (x + 1).to_string())
+                                        .unwrap_or_default()
+                                )),
+                                s.clone().bold().paint(sign),
+                            )?;
+                            for (emphasized, value) in change.iter_strings_lossy() {
+                                if emphasized {
+                                    write!(self.writer, "{}", s.clone().underline().paint(value))?;
+                                } else {
+                                    write!(self.writer, "{}", s.clone().paint(value))?;
+                                }
+                            }
+                            if change.missing_newline() {
+                                writeln!(self.writer)?;
+                            }
+                        }
+                    }
                 }
             }
 

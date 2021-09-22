@@ -46,6 +46,7 @@ mod tests {
 
     ruleset_test! {
         unencrypted_ebs: [("ruleset.yaml", "match.tf", Ok(2), None), ("ruleset.yaml", "unmatch.tf", Ok(0), None)],
+        uncontrolled_ebs_encryption_key: [("ruleset.yaml", "match.tf", Ok(2), None), ("ruleset.yaml", "unmatch.tf", Ok(0), None)],
         encoding: [
             ("ruleset.yaml", "shift_jis.go", Result::Ok(3), Some(encoding_rs::SHIFT_JIS)),
             ("ruleset.yaml", "utf_16le.go", Result::Ok(3), Some(encoding_rs::UTF_16LE)),
