@@ -55,18 +55,22 @@ pub fn run(opts: CheckOpts) -> i32 {
 
 pub(crate) fn handle_opts(opts: CheckOpts) -> Result<usize> {
     let mut rule_map = HashMap::<ruleset::Language, Vec<Rule>>::new();
-    let ruleset = ruleset::from_reader(&opts.ruleset_path).map_err(|e| {
+
+    let rulesets = ruleset::from_path(&opts.ruleset_path).map_err(|e| {
         anyhow!(
             "failed to load ruleset file {}: {}",
             opts.ruleset_path.as_os_str().to_string_lossy(),
             e
         )
     })?;
-    for rule in ruleset.rules {
-        if let Some(v) = rule_map.get_mut(&rule.language) {
-            v.push(rule);
-        } else {
-            rule_map.insert(rule.language, vec![rule]);
+
+    for ruleset in rulesets {
+        for rule in ruleset.rules {
+            if let Some(v) = rule_map.get_mut(&rule.language) {
+                v.push(rule);
+            } else {
+                rule_map.insert(rule.language, vec![rule]);
+            }
         }
     }
 

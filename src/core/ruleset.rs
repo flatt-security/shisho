@@ -1,11 +1,7 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::{
-    convert::TryFrom,
-    fs::File,
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+use std::{convert::TryFrom, fs::File, path::Path, str::FromStr};
+use walkdir::WalkDir;
 
 use crate::core::{
     constraint::Constraint, language::Queryable, matcher::MatchedItem, query::Query,
@@ -193,9 +189,28 @@ pub fn from_str(s: &str) -> Result<RuleSet> {
     Ok(rset)
 }
 
-pub fn from_reader<P: AsRef<Path>>(ruleset_path: P) -> Result<RuleSet> {
-    let f = File::open(ruleset_path)?;
-    let rset: RuleSet = serde_yaml::from_reader(f)?;
+pub fn from_path<P: AsRef<Path>>(ruleset_path: P) -> Result<Vec<RuleSet>> {
+    let ruleset_path: &Path = ruleset_path.as_ref();
+    if ruleset_path.is_dir() {
+        WalkDir::new(ruleset_path)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .map(|e| e.into_path())
+            .filter(|p| p.is_file())
+            .map(|p| from_filepath(p))
+            .collect::<Result<Vec<RuleSet>>>()
+    } else {
+        Ok(vec![from_filepath(ruleset_path)?])
+    }
+}
+
+fn from_filepath<P: AsRef<Path>>(p: P) -> Result<RuleSet> {
+    let f = File::open(p)?;
+    from_reader(f)
+}
+
+fn from_reader<R: std::io::Read>(r: R) -> Result<RuleSet> {
+    let rset: RuleSet = serde_yaml::from_reader(r)?;
     Ok(rset)
 }
 
@@ -204,13 +219,5 @@ impl<'a> TryFrom<&'a str> for RuleSet {
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
         from_str(value)
-    }
-}
-
-impl<'a> TryFrom<PathBuf> for RuleSet {
-    type Error = anyhow::Error;
-
-    fn try_from(value: PathBuf) -> Result<Self, Self::Error> {
-        from_reader(value)
     }
 }
