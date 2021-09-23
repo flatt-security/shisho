@@ -33,14 +33,18 @@ pub struct CheckOpts {
     #[structopt(short, long, parse(try_from_str = parse_encoding), possible_values(&LABELS_SORTED))]
     pub encoding: Option<&'static Encoding>,
 
+    #[structopt(long)]
+    pub exit_zero: bool,
+
     #[structopt(flatten)]
     pub report: ReportOpts,
 }
 
 pub fn run(opts: CheckOpts) -> i32 {
+    let exit_zero = opts.exit_zero;
     match handle_opts(opts) {
         Ok(total_findings) => {
-            if total_findings > 0 {
+            if total_findings > 0 && !exit_zero {
                 1
             } else {
                 0
