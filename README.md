@@ -7,6 +7,7 @@
 [![License][license-img]][license]
 [![Documentation][documentation-img]][documentation]
 [![Test][test-img]][test]
+[![Playground][playground-img]][playground]
 
 Shisho is a lightweight static analyzer for developers.
 
@@ -54,7 +55,8 @@ Then you'll see a shisho's executable in `/usr/local/bin`.
 ### Windows
 
 Download the prebuild binary from [releases](https://github.com/flatt-security/shisho/releases) and put it into your `%PATH%` directory.
-If you're using [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/install-win10), you can install shisho by `bash <(curl -sL get.shisho.dev/linux)`.
+
+If you're using [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/install-win10), you can install shisho with the above instructions.
 
 # More
 
@@ -69,5 +71,7 @@ If you're using [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/w
 [license-img]: https://img.shields.io/github/license/flatt-security/shisho
 [documentation]: https://docs.shisho.dev
 [documentation-img]: https://img.shields.io/badge/docs-docs.shisho.dev-purple
+[playground]: https://play.shisho.dev
+[playground-img]: https://img.shields.io/badge/playground-playground.shisho.dev-purple
 [test]: https://github.com/flatt-security/shisho/actions/workflows/test.yml
 [test-img]: https://github.com/flatt-security/shisho/actions/workflows/test.yml/badge.svg?branch=main
