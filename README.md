@@ -15,6 +15,10 @@ Shisho is a lightweight static analyzer for developers.
 
 ![demo](./docs/content/images/shisho-demo.gif)
 
+## Try at Playground
+
+You can try Shisho at [our playground](https://play.shisho.dev).
+
 ## Try with Docker
 
 You can try shisho in your machine as follows:
