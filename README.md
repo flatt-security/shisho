@@ -2,7 +2,11 @@
 
 ![shisho](./docs/public/images/header.png)
 
-[![Run tests](https://github.com/flatt-security/shisho/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/flatt-security/shisho/actions/workflows/test.yml) [![Run lint](https://github.com/flatt-security/shisho/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/flatt-security/shisho/actions/workflows/lint.yml)
+[![GitHub Release][release-img]][release]
+[![GitHub Marketplace][marketplace-img]][marketplace]
+[![License][license-img]][license]
+[![Documentation][documentation-img]][documentation]
+[![Test][test-img]][test]
 
 Shisho is a lightweight static analyzer for developers.
 
@@ -56,3 +60,14 @@ If you're using [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/w
 
 - We're also building [Shisho as a Service](https://shisho.dev) to make Security-as-Code more accessible.
 - If you need direct support, you can contact us at `contact@flatt.tech`.
+
+[release]: https://github.com/flatt-security/shisho/releases/latest
+[release-img]: https://img.shields.io/github/release/flatt-security/shisho.svg?logo=github
+[marketplace]: https://github.com/marketplace/actions/flatt-security-shisho
+[marketplace-img]: https://img.shields.io/badge/marketplace-shisho--action-blue?logo=github
+[license]: https://github.com/flatt-security/shisho/blob/main/LICENSE
+[license-img]: https://img.shields.io/github/license/flatt-security/shisho
+[documentation]: https://docs.shisho.dev
+[documentation-img]: https://img.shields.io/badge/docs-docs.shisho.dev-purple
+[test]: https://github.com/flatt-security/shisho/actions/workflows/test.yml
+[test-img]: https://github.com/flatt-security/shisho/actions/workflows/test.yml/badge.svg?branch=main

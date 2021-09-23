@@ -8,7 +8,6 @@ on:
 
 jobs:
   test:
-    # TODO (enhancement): We can extend this timeout if our tests get larger than expected.
     timeout-minutes: 10
     strategy:
       matrix:
@@ -31,3 +30,45 @@ jobs:
         run: cargo build
       - name: Run tests
         run: cargo test
+
+  clippy:
+    strategy:
+      matrix:
+        rust:
+          - stable
+        os: [ubuntu-latest]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout HEAD
+        uses: actions/checkout@v1
+        with:
+          submodules: true
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          override: true
+      - run: rustup component add clippy
+      - uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-features
+
+  shisho:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout HEAD
+        uses: actions/checkout@v1
+      - name: Run Shisho
+        uses: flatt-security/shisho-action@main
+        with:
+          ruleset-path: "./rules"
+          target-path: "./"
+          output-format: "sarif"
+          output-path: "shisho.sarif"
+          succeed-always: true
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v1
+        with:
+          sarif_file: ./shisho.sarif
