@@ -1,36 +1,23 @@
-name: "Test Dockerfile with Shisho"
+name: "Run tests with Shisho"
 
 on:
   push:
 
 jobs:
   test:
-    # TODO (enhancement): We can extend this timeout if our tests get larger than expected.
-    timeout-minutes: 10
-    strategy:
-      matrix:
-        rust:
-          - stable
-        os: [ubuntu-latest]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout HEAD
         uses: actions/checkout@v1
+      - name: Run Shisho
+        uses: flatt-security/shisho-action@main
         with:
-          submodules: true
-      - name: Setup Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ matrix.rust }}
-          override: true
-      - name: Build
-        run: cargo build
-      - name: Run tests
-        run: |
-          # TODO: replace this with Shisho docker image
-          cargo run -- check ./rules/docker.shisho.yaml --format sarif ./ > ./results.sarif || true
+          ruleset-path: "./rules"
+          target-path: "./"
+          output-format: "sarif"
+          output-path: "shisho.sarif"
+          succeed-always: true
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@v1
         with:
-          sarif_file: ./results.sarif
+          sarif_file: ./shisho.sarif
