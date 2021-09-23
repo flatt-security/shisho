@@ -12,8 +12,6 @@ jobs:
     steps:
       - name: Checkout HEAD
         uses: actions/checkout@v1
-        with:
-          submodules: true
       - name: Run Shisho
         uses: flatt-security/shisho-action@main
         with:
