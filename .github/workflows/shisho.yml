@@ -16,10 +16,6 @@ jobs:
         uses: flatt-security/shisho-action@main
         with:
           ruleset-path: "./rules"
-          target-path: "./"
-          output-format: "sarif"
-          output-path: "shisho.sarif"
-          succeed-always: true
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@v1
         with:
