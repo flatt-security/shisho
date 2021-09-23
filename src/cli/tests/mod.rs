@@ -32,6 +32,7 @@ mod tests {
                         ruleset_path: ruleset,
                         encoding: encoding,
                         target_path: Some(target),
+                        exit_zero: false,
                     });
                     match (r, mitem_num) {
                         (Ok(x), Ok(y)) if x == y => (),
