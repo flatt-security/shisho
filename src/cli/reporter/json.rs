@@ -48,7 +48,7 @@ impl<'a, W: std::io::Write> Reporter<'a> for JSONReporter<'a, W> {
             let mut r = Entry {
                 id: rule.id.clone(),
                 location: Location {
-                    file: target.canonicalized_path(),
+                    file: target.relative_path(),
                     range: mitem.area.range::<T>(target.body.as_ref()),
                 },
                 rewrite: vec![],
