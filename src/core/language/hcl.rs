@@ -1,4 +1,4 @@
-use crate::core::node::Range;
+use crate::core::node::{Node, Range};
 
 use super::Queryable;
 
@@ -14,57 +14,55 @@ impl Queryable for HCL {
         tree_sitter_hcl_query::language()
     }
 
-    fn get_query_nodes<'tree>(root: &'tree tree_sitter::Tree) -> Vec<tree_sitter::Node<'tree>> {
-        // TODO (y0n3uchy): this should be done more strictly.
-
+    fn get_query_nodes<'tree, 'a>(root: &'a Box<Node<'tree>>) -> &'a Vec<Box<Node<'tree>>> {
         // see `//third_party/tree-sitter-hcl-query/grammar.js`
-        let source_file = root.root_node();
-        let body = source_file
-            .child(0)
-            .expect("failed to load the code; no root element");
-
-        let mut cursor = source_file.walk();
-        body.children(&mut cursor).collect()
+        &root
+            .children
+            .get(0)
+            .expect("failed to load the code; no root element")
+            .children
     }
 
-    fn is_leaf_like(node: &tree_sitter::Node) -> bool {
+    fn is_leaf_like(node: &Box<Node>) -> bool {
         Self::is_string_literal(node)
     }
 
-    fn is_string_literal(node: &tree_sitter::Node) -> bool {
+    fn is_string_literal(node: &Box<Node>) -> bool {
         match node.kind() {
             "string_literal" | "quoted_template" => true,
             _ => false,
         }
     }
 
-    fn is_skippable(node: &tree_sitter::Node) -> bool {
+    fn is_skippable(node: &Box<Node>) -> bool {
         node.kind() == "\n"
     }
 
-    fn range(node: &tree_sitter::Node, source: &[u8]) -> Range {
+    fn range(node: &Box<Node>) -> Range {
         match node.kind() {
             "attribute" => {
                 let bracket = node
-                    .children(&mut node.walk())
-                    .skip(node.child_count() - 2)
+                    .children
+                    .iter()
+                    .skip(node.children.len() - 2)
                     .next()
                     .unwrap();
-                let start = Self::default_range(node, source).start;
-                let end = Self::range(&bracket, source).end;
+                let start = Self::default_range(node).start;
+                let end = Self::range(&bracket).end;
                 Range { start, end }
             }
             "block" => {
                 let bracket = node
-                    .children(&mut node.walk())
-                    .skip(node.child_count() - 2)
+                    .children
+                    .iter()
+                    .skip(node.children.len() - 2)
                     .next()
                     .unwrap();
-                let start = Self::default_range(node, source).start;
-                let end = Self::range(&bracket, source).end;
+                let start = Self::default_range(node).start;
+                let end = Self::range(&bracket).end;
                 Range { start, end }
             }
-            _ => Self::default_range(node, source),
+            _ => Self::default_range(node),
         }
     }
 }
@@ -86,7 +84,7 @@ mod tests {
             let query = Query::<HCL>::try_from(r#"encrypted = true"#).unwrap();
             let tree = Tree::<HCL>::try_from(r#"encrypted = true"#).unwrap();
 
-            let ptree = tree.to_partial();
+            let ptree = tree.to_view();
             let session = ptree.matches(&query);
             assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 1);
         }
@@ -96,7 +94,7 @@ mod tests {
             let tree =
                 Tree::<HCL>::try_from(r#"resource "rtype" "rname" { attr = "value" }"#).unwrap();
 
-            let ptree = tree.to_partial();
+            let ptree = tree.to_view();
             let session = ptree.matches(&query);
             assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 1);
         }
@@ -107,7 +105,7 @@ mod tests {
             let tree =
                 Tree::<HCL>::try_from(r#"resource "rtype" "rname" { attr = "value" }"#).unwrap();
 
-            let ptree = tree.to_partial();
+            let ptree = tree.to_view();
             let session = ptree.matches(&query);
             assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 1);
         }
@@ -129,7 +127,7 @@ mod tests {
             )
             .unwrap();
 
-            let ptree = tree.to_partial();
+            let ptree = tree.to_view();
             let session = ptree.matches(&query);
             let result = session.collect::<Vec<MatchedItem>>();
             assert_eq!(result.len(), 1);
@@ -154,7 +152,7 @@ mod tests {
             )
             .unwrap();
 
-            let ptree = tree.to_partial();
+            let ptree = tree.to_view();
             let session = ptree.matches(&query);
             assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 2);
         }
@@ -190,7 +188,7 @@ mod tests {
             "#,
             )
             .unwrap();
-            let ptree = tree.to_partial();
+            let ptree = tree.to_view();
 
             let query = Query::<HCL>::try_from(
                 r#"
@@ -223,7 +221,7 @@ mod tests {
             )
             .unwrap();
 
-            let ptree = tree.to_partial();
+            let ptree = tree.to_view();
             let session = ptree.matches(&query);
             assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 1);
         }
@@ -268,7 +266,7 @@ mod tests {
             )
             .unwrap();
 
-            let ptree = tree.to_partial();
+            let ptree = tree.to_view();
             let session = ptree.matches(&query);
             assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 3);
         }
@@ -304,7 +302,7 @@ mod tests {
             "#,
             )
             .unwrap();
-            let ptree = tree.to_partial();
+            let ptree = tree.to_view();
 
             {
                 let query = Query::<HCL>::try_from(
@@ -353,7 +351,7 @@ mod tests {
             )
             .unwrap();
 
-            let ptree = tree.to_partial();
+            let ptree = tree.to_view();
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
@@ -377,7 +375,7 @@ mod tests {
             )
             .unwrap();
 
-            let ptree = tree.to_partial();
+            let ptree = tree.to_view();
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
@@ -407,7 +405,7 @@ mod tests {
             )
             .unwrap();
 
-            let ptree = tree.to_partial();
+            let ptree = tree.to_view();
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 2);
@@ -432,7 +430,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        let ptree = tree.to_partial();
+        let ptree = tree.to_view();
         {
             let query = Query::<HCL>::try_from(
                 r#"
@@ -478,7 +476,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        let ptree = tree.to_partial();
+        let ptree = tree.to_view();
         {
             let query = Query::<HCL>::try_from(
                 r#"
@@ -520,7 +518,7 @@ mod tests {
             "#,
             )
             .unwrap();
-            let ptree = tree.to_partial();
+            let ptree = tree.to_view();
             {
                 let query = Query::<HCL>::try_from(
                     r#"
@@ -566,7 +564,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        let ptree = tree.to_partial();
+        let ptree = tree.to_view();
         {
             let query = Query::<HCL>::try_from(
                 r#"
@@ -619,7 +617,7 @@ mod tests {
 
         let tree_base = code.clone();
         let tree = Tree::<HCL>::try_from(tree_base.as_str()).unwrap();
-        let ptree = tree.to_partial();
+        let ptree = tree.to_view();
 
         let query = Query::<HCL>::try_from(r#"resource "rtype" "rname" { attr = :[_] }"#).unwrap();
         let session = ptree.matches(&query);
@@ -644,7 +642,7 @@ mod tests {
 
         let tree_base = code.clone();
         let tree = Tree::<HCL>::try_from(tree_base.as_str()).unwrap();
-        let ptree = tree.to_partial();
+        let ptree = tree.to_view();
 
         let query = Query::<HCL>::try_from("resource \"rtype\" \"rname\" { attr = :[X] }\nresource \"rtype\" \"another\" { attr = :[Y] }\n")
             .unwrap();

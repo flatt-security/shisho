@@ -1,9 +1,8 @@
 use crate::core::{language::Queryable, pattern::Pattern};
 use anyhow::Result;
-use std::{
-    convert::{TryFrom, TryInto},
-    marker::PhantomData,
-};
+use std::{convert::TryFrom, marker::PhantomData};
+
+use super::node::Node;
 
 pub const SHISHO_NODE_METAVARIABLE_NAME: &str = "shisho_metavariable_name";
 pub const SHISHO_NODE_METAVARIABLE: &str = "shisho_metavariable";
@@ -11,26 +10,20 @@ pub const SHISHO_NODE_ELLIPSIS_METAVARIABLE: &str = "shisho_ellipsis_metavariabl
 pub const SHISHO_NODE_ELLIPSIS: &str = "shisho_ellipsis";
 
 #[derive(Debug)]
-pub struct Query<T>
+pub struct Query<'p, T>
 where
     T: Queryable,
 {
-    pub(crate) tsquery: tree_sitter::Tree,
-
-    raw: Vec<u8>,
+    pattern: Pattern<'p, T>,
     _marker: PhantomData<T>,
 }
 
-impl<T> Query<T>
+impl<'p, T> Query<'p, T>
 where
     T: Queryable,
 {
-    pub fn value_of(&self, node: &tree_sitter::Node) -> &str {
-        node.utf8_text(self.raw.as_slice()).unwrap()
-    }
-
-    pub fn tsnodes(&self) -> Vec<tree_sitter::Node> {
-        T::get_query_nodes(&self.tsquery)
+    pub fn query_nodes(&self) -> Vec<&Box<Node>> {
+        T::get_query_nodes(&self.pattern.root)
             .into_iter()
             .filter(|n| !T::is_skippable(n))
             .collect()
@@ -40,30 +33,26 @@ where
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct MetavariableId(pub String);
 
-impl<T> TryFrom<&str> for Query<T>
+impl<'p, T> TryFrom<String> for Query<'p, T>
 where
     T: Queryable,
 {
     type Error = anyhow::Error;
 
-    fn try_from(value: &str) -> Result<Self, anyhow::Error> {
-        let p = Pattern::from(value);
-        p.try_into()
+    fn try_from(value: String) -> Result<Self, anyhow::Error> {
+        let p = Pattern::<'p, T>::try_from(value)?;
+        Ok(p.into())
     }
 }
 
-impl<T> TryFrom<Pattern<T>> for Query<T>
+impl<'p, T> From<Pattern<'p, T>> for Query<'p, T>
 where
     T: Queryable,
 {
-    type Error = anyhow::Error;
-
-    fn try_from(value: Pattern<T>) -> Result<Self, anyhow::Error> {
-        let query = value.to_tstree()?;
-        Ok(Query {
-            tsquery: query,
-            raw: value.as_ref().to_vec(),
+    fn from(pattern: Pattern<'p, T>) -> Self {
+        Query {
+            pattern,
             _marker: PhantomData,
-        })
+        }
     }
 }

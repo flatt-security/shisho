@@ -160,7 +160,7 @@ fn handle_typed_rules<'a, E: Reporter<'a>, Lang: Queryable + 'static>(
     rules: &Vec<Rule>,
 ) -> Result<usize> {
     let tree = Tree::<Lang>::try_from(target.body.as_str()).unwrap();
-    let ptree = tree.to_partial();
+    let ptree = tree.to_view();
 
     let mut total_findings = 0;
     for rule in rules {

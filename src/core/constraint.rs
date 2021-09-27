@@ -9,29 +9,29 @@ use crate::core::{
 };
 
 #[derive(Debug)]
-pub struct Constraint<T>
+pub struct Constraint<'a, T>
 where
     T: Queryable,
 {
     pub target: MetavariableId,
-    pub predicate: Predicate<T>,
+    pub predicate: Predicate<'a, T>,
 }
 
 #[derive(Debug)]
-pub enum Predicate<T>
+pub enum Predicate<'a, T>
 where
     T: Queryable,
 {
-    MatchQuery(Query<T>),
-    NotMatchQuery(Query<T>),
+    MatchQuery(Query<'a, T>),
+    NotMatchQuery(Query<'a, T>),
 
     MatchRegex(Regex),
     NotMatchRegex(Regex),
 }
 
-impl<T> Constraint<T> where T: Queryable {}
+impl<'a, T> Constraint<'a, T> where T: Queryable {}
 
-impl<T> TryFrom<RawConstraint> for Constraint<T>
+impl<'a, T> TryFrom<RawConstraint> for Constraint<'a, T>
 where
     T: Queryable,
 {
@@ -40,11 +40,11 @@ where
     fn try_from(rc: RawConstraint) -> Result<Self, Self::Error> {
         let predicate = match rc.should {
             RawPredicate::Match => {
-                let p = rc.pattern.as_str().try_into()?;
+                let p = rc.pattern.try_into()?;
                 Predicate::MatchQuery(p)
             }
             RawPredicate::NotMatch => {
-                let p = rc.pattern.as_str().try_into()?;
+                let p = rc.pattern.try_into()?;
                 Predicate::NotMatchQuery(p)
             }
             RawPredicate::MatchRegex => {

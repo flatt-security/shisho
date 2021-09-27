@@ -7,50 +7,76 @@ use crate::core::{
     },
 };
 use anyhow::{anyhow, Result};
-use std::{
-    convert::{TryFrom, TryInto},
-    marker::PhantomData,
-};
+use std::{convert::TryFrom, marker::PhantomData};
 
-pub struct Tree<T> {
-    pub(crate) tstree: tree_sitter::Tree,
+use super::node::Node;
 
-    raw: Vec<u8>,
+pub struct Tree<'tree, T> {
+    pub root: Box<Node<'tree>>,
+    pub source: Vec<u8>,
+
+    tstree: tree_sitter::Tree,
     _marker: PhantomData<T>,
 }
 
-impl<T> Tree<T>
+impl<'tree, T> Tree<'tree, T>
 where
     T: Queryable,
 {
-    pub fn new(tree: tree_sitter::Tree, raw: Vec<u8>) -> Tree<T> {
-        Tree {
-            tstree: tree,
-            raw,
+    pub fn to_view(&self) -> TreeView<T> {
+        TreeView::new(&self.root, &self.source)
+    }
+}
+
+impl<'tree, T> TryFrom<&str> for Tree<'tree, T>
+where
+    T: Queryable,
+{
+    type Error = anyhow::Error;
+
+    fn try_from(source: &str) -> Result<Self, anyhow::Error> {
+        let source = if source.as_bytes().len() != 0
+            && source.as_bytes()[source.as_bytes().len() - 1] != b'\n'
+        {
+            [source.as_bytes(), "\n".as_bytes()].concat()
+        } else {
+            source.into()
+        };
+
+        let mut parser = tree_sitter::Parser::new();
+        parser
+            .set_language(T::target_language())
+            .expect("Error loading hcl grammar");
+
+        let tstree = parser
+            .parse(&source, None)
+            .ok_or(anyhow!("failed to load the code"))?;
+        let root = Node::from_tsnode(tstree.root_node(), &source);
+
+        Ok(Tree {
+            root,
+            source,
+
+            tstree,
             _marker: PhantomData,
-        }
-    }
-
-    pub fn to_partial<'tree>(&'tree self) -> PartialTree<'tree, T> {
-        PartialTree::new(self.tstree.root_node(), self.raw.as_slice())
+        })
     }
 }
 
-pub struct PartialTree<'tree, T> {
-    pub(crate) root: tree_sitter::Node<'tree>,
-
-    raw: &'tree [u8],
+pub struct TreeView<'tree, T> {
+    pub root: &'tree Box<Node<'tree>>,
+    pub source: &'tree [u8],
     _marker: PhantomData<T>,
 }
 
-impl<'tree, T> PartialTree<'tree, T>
+impl<'tree, T> TreeView<'tree, T>
 where
     T: Queryable,
 {
-    pub fn new(top: tree_sitter::Node<'tree>, raw: &'tree [u8]) -> PartialTree<'tree, T> {
-        PartialTree {
-            root: top,
-            raw,
+    pub fn new(root: &'tree Box<Node<'tree>>, source: &'tree [u8]) -> TreeView<'tree, T> {
+        TreeView {
+            root,
+            source,
             _marker: PhantomData,
         }
     }
@@ -64,102 +90,23 @@ where
     {
         QueryMatcher::new(self, query).into_iter()
     }
-
-    pub fn value_of(&self, node: &tree_sitter::Node<'tree>) -> &str {
-        node.utf8_text(self.raw).unwrap()
-    }
-}
-
-impl<'tree, T> AsRef<[u8]> for PartialTree<'tree, T>
-where
-    T: Queryable,
-{
-    fn as_ref(&self) -> &[u8] {
-        self.raw
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub struct RawTree<T>
-where
-    T: Queryable,
-{
-    raw_bytes: Vec<u8>,
-    _marker: PhantomData<T>,
-}
-
-impl<'a, T> From<&'a str> for RawTree<T>
-where
-    T: Queryable,
-{
-    fn from(value: &'a str) -> Self {
-        let value = value.to_string();
-        RawTree {
-            raw_bytes: if value.as_bytes().len() != 0
-                && value.as_bytes()[value.as_bytes().len() - 1] != b'\n'
-            {
-                [value.as_bytes(), "\n".as_bytes()].concat()
-            } else {
-                value.into()
-            },
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<'a, T> TryFrom<RawTree<T>> for Tree<T>
-where
-    T: Queryable,
-{
-    type Error = anyhow::Error;
-
-    fn try_from(value: RawTree<T>) -> Result<Self, anyhow::Error> {
-        let mut parser = tree_sitter::Parser::new();
-        parser
-            .set_language(T::target_language())
-            .expect("Error loading hcl grammar");
-
-        let parsed = parser
-            .parse(&value.raw_bytes, None)
-            .ok_or(anyhow!("failed to load the code"))?;
-
-        Ok(Tree::new(parsed, value.raw_bytes))
-    }
-}
-
-impl<T> TryFrom<&str> for Tree<T>
-where
-    T: Queryable,
-{
-    type Error = anyhow::Error;
-
-    fn try_from(value: &str) -> Result<Self, anyhow::Error> {
-        let r = RawTree::from(value);
-        r.try_into()
-    }
 }
 
 #[allow(unused)]
-pub trait TSTreeVisitor<'tree, T>
+pub trait TreeVisitor<'tree, T>
 where
     T: Queryable,
 {
     type Output;
 
-    fn walk_leaf_named_node(&self, node: tree_sitter::Node) -> Result<Self::Output, anyhow::Error>;
+    fn walk_leaf_named_node(&self, node: &Box<Node>) -> Result<Self::Output, anyhow::Error>;
 
-    fn walk_leaf_unnamed_node(
-        &self,
-        node: tree_sitter::Node,
-    ) -> Result<Self::Output, anyhow::Error>;
+    fn walk_leaf_unnamed_node(&self, node: &Box<Node>) -> Result<Self::Output, anyhow::Error>;
 
-    fn walk_intermediate_node(
-        &self,
-        node: tree_sitter::Node,
-    ) -> Result<Self::Output, anyhow::Error> {
-        let mut cursor = node.walk();
+    fn walk_intermediate_node(&self, node: &Box<Node>) -> Result<Self::Output, anyhow::Error> {
         let children = node
-            .children(&mut cursor)
+            .children
+            .iter()
             .map(|child| self.handle_node(child))
             .collect::<Result<Vec<Self::Output>, anyhow::Error>>()?;
 
@@ -168,32 +115,34 @@ where
 
     fn flatten_intermediate_node(
         &self,
-        node: tree_sitter::Node,
+        node: &Box<Node>,
         children: Vec<Self::Output>,
     ) -> Result<Self::Output, anyhow::Error>;
 
-    fn walk_ellipsis(&self, node: tree_sitter::Node) -> Result<Self::Output, anyhow::Error>;
+    fn walk_ellipsis(&self, node: &Box<Node>) -> Result<Self::Output, anyhow::Error>;
 
     fn walk_ellipsis_metavariable(
         &self,
-        node: tree_sitter::Node,
+        node: &Box<Node>,
         variable_name: &str,
     ) -> Result<Self::Output, anyhow::Error>;
 
     fn walk_metavariable(
         &self,
-        node: tree_sitter::Node,
+        node: &Box<Node>,
         variable_name: &str,
     ) -> Result<Self::Output, anyhow::Error>;
 
-    fn handle_node(&self, node: tree_sitter::Node) -> Result<Self::Output, anyhow::Error> {
+    fn handle_node(&self, node: &Box<Node>) -> Result<Self::Output, anyhow::Error> {
         match node.kind() {
             SHISHO_NODE_ELLIPSIS => self.walk_ellipsis(node),
             s if s == SHISHO_NODE_ELLIPSIS_METAVARIABLE || s == SHISHO_NODE_METAVARIABLE => {
                 let variable_name = node
-                    .named_children(&mut node.walk())
+                    .children
+                    .iter()
+                    .filter(|c| c.is_named())
                     .find(|child| child.kind() == SHISHO_NODE_METAVARIABLE_NAME)
-                    .map(|child| self.value_of(&child))
+                    .map(|child| child.utf8_text())
                     .ok_or(anyhow!(
                         "{} did not have {}",
                         SHISHO_NODE_ELLIPSIS_METAVARIABLE,
@@ -218,13 +167,11 @@ where
         }
     }
 
-    fn walk(&self, tree: &'tree tree_sitter::Tree) -> Result<Self::Output, anyhow::Error> {
-        self.handle_node(tree.root_node())
+    fn walk(&self, tree: &'tree Tree<'tree, T>) -> Result<Self::Output, anyhow::Error> {
+        self.handle_node(&tree.root)
     }
 
-    fn value_of(&self, node: &tree_sitter::Node) -> &'tree str;
-
-    fn children_of(&self, node: tree_sitter::Node) -> usize {
-        node.child_count()
+    fn children_of(&self, node: &Box<Node>) -> usize {
+        node.children.len()
     }
 }

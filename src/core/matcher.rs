@@ -7,21 +7,22 @@ use crate::core::{
         MetavariableId, Query, SHISHO_NODE_ELLIPSIS, SHISHO_NODE_ELLIPSIS_METAVARIABLE,
         SHISHO_NODE_METAVARIABLE, SHISHO_NODE_METAVARIABLE_NAME,
     },
-    tree::PartialTree,
+    tree::TreeView,
 };
 use anyhow::{anyhow, Result};
 use itertools::Itertools;
 use std::collections::HashMap;
 
+use super::node::Node;
+
 pub struct QueryMatcher<'tree, 'query, T>
 where
     T: Queryable,
 {
-    cursor: Option<tree_sitter::TreeCursor<'tree>>,
     items: Vec<MatchedItem<'tree>>,
 
-    tree: &'tree PartialTree<'tree, T>,
-    query: &'query Query<T>,
+    view: &'tree TreeView<'tree, T>,
+    query: &'query Query<'query, T>,
 }
 
 pub type UnverifiedMetavariable<'tree> = (MetavariableId, CaptureItem<'tree>);
@@ -36,56 +37,26 @@ impl<'tree, 'query, T> QueryMatcher<'tree, 'query, T>
 where
     T: Queryable,
 {
-    fn yield_next_sibilings(&mut self) -> Option<Vec<tree_sitter::Node<'tree>>> {
-        if let Some(cursor) = self.cursor.as_mut() {
-            // collect sibilings
-            let nodes = if let Some(parent) = cursor.node().parent() {
-                parent.children(&mut parent.walk()).collect()
-            } else {
-                vec![cursor.node()]
-            };
-
-            // move to next leftmost child
-            let got_root = 'o: loop {
-                if cursor.goto_first_child() {
-                    break 'o false;
-                }
-                while !cursor.goto_next_sibling() {
-                    if !cursor.goto_parent() {
-                        break 'o true;
-                    }
-                }
-            };
-            if got_root {
-                self.cursor = None;
-            }
-            Some(nodes)
-        } else {
-            None
-        }
-    }
-}
-
-impl<'tree, 'query, T> QueryMatcher<'tree, 'query, T>
-where
-    T: Queryable,
-{
-    pub fn new(tree: &'tree PartialTree<'tree, T>, query: &'query Query<T>) -> Self {
+    pub fn new(view: &'tree TreeView<'tree, T>, query: &'query Query<T>) -> Self {
         QueryMatcher {
             query,
-            tree,
-            cursor: Some(tree.root.walk()),
+            view,
+
             items: vec![],
         }
     }
 
+    fn yield_next_sibilings(&self) -> Option<Vec<&'tree Box<Node<'tree>>>> {
+        todo!()
+    }
+
     fn match_sibillings(
         &self,
-        tsibilings: Vec<tree_sitter::Node<'tree>>,
-        qsibilings: Vec<tree_sitter::Node<'query>>,
-    ) -> Vec<(MatcherState<'tree>, Option<tree_sitter::Node<'tree>>)> {
+        tsibilings: Vec<&'tree Box<Node<'tree>>>,
+        qsibilings: Vec<&'query Box<Node<'query>>>,
+    ) -> Vec<(MatcherState<'tree>, Option<&Box<Node<'tree>>>)> {
         let mut queue: Vec<(usize, usize, Vec<UnverifiedMetavariable>)> = vec![(0, 0, vec![])];
-        let mut result: Vec<(MatcherState, Option<tree_sitter::Node<'tree>>)> = vec![];
+        let mut result: Vec<(MatcherState, Option<&Box<Node<'tree>>>)> = vec![];
 
         while let Some((tidx, qidx, captures)) = queue.pop() {
             match (tsibilings.get(tidx), qsibilings.get(qidx)) {
@@ -135,7 +106,7 @@ where
                 }
 
                 (Some(tchild), Some(qchild)) => {
-                    for submatch in self.match_subtree(Some(tchild.clone()), Some(qchild.clone())) {
+                    for submatch in self.match_subtree(Some(tchild), Some(qchild)) {
                         queue.push((
                             tidx + 1,
                             qidx + 1,
@@ -151,8 +122,8 @@ where
 
     fn match_subtree(
         &self,
-        tnode: Option<tree_sitter::Node<'tree>>,
-        qnode: Option<tree_sitter::Node<'query>>,
+        tnode: Option<&'tree Box<Node<'tree>>>,
+        qnode: Option<&'query Box<Node<'query>>>,
     ) -> Vec<MatcherState<'tree>> {
         match (tnode, qnode) {
             (None, None) => {
@@ -167,7 +138,7 @@ where
                         captures: vec![(mid, item)],
                     }]
                 }
-                _ if qnode.child_count() == 0 || T::is_leaf_like(&qnode) => {
+                _ if qnode.children.len() == 0 || T::is_leaf_like(&qnode) => {
                     self.match_leaf(&tnode, &qnode)
                 }
                 _ => {
@@ -176,11 +147,13 @@ where
                     }
 
                     let tchildren = tnode
-                        .children(&mut tnode.walk())
+                        .children
+                        .iter()
                         .filter(|n| !T::is_skippable(n))
                         .collect();
                     let qchildren = qnode
-                        .children(&mut qnode.walk())
+                        .children
+                        .iter()
                         .filter(|n| !T::is_skippable(n))
                         .collect();
                     self.match_sibillings(tchildren, qchildren)
@@ -204,14 +177,14 @@ where
 
     fn match_leaf(
         &self,
-        tnode: &tree_sitter::Node<'tree>,
-        qnode: &tree_sitter::Node<'query>,
+        tnode: &'tree Box<Node<'tree>>,
+        qnode: &'query Box<Node<'query>>,
     ) -> Vec<MatcherState<'tree>> {
         if T::is_string_literal(tnode) && T::is_string_literal(qnode) {
-            match_string_pattern(self.tree.value_of(tnode), self.query.value_of(qnode))
+            match_string_pattern(tnode.utf8_text(), qnode.utf8_text())
                 .into_iter()
                 .map(|captures| MatcherState {
-                    subtree: Some(ConsecutiveNodes::from(vec![tnode.clone()])),
+                    subtree: Some(ConsecutiveNodes::from(vec![tnode])),
                     captures,
                 })
                 .collect()
@@ -221,19 +194,16 @@ where
             }
 
             let (tvalue, qvalue) = if tnode.is_named() {
-                (
-                    self.tree.value_of(tnode).to_string(),
-                    self.query.value_of(qnode).to_string(),
-                )
+                (tnode.utf8_text().to_string(), qnode.utf8_text().to_string())
             } else {
                 (
-                    T::normalize_annonymous_leaf(self.tree.value_of(tnode)),
-                    T::normalize_annonymous_leaf(self.query.value_of(qnode)),
+                    T::normalize_annonymous_leaf(tnode.utf8_text()),
+                    T::normalize_annonymous_leaf(qnode.utf8_text()),
                 )
             };
             if tvalue == qvalue {
                 vec![MatcherState {
-                    subtree: Some(ConsecutiveNodes::from(vec![tnode.clone()])),
+                    subtree: Some(ConsecutiveNodes::from(vec![tnode])),
                     captures: vec![],
                 }]
             } else {
@@ -261,14 +231,15 @@ where
     }
 
     fn is_equivalent_capture(&self, a: &CaptureItem<'tree>, b: &CaptureItem<'tree>) -> bool {
-        a.to_string_with(self.tree.as_ref()) == b.to_string_with(self.tree.as_ref())
+        a.as_str() == b.as_str()
     }
 
-    fn variable_name_of(&self, qnode: &tree_sitter::Node) -> &str {
+    fn variable_name_of(&self, qnode: &Box<Node<'query>>) -> &'query str {
         qnode
-            .named_children(&mut qnode.walk())
+            .children
+            .iter()
             .find(|child| child.kind() == SHISHO_NODE_METAVARIABLE_NAME)
-            .map(|child| self.query.value_of(&child))
+            .map(|child| child.utf8_text())
             .expect(
                 format!(
                     "{} did not have {}",
@@ -286,18 +257,19 @@ where
     type Item = MatchedItem<'tree>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let qnodes = self.query.tsnodes();
+        let qnodes = self.query.query_nodes();
         loop {
             if let Some(mitem) = self.items.pop() {
                 return Some(mitem);
             }
 
             if let Some(tnodes) = self.yield_next_sibilings() {
-                let tnodes: Vec<tree_sitter::Node> =
+                let tnodes: Vec<&Box<Node>> =
                     tnodes.into_iter().filter(|x| !T::is_skippable(x)).collect();
                 for i in 0..tnodes.len() {
                     let tsibilings = tnodes[i..].to_vec();
 
+                    let mut items = vec![];
                     'mitem: for (mitem, _trailling) in
                         self.match_sibillings(tsibilings, qnodes.clone())
                     {
@@ -319,12 +291,14 @@ where
                             }
                         }
 
-                        self.items.push(MatchedItem {
-                            raw: self.tree.as_ref(),
+                        items.push(MatchedItem {
+                            source: self.view.source,
                             area: mitem.subtree.unwrap(),
                             captures,
                         });
                     }
+
+                    self.items.extend(items);
                 }
             } else {
                 return None;
@@ -335,7 +309,7 @@ where
 
 #[derive(Debug)]
 pub struct MatchedItem<'tree> {
-    pub raw: &'tree [u8],
+    pub source: &'tree [u8],
     pub area: ConsecutiveNodes<'tree>,
     pub captures: HashMap<MetavariableId, CaptureItem<'tree>>,
 }
@@ -347,7 +321,7 @@ impl<'tree> MatchedItem<'tree> {
         match capture {
             CaptureItem::Empty => None,
             CaptureItem::Literal(s) => Some(s.as_str()),
-            CaptureItem::Nodes(n) => Some(n.utf8_text(self.raw).unwrap()),
+            CaptureItem::Nodes(n) => Some(n.utf8_text().unwrap()),
         }
     }
 
@@ -378,7 +352,7 @@ impl<'tree> MatchedItem<'tree> {
                         "match-query predicate for string literals is not supported"
                     )),
                     CaptureItem::Nodes(n) => Ok(n.as_vec().into_iter().any(|node| {
-                        let ptree = PartialTree::<T>::new(node.clone(), self.raw);
+                        let ptree = TreeView::<T>::new(node, self.source);
                         let matches = ptree.matches(q).collect::<Vec<MatchedItem>>();
                         matches.len() > 0
                     })),
@@ -392,7 +366,7 @@ impl<'tree> MatchedItem<'tree> {
                         "match-query predicate for string literals is not supported"
                     )),
                     CaptureItem::Nodes(n) => Ok(n.as_vec().into_iter().all(|node| {
-                        let ptree = PartialTree::<T>::new(node.clone(), self.raw);
+                        let ptree = TreeView::<T>::new(node, self.source);
                         let matches = ptree.matches(q).collect::<Vec<MatchedItem>>();
                         matches.len() == 0
                     })),
@@ -415,17 +389,17 @@ pub enum CaptureItem<'tree> {
 }
 
 impl<'tree> CaptureItem<'tree> {
-    pub fn to_string_with(&'tree self, source: &'tree [u8]) -> &'tree str {
+    pub fn as_str(&'tree self) -> &'tree str {
         match self {
             CaptureItem::Empty => "",
             CaptureItem::Literal(s) => s.as_str(),
-            CaptureItem::Nodes(n) => n.utf8_text(source).unwrap(),
+            CaptureItem::Nodes(n) => n.utf8_text().unwrap(),
         }
     }
 }
 
-impl<'tree> From<Vec<tree_sitter::Node<'tree>>> for CaptureItem<'tree> {
-    fn from(value: Vec<tree_sitter::Node<'tree>>) -> Self {
+impl<'tree> From<Vec<&'tree Box<Node<'tree>>>> for CaptureItem<'tree> {
+    fn from(value: Vec<&'tree Box<Node<'tree>>>) -> Self {
         if value.len() == 0 {
             Self::Empty
         } else {

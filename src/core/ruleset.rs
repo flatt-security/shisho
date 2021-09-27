@@ -4,8 +4,7 @@ use std::{convert::TryFrom, fs::File, path::Path, str::FromStr};
 use walkdir::WalkDir;
 
 use crate::core::{
-    constraint::Constraint, language::Queryable, matcher::MatchedItem, query::Query,
-    tree::PartialTree,
+    constraint::Constraint, language::Queryable, matcher::MatchedItem, query::Query, tree::TreeView,
 };
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -64,7 +63,7 @@ impl Rule {
 
     pub fn find<'tree, 'item, T: 'static>(
         &self,
-        tree: &'tree PartialTree<'tree, T>,
+        tree: &'tree TreeView<'tree, T>,
     ) -> Result<Vec<MatchedItem<'item>>>
     where
         T: Queryable,
@@ -79,7 +78,7 @@ impl Rule {
         let patterns = self.get_patterns()?;
         let mut matches = vec![];
         for p in patterns {
-            let query = Query::<T>::try_from(p)?;
+            let query = Query::<T>::try_from(p.to_string())?;
             matches.extend(
                 tree.matches(&query)
                     .filter(|x| x.satisfies_all(&constraints).unwrap_or(false)),
@@ -88,22 +87,20 @@ impl Rule {
         Ok(matches)
     }
 
-    pub fn get_patterns(&self) -> Result<Vec<&str>> {
+    pub fn get_patterns(&self) -> Result<Vec<String>> {
         match (&self.pattern, &self.patterns) {
-            (Some(p), patterns) if patterns.len() == 0 => Ok(vec![&p]),
-            (None, patterns) if patterns.len() > 0 => {
-                Ok(patterns.iter().map(|x| x.as_str()).collect())
-            }
+            (Some(p), patterns) if patterns.len() == 0 => Ok(vec![p.to_string()]),
+            (None, patterns) if patterns.len() > 0 => Ok(patterns.clone()),
             _ => Err(anyhow::anyhow!(
                 "You can use only one of `pattern` or `patterns`."
             )),
         }
     }
 
-    pub fn get_rewrite_options(&self) -> Result<Vec<&str>> {
+    pub fn get_rewrite_options(&self) -> Result<Vec<String>> {
         match (&self.rewrite, &self.rewrite_options) {
-            (Some(p), patterns) if patterns.len() == 0 => Ok(vec![&p]),
-            (None, patterns) => Ok(patterns.iter().map(|x| x.as_str()).collect()),
+            (Some(p), patterns) if patterns.len() == 0 => Ok(vec![p.to_string()]),
+            (None, patterns) => Ok(patterns.clone()),
             _ => Err(anyhow::anyhow!(
                 "You can use only one of `rewrite` or `rewrite_options`."
             )),
