@@ -19,7 +19,7 @@ pub struct Position {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Node<'tree> {
     inner: tree_sitter::Node<'tree>,
-    source: &'tree [u8],
+    pub(crate) source: &'tree [u8],
 
     pub children: Vec<Box<Node<'tree>>>,
 }
@@ -65,8 +65,8 @@ impl<'tree> Node<'tree> {
         })
     }
 
-    pub fn to_view<T: Queryable>(self: &'tree Box<Self>) -> TreeView<'tree, T> {
-        TreeView::new(&self, self.source)
+    pub fn to_view<T: Queryable>(self: Box<Self>) -> TreeView<'tree, T> {
+        TreeView::from(self)
     }
 }
 

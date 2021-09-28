@@ -7,7 +7,10 @@ use crate::core::{
     },
 };
 use anyhow::{anyhow, Result};
-use std::{convert::TryFrom, marker::PhantomData};
+use std::{
+    convert::{TryFrom, TryInto},
+    marker::PhantomData,
+};
 
 use super::{code::NormalizedSource, node::Node};
 
@@ -52,8 +55,20 @@ where
     }
 }
 
+impl<'tree, T> TryFrom<&str> for Tree<'tree, T>
+where
+    T: Queryable,
+{
+    type Error = anyhow::Error;
+
+    fn try_from(nsource: &str) -> Result<Self, anyhow::Error> {
+        let nsource = NormalizedSource::from(nsource);
+        nsource.try_into()
+    }
+}
+
 pub struct TreeView<'tree, T> {
-    pub root: &'tree Box<Node<'tree>>,
+    pub root: Box<Node<'tree>>,
     pub source: &'tree [u8],
     _marker: PhantomData<T>,
 }
@@ -62,7 +77,7 @@ impl<'tree, T> TreeView<'tree, T>
 where
     T: Queryable,
 {
-    pub fn new(root: &'tree Box<Node<'tree>>, source: &'tree [u8]) -> TreeView<'tree, T> {
+    pub fn new(root: Box<Node<'tree>>, source: &'tree [u8]) -> TreeView<'tree, T> {
         TreeView {
             root,
             source,
@@ -78,6 +93,33 @@ where
         'tree: 'query,
     {
         QueryMatcher::new(self, query).into_iter()
+    }
+}
+
+impl<'tree, T> From<&'tree Tree<'tree, T>> for TreeView<'tree, T>
+where
+    T: Queryable,
+{
+    fn from(t: &'tree Tree<'tree, T>) -> Self {
+        TreeView {
+            root: t.root_node(),
+            source: &t.source,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<'tree, T> From<Box<Node<'tree>>> for TreeView<'tree, T>
+where
+    T: Queryable,
+{
+    fn from(t: Box<Node<'tree>>) -> Self {
+        let source = t.source;
+        TreeView {
+            root: t,
+            source,
+            _marker: PhantomData,
+        }
     }
 }
 

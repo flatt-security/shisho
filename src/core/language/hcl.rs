@@ -72,7 +72,7 @@ mod tests {
     use crate::core::matcher::MatchedItem;
     use crate::core::query::MetavariableId;
     use crate::core::transform::Transformable;
-    use crate::core::tree::Tree;
+    use crate::core::tree::{Tree, TreeView};
     use crate::core::{code::Code, query::Query};
     use std::convert::TryFrom;
 
@@ -84,7 +84,7 @@ mod tests {
             let query = Query::<HCL>::try_from(r#"encrypted = true"#).unwrap();
             let tree = Tree::<HCL>::try_from(r#"encrypted = true"#).unwrap();
 
-            let ptree = tree.to_view();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 1);
         }
@@ -94,7 +94,7 @@ mod tests {
             let tree =
                 Tree::<HCL>::try_from(r#"resource "rtype" "rname" { attr = "value" }"#).unwrap();
 
-            let ptree = tree.to_view();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 1);
         }
@@ -105,7 +105,7 @@ mod tests {
             let tree =
                 Tree::<HCL>::try_from(r#"resource "rtype" "rname" { attr = "value" }"#).unwrap();
 
-            let ptree = tree.to_view();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 1);
         }
@@ -127,7 +127,7 @@ mod tests {
             )
             .unwrap();
 
-            let ptree = tree.to_view();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             let result = session.collect::<Vec<MatchedItem>>();
             assert_eq!(result.len(), 1);
@@ -152,7 +152,7 @@ mod tests {
             )
             .unwrap();
 
-            let ptree = tree.to_view();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 2);
         }
@@ -188,7 +188,7 @@ mod tests {
             "#,
             )
             .unwrap();
-            let ptree = tree.to_view();
+            let ptree = TreeView::from(&tree);
 
             let query = Query::<HCL>::try_from(
                 r#"
@@ -221,7 +221,7 @@ mod tests {
             )
             .unwrap();
 
-            let ptree = tree.to_view();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 1);
         }
@@ -266,7 +266,7 @@ mod tests {
             )
             .unwrap();
 
-            let ptree = tree.to_view();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 3);
         }
@@ -302,7 +302,7 @@ mod tests {
             "#,
             )
             .unwrap();
-            let ptree = tree.to_view();
+            let ptree = TreeView::from(&tree);
 
             {
                 let query = Query::<HCL>::try_from(
@@ -351,7 +351,7 @@ mod tests {
             )
             .unwrap();
 
-            let ptree = tree.to_view();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
@@ -375,7 +375,7 @@ mod tests {
             )
             .unwrap();
 
-            let ptree = tree.to_view();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
@@ -405,7 +405,7 @@ mod tests {
             )
             .unwrap();
 
-            let ptree = tree.to_view();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 2);
@@ -430,7 +430,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        let ptree = tree.to_view();
+        let ptree = TreeView::from(&tree);
         {
             let query = Query::<HCL>::try_from(
                 r#"
@@ -476,7 +476,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        let ptree = tree.to_view();
+        let ptree = TreeView::from(&tree);
         {
             let query = Query::<HCL>::try_from(
                 r#"
@@ -518,7 +518,7 @@ mod tests {
             "#,
             )
             .unwrap();
-            let ptree = tree.to_view();
+            let ptree = TreeView::from(&tree);
             {
                 let query = Query::<HCL>::try_from(
                     r#"
@@ -564,7 +564,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        let ptree = tree.to_view();
+        let ptree = TreeView::from(&tree);
         {
             let query = Query::<HCL>::try_from(
                 r#"
@@ -617,7 +617,7 @@ mod tests {
 
         let tree_base = code.clone();
         let tree = Tree::<HCL>::try_from(tree_base.as_str()).unwrap();
-        let ptree = tree.to_view();
+        let ptree = TreeView::from(&tree);
 
         let query = Query::<HCL>::try_from(r#"resource "rtype" "rname" { attr = :[_] }"#).unwrap();
         let session = ptree.matches(&query);
@@ -642,7 +642,7 @@ mod tests {
 
         let tree_base = code.clone();
         let tree = Tree::<HCL>::try_from(tree_base.as_str()).unwrap();
-        let ptree = tree.to_view();
+        let ptree = TreeView::from(&tree);
 
         let query = Query::<HCL>::try_from("resource \"rtype\" \"rname\" { attr = :[X] }\nresource \"rtype\" \"another\" { attr = :[Y] }\n")
             .unwrap();

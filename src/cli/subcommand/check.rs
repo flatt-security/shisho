@@ -163,8 +163,7 @@ fn handle_typed_rules<'a, E: Reporter<'a>, Lang: Queryable + 'static>(
 ) -> Result<usize> {
     let source = NormalizedSource::from(target.body.as_str());
     let tree = Tree::<Lang>::try_from(source).unwrap();
-    let root = tree.root_node();
-    let ptree = TreeView::new(&root, &tree.source);
+    let ptree = TreeView::from(&tree);
 
     let mut total_findings = 0;
     for rule in rules {

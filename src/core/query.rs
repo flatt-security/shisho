@@ -1,6 +1,9 @@
 use crate::core::{language::Queryable, pattern::Pattern};
 use anyhow::Result;
-use std::{convert::TryFrom, marker::PhantomData};
+use std::{
+    convert::{TryFrom, TryInto},
+    marker::PhantomData,
+};
 
 use super::{code::NormalizedSource, node::Node};
 
@@ -30,14 +33,25 @@ where
     }
 }
 
-impl<T> TryFrom<String> for Query<T>
+impl<T> TryFrom<&str> for Query<T>
 where
     T: Queryable,
 {
     type Error = anyhow::Error;
 
-    fn try_from(value: String) -> Result<Self, anyhow::Error> {
-        let source = NormalizedSource::from(value);
+    fn try_from(source: &str) -> Result<Self, anyhow::Error> {
+        let source = NormalizedSource::from(source);
+        source.try_into()
+    }
+}
+
+impl<T> TryFrom<NormalizedSource> for Query<T>
+where
+    T: Queryable,
+{
+    type Error = anyhow::Error;
+
+    fn try_from(source: NormalizedSource) -> Result<Self, anyhow::Error> {
         let pattern = Pattern::<T>::try_from(source)?;
         Ok(pattern.into())
     }

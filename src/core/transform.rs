@@ -142,14 +142,25 @@ where
     }
 }
 
-impl<T> TryFrom<String> for AutofixItem<T>
+impl<T> TryFrom<&str> for AutofixItem<T>
 where
     T: Queryable,
 {
     type Error = anyhow::Error;
 
-    fn try_from(value: String) -> Result<Self, Self::Error> {
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
         let source = NormalizedSource::from(value);
+        source.try_into()
+    }
+}
+
+impl<T> TryFrom<NormalizedSource> for AutofixItem<T>
+where
+    T: Queryable,
+{
+    type Error = anyhow::Error;
+
+    fn try_from(source: NormalizedSource) -> Result<Self, Self::Error> {
         let pattern = Pattern::<T>::try_from(source)?;
         Ok(Self {
             pattern,

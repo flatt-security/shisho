@@ -38,11 +38,11 @@ where
     fn try_from(rc: RawConstraint) -> Result<Self, Self::Error> {
         let predicate = match rc.should {
             RawPredicate::Match => {
-                let p = rc.pattern.try_into()?;
+                let p = rc.pattern.as_str().try_into()?;
                 Predicate::MatchQuery(p)
             }
             RawPredicate::NotMatch => {
-                let p = rc.pattern.try_into()?;
+                let p = rc.pattern.as_str().try_into()?;
                 Predicate::NotMatchQuery(p)
             }
             RawPredicate::MatchRegex => {

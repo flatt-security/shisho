@@ -356,7 +356,7 @@ impl<'tree> MatchedItem<'tree> {
                         "match-query predicate for string literals is not supported"
                     )),
                     CaptureItem::Nodes(n) => Ok(n.as_vec().into_iter().any(|node| {
-                        let ptree = TreeView::<T>::new(node, self.source);
+                        let ptree = TreeView::<T>::new((*node).clone(), self.source);
                         let matches = ptree.matches(q).collect::<Vec<MatchedItem>>();
                         matches.len() > 0
                     })),
@@ -370,7 +370,7 @@ impl<'tree> MatchedItem<'tree> {
                         "match-query predicate for string literals is not supported"
                     )),
                     CaptureItem::Nodes(n) => Ok(n.as_vec().into_iter().all(|node| {
-                        let ptree = TreeView::<T>::new(node, self.source);
+                        let ptree = TreeView::<T>::new((*node).clone(), self.source);
                         let matches = ptree.matches(q).collect::<Vec<MatchedItem>>();
                         matches.len() == 0
                     })),

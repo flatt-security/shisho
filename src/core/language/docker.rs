@@ -45,7 +45,7 @@ mod tests {
     use crate::core::{
         matcher::MatchedItem,
         query::{MetavariableId, Query},
-        tree::Tree,
+        tree::{Tree, TreeView},
     };
     use std::convert::TryFrom;
 
@@ -54,7 +54,7 @@ mod tests {
         {
             let query = Query::<Dockerfile>::try_from(r#"FROM :[A]"#).unwrap();
             let tree = Tree::<Dockerfile>::try_from(r#"FROM name"#).unwrap();
-            let ptree = tree.to_view();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
@@ -64,7 +64,7 @@ mod tests {
         {
             let query = Query::<Dockerfile>::try_from(r#"FROM :[A]::[B]"#).unwrap();
             let tree = Tree::<Dockerfile>::try_from(r#"FROM name:tag"#).unwrap();
-            let ptree = tree.to_view();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
@@ -74,9 +74,8 @@ mod tests {
 
         {
             let query = Query::<Dockerfile>::try_from(r#"FROM :[A]::[B]@:[HASH]"#).unwrap();
-
             let tree = Tree::<Dockerfile>::try_from(r#"FROM name:tag@hash"#).unwrap();
-            let ptree = tree.to_view();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
@@ -88,9 +87,8 @@ mod tests {
         {
             let query =
                 Query::<Dockerfile>::try_from(r#"FROM :[A]::[B]@:[HASH] as :[ALIAS]"#).unwrap();
-
             let tree = Tree::<Dockerfile>::try_from(r#"FROM name:tag@hash as alias"#).unwrap();
-            let ptree = tree.to_view();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
@@ -111,7 +109,7 @@ mod tests {
             let tree =
                 Tree::<Dockerfile>::try_from(r#"RUN echo "hosts: files dns" > /etc/nsswitch.conf"#)
                     .unwrap();
-            let ptree = tree.to_view();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
@@ -127,7 +125,7 @@ mod tests {
             automake \
             && rm -rf /var/lib/apt/lists/*"#;
             let tree = Tree::<Dockerfile>::try_from(cmd).unwrap();
-            let ptree = tree.to_view();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
@@ -142,9 +140,8 @@ mod tests {
     fn test_copy_instruction() {
         {
             let query = Query::<Dockerfile>::try_from(r#"COPY :[X] :[Y]"#).unwrap();
-
             let tree = Tree::<Dockerfile>::try_from(r#"COPY ./ /app"#).unwrap();
-            let ptree = tree.to_view();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);

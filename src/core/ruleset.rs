@@ -78,7 +78,7 @@ impl Rule {
         let patterns = self.get_patterns()?;
         let mut matches = vec![];
         for p in patterns {
-            let query = Query::<T>::try_from(p.to_string())?;
+            let query = Query::<T>::try_from(p.as_str())?;
             matches.extend(
                 tree.matches(&query)
                     .filter(|x| x.satisfies_all(&constraints).unwrap_or(false)),
