@@ -22,7 +22,7 @@ pub fn run(opts: CompletionOpts) -> i32 {
         CompletionOpts::Fish => completion(Shell::Fish),
     };
 
-    return 0;
+    0
 }
 
 fn completion(s: Shell) {

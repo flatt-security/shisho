@@ -58,7 +58,7 @@ impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
                             subtree: ConsecutiveNodes::try_from(nodes).ok(),
                             captures,
                         },
-                        t.map(|t| t.clone()),
+                        t.copied(),
                     ))
                 }
                 (Some(_tchild), Some(qchild)) if qchild.kind() == SHISHO_NODE_ELLIPSIS => {
@@ -66,7 +66,7 @@ impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
                     for tcidx in tidx..=tsibilings.len() {
                         queue.push((tcidx, qidx + 1, captures.clone()));
                         if let Some(tchild) = tsibilings.get(tcidx) {
-                            captured_nodes.push(tchild.clone());
+                            captured_nodes.push(tchild);
                         }
                     }
                 }
@@ -74,7 +74,7 @@ impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
                 (Some(_tchild), Some(qchild))
                     if qchild.kind() == SHISHO_NODE_ELLIPSIS_METAVARIABLE =>
                 {
-                    let mid = MetavariableId(self.variable_name_of(&qchild).to_string());
+                    let mid = MetavariableId(self.variable_name_of(qchild).to_string());
                     let mut captured_nodes = vec![];
                     for tcidx in tidx..(tsibilings.len() + 1) {
                         queue.push((
@@ -87,7 +87,7 @@ impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
                             .concat(),
                         ));
                         if let Some(tchild) = tsibilings.get(tcidx) {
-                            captured_nodes.push(tchild.clone());
+                            captured_nodes.push(tchild);
                         }
                     }
                 }
@@ -118,15 +118,15 @@ impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
             }
             (Some(tnode), Some(qnode)) => match qnode.kind() {
                 s if s == SHISHO_NODE_METAVARIABLE => {
-                    let mid = MetavariableId(self.variable_name_of(&qnode).to_string());
+                    let mid = MetavariableId(self.variable_name_of(qnode).to_string());
                     let item = CaptureItem::from(vec![tnode]);
                     vec![MatcherState {
                         subtree: ConsecutiveNodes::try_from(vec![tnode]).ok(),
                         captures: vec![(mid, item)],
                     }]
                 }
-                _ if qnode.children.len() == 0 || T::is_leaf_like(&qnode) => {
-                    self.match_leaf(&tnode, &qnode)
+                _ if qnode.children.is_empty() || T::is_leaf_like(qnode) => {
+                    self.match_leaf(tnode, qnode)
                 }
                 _ => {
                     if tnode.kind() != qnode.kind() {
@@ -223,7 +223,7 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         let qnodes: Vec<&Box<Node<'query>>> = T::unwrap_root(&self.query)
-            .into_iter()
+            .iter()
             .filter(|n| !T::is_skippable(n))
             .collect();
 

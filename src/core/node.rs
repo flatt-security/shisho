@@ -47,7 +47,7 @@ impl<'tree> Node<'tree> {
         self.inner.end_position()
     }
 
-    pub fn utf8_text<'a>(&self) -> &'tree str {
+    pub fn utf8_text(&self) -> &'tree str {
         core::str::from_utf8(&self.source[self.start_byte()..self.end_byte()]).unwrap()
     }
 
@@ -92,18 +92,15 @@ pub struct ConsecutiveNodes<'tree> {
 
 impl<'tree> TryFrom<Vec<&'tree Box<Node<'tree>>>> for ConsecutiveNodes<'tree> {
     type Error = anyhow::Error;
-    fn try_from(value: Vec<&'tree Box<Node<'tree>>>) -> Result<Self, Self::Error> {
+    fn try_from(inner: Vec<&'tree Box<Node<'tree>>>) -> Result<Self, Self::Error> {
         // TODO (y0n3uchy): check all capture items are consecutive
-        if value.len() == 0 {
+        if inner.is_empty() {
             Err(anyhow::anyhow!(
                 "internal error; ConsecutiveNodes was generated from empty vec."
             ))
         } else {
-            let source = value.get(0).unwrap().source;
-            Ok(ConsecutiveNodes {
-                inner: value,
-                source,
-            })
+            let source = inner.get(0).unwrap().source;
+            Ok(ConsecutiveNodes { inner, source })
         }
     }
 }
@@ -113,7 +110,7 @@ impl<'tree> TryFrom<Vec<ConsecutiveNodes<'tree>>> for ConsecutiveNodes<'tree> {
 
     fn try_from(cns: Vec<ConsecutiveNodes<'tree>>) -> Result<Self, Self::Error> {
         // TODO (y0n3uchy): check all capture items are consecutive
-        if cns.len() == 0 {
+        if cns.is_empty() {
             Err(anyhow::anyhow!(
                 "internal error; ConsecutiveNodes was generated from empty vec."
             ))

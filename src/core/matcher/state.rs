@@ -38,7 +38,7 @@ impl<'tree> From<MatcherState<'tree>> for Option<MatchedItem<'tree>> {
     }
 }
 
-fn fold_capture<'tree>(capture_items: Vec<CaptureItem<'tree>>) -> Option<CaptureItem<'tree>> {
+fn fold_capture(capture_items: Vec<CaptureItem<'_>>) -> Option<CaptureItem<'_>> {
     let mut it = capture_items.into_iter();
     let first = it.next();
     it.fold(first, |acc, capture| match acc {

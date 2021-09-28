@@ -35,7 +35,7 @@ pub trait Queryable {
     }
 
     fn default_range(node: &Box<Node>) -> Range {
-        if node.utf8_text().ends_with("\n") {
+        if node.utf8_text().ends_with('\n') {
             Range {
                 start: Position {
                     row: node.start_position().row + 1,

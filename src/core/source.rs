@@ -14,7 +14,7 @@ impl<T> Code<T>
 where
     T: Queryable,
 {
-    pub fn as_str<'a>(&'a self) -> &'a str {
+    pub fn as_str(&self) -> &str {
         self.code.as_str()
     }
 }
@@ -60,7 +60,7 @@ impl From<NormalizedSource> for Vec<u8> {
 
 impl From<&[u8]> for NormalizedSource {
     fn from(source: &[u8]) -> Self {
-        if source.len() != 0 && source[source.len() - 1] != b'\n' {
+        if !source.is_empty() && source[source.len() - 1] != b'\n' {
             Self {
                 source: [source, "\n".as_bytes()].concat(),
             }

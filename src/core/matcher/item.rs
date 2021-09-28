@@ -28,7 +28,7 @@ impl<'tree> CaptureItem<'tree> {
 
 impl<'tree> From<Vec<&'tree Box<Node<'tree>>>> for CaptureItem<'tree> {
     fn from(value: Vec<&'tree Box<Node<'tree>>>) -> Self {
-        if value.len() == 0 {
+        if value.is_empty() {
             Self::Empty
         } else {
             Self::Nodes(ConsecutiveNodes::try_from(value).unwrap())
@@ -44,10 +44,10 @@ pub struct MatchedItem<'tree> {
 
 impl<'tree> MatchedItem<'tree> {
     pub fn capture_of(&self, id: &MetavariableId) -> Option<&CaptureItem> {
-        self.captures.get(&id)
+        self.captures.get(id)
     }
 
-    pub fn satisfies_all<T: Queryable>(&self, constraints: &Vec<Constraint<T>>) -> Result<bool> {
+    pub fn satisfies_all<T: Queryable>(&self, constraints: &[Constraint<T>]) -> Result<bool> {
         for c in constraints {
             if !self.satisfies(c)? {
                 return Ok(false);
@@ -69,10 +69,9 @@ impl<'tree> MatchedItem<'tree> {
                     CaptureItem::Literal(_) => Err(anyhow::anyhow!(
                         "match-query predicate for string literals is not supported"
                     )),
-                    CaptureItem::Nodes(n) => Ok(n.as_vec().into_iter().any(|node| {
+                    CaptureItem::Nodes(n) => Ok(n.as_vec().iter().any(|node| {
                         let ptree = TreeView::<T>::from((*node).clone());
-                        let matches = ptree.matches(q).collect::<Vec<MatchedItem>>();
-                        matches.len() > 0
+                        !ptree.matches(q).count() == 0
                     })),
                 }
             }
@@ -83,10 +82,9 @@ impl<'tree> MatchedItem<'tree> {
                     CaptureItem::Literal(_) => Err(anyhow::anyhow!(
                         "match-query predicate for string literals is not supported"
                     )),
-                    CaptureItem::Nodes(n) => Ok(n.as_vec().into_iter().all(|node| {
+                    CaptureItem::Nodes(n) => Ok(n.as_vec().iter().all(|node| {
                         let ptree = TreeView::<T>::from((*node).clone());
-                        let matches = ptree.matches(q).collect::<Vec<MatchedItem>>();
-                        matches.len() == 0
+                        ptree.matches(q).count() == 0
                     })),
                 }
             }

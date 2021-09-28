@@ -22,7 +22,7 @@ impl<'a, W: std::io::Write> Reporter<'a> for ConsoleReporter<'a, W> {
         target: &Target,
         items: Vec<(&Rule, MatchedItem)>,
     ) -> Result<()> {
-        let lines = target.body.split("\n").collect::<Vec<&str>>();
+        let lines = target.body.split('\n').collect::<Vec<&str>>();
 
         for (rule, mitem) in items {
             // print metadata of the matched items
@@ -131,9 +131,9 @@ impl<'a, W: std::io::Write> Reporter<'a> for ConsoleReporter<'a, W> {
                             )?;
                             for (emphasized, value) in change.iter_strings_lossy() {
                                 if emphasized {
-                                    write!(self.writer, "{}", s.clone().underline().paint(value))?;
+                                    write!(self.writer, "{}", s.underline().paint(value))?;
                                 } else {
-                                    write!(self.writer, "{}", s.clone().paint(value))?;
+                                    write!(self.writer, "{}", s.paint(value))?;
                                 }
                             }
                             if change.missing_newline() {
@@ -145,7 +145,7 @@ impl<'a, W: std::io::Write> Reporter<'a> for ConsoleReporter<'a, W> {
             }
 
             // print a separator between matched items
-            writeln!(self.writer, "")?;
+            writeln!(self.writer)?;
         }
 
         Ok(())

@@ -29,10 +29,7 @@ impl Queryable for HCL {
     }
 
     fn is_string_literal(node: &Box<Node>) -> bool {
-        match node.kind() {
-            "string_literal" | "quoted_template" => true,
-            _ => false,
-        }
+        matches!(node.kind(), "string_literal" | "quoted_template")
     }
 
     fn is_skippable(node: &Box<Node>) -> bool {
@@ -42,25 +39,15 @@ impl Queryable for HCL {
     fn range(node: &Box<Node>) -> Range {
         match node.kind() {
             "attribute" => {
-                let bracket = node
-                    .children
-                    .iter()
-                    .skip(node.children.len() - 2)
-                    .next()
-                    .unwrap();
+                let bracket = node.children.get(node.children.len() - 2).unwrap();
                 let start = Self::default_range(node).start;
-                let end = Self::range(&bracket).end;
+                let end = Self::range(bracket).end;
                 Range { start, end }
             }
             "block" => {
-                let bracket = node
-                    .children
-                    .iter()
-                    .skip(node.children.len() - 2)
-                    .next()
-                    .unwrap();
+                let bracket = node.children.get(node.children.len() - 2).unwrap();
                 let start = Self::default_range(node).start;
-                let end = Self::range(&bracket).end;
+                let end = Self::range(bracket).end;
                 Range { start, end }
             }
             _ => Self::default_range(node),

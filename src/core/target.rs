@@ -91,7 +91,7 @@ impl Target {
             .filter_map(|e| e.ok())
             .map(|e| e.into_path())
             .filter(|p| p.is_file())
-            .map(move |p| Target::from(Some(p), encoding.clone()))
+            .map(move |p| Target::from(Some(p), encoding))
             .filter_map(|e| e.ok())
     }
 }

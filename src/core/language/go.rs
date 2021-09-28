@@ -28,10 +28,10 @@ impl Queryable for Go {
     }
 
     fn is_string_literal(node: &Box<Node>) -> bool {
-        match node.kind() {
-            "interpreted_string_literal" | "raw_string_literal" => true,
-            _ => false,
-        }
+        matches!(
+            node.kind(),
+            "interpreted_string_literal" | "raw_string_literal"
+        )
     }
 }
 

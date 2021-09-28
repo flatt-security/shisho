@@ -43,7 +43,7 @@ fn to_regex(q: &str) -> String {
         "(?s-m)\\A{}\\z",
         p.replace_all(escaped_qvalue.as_str(), |caps: &Captures| {
             if &caps[1] == "_" {
-                format!("(.*)")
+                "(.*)".to_string()
             } else {
                 format!("(?P<{}>.*)", &caps[1])
             }

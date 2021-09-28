@@ -25,7 +25,7 @@ impl<T> AutofixItem<T>
 where
     T: Queryable,
 {
-    pub fn root_node<'p>(&'p self) -> Box<RootNode<'p>> {
+    pub fn root_node(&'_ self) -> Box<RootNode<'_>> {
         self.pattern.root_node()
     }
 
@@ -36,7 +36,7 @@ where
         };
 
         let patched_item = T::unwrap_root(&self.root_node())
-            .into_iter()
+            .iter()
             .filter(|x| !T::is_skippable(x))
             .map(|node| processor.handle_node(node))
             .collect::<Result<Vec<PatchedItem>>>()?;
@@ -156,21 +156,19 @@ where
         let mut end: usize = node.start_byte();
 
         for child in children {
-            body = body
-                + self
-                    .autofix
-                    .pattern
-                    .string_between(end, child.start_byte)?
-                    .as_str()
-                + child.body.as_str();
-            end = child.end_byte;
-        }
-        body = body
-            + self
+            body += self
                 .autofix
                 .pattern
-                .string_between(end, node.end_byte())?
+                .string_between(end, child.start_byte)?
                 .as_str();
+            body += child.body.as_str();
+            end = child.end_byte;
+        }
+        body += self
+            .autofix
+            .pattern
+            .string_between(end, node.end_byte())?
+            .as_str();
 
         Ok(PatchedItem {
             body,
@@ -204,7 +202,7 @@ where
         let current_code = self.as_str().as_bytes();
 
         let before_snippet = String::from_utf8(current_code[0..item.area.start_byte()].to_vec())?;
-        let snippet = query.to_patched_snippet(&item)?;
+        let snippet = query.to_patched_snippet(item)?;
         let after_snippet = String::from_utf8(
             current_code[item.area.end_byte().min(current_code.len())..current_code.len()].to_vec(),
         )?;

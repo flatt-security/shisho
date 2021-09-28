@@ -26,7 +26,7 @@ impl<'tree, T> Tree<'tree, T>
 where
     T: Queryable,
 {
-    pub fn root_node<'p>(&'p self) -> Box<Node<'p>> {
+    pub fn root_node(&'_ self) -> Box<Node<'_>> {
         Node::from_tsnode(self.tstree.root_node(), &self.source)
     }
 }
@@ -93,7 +93,7 @@ where
     where
         'tree: 'query,
     {
-        TreeMatcher::new(self, query).into_iter()
+        TreeMatcher::new(self, query)
     }
 
     pub fn traverse(&'tree self) -> TreeTreverser<'tree> {
@@ -192,7 +192,7 @@ where
                     panic!("invalid state")
                 }
             }
-            _ if (self.children_of(node) == 0 || T::is_leaf_like(&node)) => {
+            _ if (self.children_of(node) == 0 || T::is_leaf_like(node)) => {
                 if node.is_named() {
                     self.walk_leaf_named_node(node)
                 } else {

@@ -24,7 +24,7 @@ impl<T> Pattern<T>
 where
     T: Queryable,
 {
-    pub fn root_node<'p>(&'p self) -> Box<RootNode<'p>> {
+    pub fn root_node(&'_ self) -> Box<RootNode<'_>> {
         Box::new(RootNode::new(*Node::from_tsnode(
             self.tstree.root_node(),
             &self.source,

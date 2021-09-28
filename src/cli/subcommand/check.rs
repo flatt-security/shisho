@@ -144,22 +144,22 @@ pub(crate) fn handle_rulemap<'a>(
 fn handle_rules<'a, E: Reporter<'a>>(
     reporter: &mut E,
     target: &Target,
-    rules: &Vec<Rule>,
+    rules: &[Rule],
     as_lang: &ruleset::Language,
 ) -> Result<usize> {
     match as_lang {
-        ruleset::Language::HCL => handle_typed_rules::<E, HCL>(reporter, &target, rules),
+        ruleset::Language::HCL => handle_typed_rules::<E, HCL>(reporter, target, rules),
         ruleset::Language::Dockerfile => {
-            handle_typed_rules::<E, Dockerfile>(reporter, &target, rules)
+            handle_typed_rules::<E, Dockerfile>(reporter, target, rules)
         }
-        ruleset::Language::Go => handle_typed_rules::<E, Go>(reporter, &target, rules),
+        ruleset::Language::Go => handle_typed_rules::<E, Go>(reporter, target, rules),
     }
 }
 
 fn handle_typed_rules<'a, E: Reporter<'a>, Lang: Queryable + 'static>(
     reporter: &mut E,
     target: &Target,
-    rules: &Vec<Rule>,
+    rules: &[Rule],
 ) -> Result<usize> {
     let source = NormalizedSource::from(target.body.as_str());
     let tree = Tree::<Lang>::try_from(source).unwrap();

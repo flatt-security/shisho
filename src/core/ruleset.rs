@@ -89,8 +89,8 @@ impl Rule {
 
     pub fn get_patterns(&self) -> Result<Vec<String>> {
         match (&self.pattern, &self.patterns) {
-            (Some(p), patterns) if patterns.len() == 0 => Ok(vec![p.to_string()]),
-            (None, patterns) if patterns.len() > 0 => Ok(patterns.clone()),
+            (Some(p), patterns) if patterns.is_empty() => Ok(vec![p.to_string()]),
+            (None, patterns) if !patterns.is_empty() => Ok(patterns.clone()),
             _ => Err(anyhow::anyhow!(
                 "You can use only one of `pattern` or `patterns`."
             )),
@@ -99,7 +99,7 @@ impl Rule {
 
     pub fn get_rewrite_options(&self) -> Result<Vec<String>> {
         match (&self.rewrite, &self.rewrite_options) {
-            (Some(p), patterns) if patterns.len() == 0 => Ok(vec![p.to_string()]),
+            (Some(p), patterns) if patterns.is_empty() => Ok(vec![p.to_string()]),
             (None, patterns) => Ok(patterns.clone()),
             _ => Err(anyhow::anyhow!(
                 "You can use only one of `rewrite` or `rewrite_options`."
@@ -174,16 +174,12 @@ impl FromStr for Language {
     }
 }
 
-impl Language {
-    pub fn from_str(s: &str) -> Result<Self> {
-        let rset: Self = serde_yaml::from_str(s)?;
-        Ok(rset)
-    }
-}
+impl FromStr for RuleSet {
+    type Err = serde_yaml::Error;
 
-pub fn from_str(s: &str) -> Result<RuleSet> {
-    let rset: RuleSet = serde_yaml::from_str(s)?;
-    Ok(rset)
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        serde_yaml::from_str(s)
+    }
 }
 
 pub fn from_path<P: AsRef<Path>>(ruleset_path: P) -> Result<Vec<RuleSet>> {
@@ -194,7 +190,7 @@ pub fn from_path<P: AsRef<Path>>(ruleset_path: P) -> Result<Vec<RuleSet>> {
             .filter_map(|e| e.ok())
             .map(|e| e.into_path())
             .filter(|p| p.is_file())
-            .map(|p| from_filepath(p))
+            .map(from_filepath)
             .collect::<Result<Vec<RuleSet>>>()
     } else {
         Ok(vec![from_filepath(ruleset_path)?])
@@ -209,12 +205,4 @@ pub fn from_filepath<P: AsRef<Path>>(p: P) -> Result<RuleSet> {
 pub fn from_reader<R: std::io::Read>(r: R) -> Result<RuleSet> {
     let rset: RuleSet = serde_yaml::from_reader(r)?;
     Ok(rset)
-}
-
-impl<'a> TryFrom<&'a str> for RuleSet {
-    type Error = anyhow::Error;
-
-    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        from_str(value)
-    }
 }

@@ -10,7 +10,7 @@ pub fn parse_encoding(label: &str) -> Result<&'static Encoding> {
 
 // This list comes from encoding_rs, which is licensed under Apache 2.0 or MIT.
 // https://github.com/hsivonen/encoding_rs/blob/19efaf064f5b95477cc1e0b487566d213a6d67f3/src/lib.rs#L2140
-pub static LABELS_SORTED: [&'static str; 219] = [
+pub static LABELS_SORTED: [&str; 219] = [
     "l1",
     "l2",
     "l3",

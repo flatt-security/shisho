@@ -28,10 +28,10 @@ impl Queryable for Dockerfile {
     }
 
     fn is_string_literal(node: &Box<Node>) -> bool {
-        match node.kind() {
-            "shell_fragment" | "double_quoted_string" | "unquoted_string" | "shell_command" => true,
-            _ => false,
-        }
+        matches!(
+            node.kind(),
+            "shell_fragment" | "double_quoted_string" | "unquoted_string" | "shell_command"
+        )
     }
 
     fn normalize_annonymous_leaf(s: &str) -> String {
