@@ -1,6 +1,5 @@
 pub mod constraint;
 pub mod language;
-pub mod literal;
 pub mod matcher;
 pub mod node;
 pub mod pattern;

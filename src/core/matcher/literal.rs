@@ -1,7 +1,5 @@
+use super::{super::query::MetavariableId, item::CaptureItem, state::UnverifiedMetavariable};
 use regex::Captures;
-
-use crate::core::matcher::{CaptureItem, UnverifiedMetavariable};
-use crate::core::query::MetavariableId;
 
 pub fn match_string_pattern<'tree, 'query>(
     tvalue: &'tree str,

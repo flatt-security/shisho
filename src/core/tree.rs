@@ -1,6 +1,6 @@
 use crate::core::{
     language::Queryable,
-    matcher::{MatchedItem, QueryMatcher},
+    matcher::{MatchedItem, TreeMatcher},
     query::{
         Query, SHISHO_NODE_ELLIPSIS, SHISHO_NODE_ELLIPSIS_METAVARIABLE, SHISHO_NODE_METAVARIABLE,
         SHISHO_NODE_METAVARIABLE_NAME,
@@ -93,7 +93,7 @@ where
     where
         'tree: 'query,
     {
-        QueryMatcher::new(self, query).into_iter()
+        TreeMatcher::new(self, query).into_iter()
     }
 
     pub fn traverse(&'tree self) -> TreeTreverser<'tree> {
