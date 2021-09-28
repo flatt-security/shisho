@@ -1,8 +1,9 @@
 use itertools::Itertools;
 
-use super::{
-    super::{node::ConsecutiveNodes, query::MetavariableId},
-    item::{CaptureItem, MatchedItem},
+use crate::core::{
+    matcher::{CaptureItem, MatchedItem},
+    node::ConsecutiveNodes,
+    query::MetavariableId,
 };
 use std::collections::HashMap;
 

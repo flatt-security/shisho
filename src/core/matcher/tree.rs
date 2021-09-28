@@ -1,18 +1,15 @@
-use super::{
-    super::{
-        language::Queryable,
-        node::ConsecutiveNodes,
-        node::{Node, RootNode},
-        query::{
-            MetavariableId, Query, SHISHO_NODE_ELLIPSIS, SHISHO_NODE_ELLIPSIS_METAVARIABLE,
-            SHISHO_NODE_METAVARIABLE, SHISHO_NODE_METAVARIABLE_NAME,
-        },
-        tree::{TreeTreverser, TreeView},
+use crate::core::{
+    language::Queryable,
+    matcher::{
+        match_string_pattern, CaptureItem, MatchedItem, MatcherState, UnverifiedMetavariable,
     },
-    item::CaptureItem,
-    item::MatchedItem,
-    literal,
-    state::{MatcherState, UnverifiedMetavariable},
+    node::ConsecutiveNodes,
+    node::{Node, RootNode},
+    query::{
+        MetavariableId, Query, SHISHO_NODE_ELLIPSIS, SHISHO_NODE_ELLIPSIS_METAVARIABLE,
+        SHISHO_NODE_METAVARIABLE, SHISHO_NODE_METAVARIABLE_NAME,
+    },
+    tree::{TreeTreverser, TreeView},
 };
 
 use std::{convert::TryFrom, marker::PhantomData};
@@ -168,7 +165,7 @@ impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
         qnode: &'query Node<'query>,
     ) -> Vec<MatcherState<'tree>> {
         if T::is_string_literal(tnode) && T::is_string_literal(qnode) {
-            literal::match_string_pattern(tnode.utf8_text(), qnode.utf8_text())
+            match_string_pattern(tnode.utf8_text(), qnode.utf8_text())
                 .into_iter()
                 .map(|captures| MatcherState {
                     subtree: ConsecutiveNodes::try_from(vec![tnode]).ok(),
