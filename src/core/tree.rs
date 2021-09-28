@@ -26,7 +26,7 @@ impl<'tree, T> Tree<'tree, T>
 where
     T: Queryable,
 {
-    pub fn root_node(&'_ self) -> Box<Node<'_>> {
+    pub fn root_node(&'_ self) -> Node<'_> {
         Node::from_tsnode(self.tstree.root_node(), &self.source)
     }
 }
@@ -69,7 +69,7 @@ where
 }
 
 pub struct TreeView<'tree, T> {
-    pub root: Box<Node<'tree>>,
+    pub root: Node<'tree>,
     pub source: &'tree [u8],
     _marker: PhantomData<T>,
 }
@@ -78,7 +78,7 @@ impl<'tree, T> TreeView<'tree, T>
 where
     T: Queryable,
 {
-    pub fn new(root: Box<Node<'tree>>, source: &'tree [u8]) -> TreeView<'tree, T> {
+    pub fn new(root: Node<'tree>, source: &'tree [u8]) -> TreeView<'tree, T> {
         TreeView {
             root,
             source,
@@ -114,11 +114,11 @@ where
     }
 }
 
-impl<'tree, T> From<Box<Node<'tree>>> for TreeView<'tree, T>
+impl<'tree, T> From<Node<'tree>> for TreeView<'tree, T>
 where
     T: Queryable,
 {
-    fn from(t: Box<Node<'tree>>) -> Self {
+    fn from(t: Node<'tree>) -> Self {
         let source = t.source;
         TreeView {
             root: t,
@@ -135,11 +135,11 @@ where
 {
     type Output;
 
-    fn walk_leaf_named_node(&self, node: &Box<Node>) -> Result<Self::Output, anyhow::Error>;
+    fn walk_leaf_named_node(&self, node: &Node) -> Result<Self::Output, anyhow::Error>;
 
-    fn walk_leaf_unnamed_node(&self, node: &Box<Node>) -> Result<Self::Output, anyhow::Error>;
+    fn walk_leaf_unnamed_node(&self, node: &Node) -> Result<Self::Output, anyhow::Error>;
 
-    fn walk_intermediate_node(&self, node: &Box<Node>) -> Result<Self::Output, anyhow::Error> {
+    fn walk_intermediate_node(&self, node: &Node) -> Result<Self::Output, anyhow::Error> {
         let children = node
             .children
             .iter()
@@ -151,25 +151,25 @@ where
 
     fn flatten_intermediate_node(
         &self,
-        node: &Box<Node>,
+        node: &Node,
         children: Vec<Self::Output>,
     ) -> Result<Self::Output, anyhow::Error>;
 
-    fn walk_ellipsis(&self, node: &Box<Node>) -> Result<Self::Output, anyhow::Error>;
+    fn walk_ellipsis(&self, node: &Node) -> Result<Self::Output, anyhow::Error>;
 
     fn walk_ellipsis_metavariable(
         &self,
-        node: &Box<Node>,
+        node: &Node,
         variable_name: &str,
     ) -> Result<Self::Output, anyhow::Error>;
 
     fn walk_metavariable(
         &self,
-        node: &Box<Node>,
+        node: &Node,
         variable_name: &str,
     ) -> Result<Self::Output, anyhow::Error>;
 
-    fn handle_node(&self, node: &Box<Node>) -> Result<Self::Output, anyhow::Error> {
+    fn handle_node(&self, node: &Node) -> Result<Self::Output, anyhow::Error> {
         match node.kind() {
             SHISHO_NODE_ELLIPSIS => self.walk_ellipsis(node),
             s if s == SHISHO_NODE_ELLIPSIS_METAVARIABLE || s == SHISHO_NODE_METAVARIABLE => {
@@ -203,18 +203,18 @@ where
         }
     }
 
-    fn children_of(&self, node: &Box<Node>) -> usize {
+    fn children_of(&self, node: &Node) -> usize {
         node.children.len()
     }
 }
 
 pub struct TreeTreverser<'a> {
-    queue: VecDeque<(usize, &'a Box<Node<'a>>)>,
+    queue: VecDeque<(usize, &'a Node<'a>)>,
 }
 
 impl<'a> TreeTreverser<'a> {
     #[inline]
-    pub fn new(root: &'a Box<Node<'a>>) -> Self {
+    pub fn new(root: &'a Node<'a>) -> Self {
         Self {
             queue: VecDeque::from(vec![(0, root)]),
         }
@@ -222,7 +222,7 @@ impl<'a> TreeTreverser<'a> {
 }
 
 impl<'a> Iterator for TreeTreverser<'a> {
-    type Item = (usize, &'a Box<Node<'a>>);
+    type Item = (usize, &'a Node<'a>);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

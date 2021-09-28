@@ -28,7 +28,7 @@ impl<T> Query<T>
 where
     T: Queryable,
 {
-    pub fn root_node(&'_ self) -> Box<RootNode<'_>> {
+    pub fn root_node(&'_ self) -> RootNode<'_> {
         self.pattern.root_node()
     }
 }

@@ -24,11 +24,8 @@ impl<T> Pattern<T>
 where
     T: Queryable,
 {
-    pub fn root_node(&'_ self) -> Box<RootNode<'_>> {
-        Box::new(RootNode::new(*Node::from_tsnode(
-            self.tstree.root_node(),
-            &self.source,
-        )))
+    pub fn root_node(&'_ self) -> RootNode<'_> {
+        RootNode::new(Node::from_tsnode(self.tstree.root_node(), &self.source))
     }
 
     pub fn string_between(&self, start: usize, end: usize) -> Result<String> {

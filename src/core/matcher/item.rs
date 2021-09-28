@@ -26,8 +26,8 @@ impl<'tree> CaptureItem<'tree> {
     }
 }
 
-impl<'tree> From<Vec<&'tree Box<Node<'tree>>>> for CaptureItem<'tree> {
-    fn from(value: Vec<&'tree Box<Node<'tree>>>) -> Self {
+impl<'tree> From<Vec<&'tree Node<'tree>>> for CaptureItem<'tree> {
+    fn from(value: Vec<&'tree Node<'tree>>) -> Self {
         if value.is_empty() {
             Self::Empty
         } else {

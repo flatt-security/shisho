@@ -3,8 +3,6 @@ use std::convert::TryFrom;
 use crate::core::language::Queryable;
 use serde::{Deserialize, Serialize};
 
-use super::tree::TreeView;
-
 /// `Range` describes a range over a source code in a same manner as [Language Server Protocol](https://microsoft.github.io/language-server-protocol/specifications/specification-current/#range).
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Range {
@@ -23,7 +21,7 @@ pub struct Node<'tree> {
     inner: tree_sitter::Node<'tree>,
     pub(crate) source: &'tree [u8],
 
-    pub children: Vec<Box<Node<'tree>>>,
+    pub children: Vec<Node<'tree>>,
 }
 
 impl<'tree> Node<'tree> {
@@ -55,20 +53,16 @@ impl<'tree> Node<'tree> {
         self.inner.is_named()
     }
 
-    pub fn from_tsnode(tsnode: tree_sitter::Node<'tree>, source: &'tree [u8]) -> Box<Self> {
-        let children: Vec<Box<Self>> = tsnode
+    pub fn from_tsnode(tsnode: tree_sitter::Node<'tree>, source: &'tree [u8]) -> Self {
+        let children: Vec<Self> = tsnode
             .children(&mut tsnode.walk())
             .map(|c| Self::from_tsnode(c, source))
             .collect();
-        Box::new(Node {
+        Node {
             inner: tsnode,
             children,
             source,
-        })
-    }
-
-    pub fn to_view<T: Queryable>(self: Box<Self>) -> TreeView<'tree, T> {
-        TreeView::from(self)
+        }
     }
 }
 
@@ -86,13 +80,13 @@ impl<'tree> RootNode<'tree> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConsecutiveNodes<'tree> {
-    inner: Vec<&'tree Box<Node<'tree>>>,
+    inner: Vec<&'tree Node<'tree>>,
     source: &'tree [u8],
 }
 
-impl<'tree> TryFrom<Vec<&'tree Box<Node<'tree>>>> for ConsecutiveNodes<'tree> {
+impl<'tree> TryFrom<Vec<&'tree Node<'tree>>> for ConsecutiveNodes<'tree> {
     type Error = anyhow::Error;
-    fn try_from(inner: Vec<&'tree Box<Node<'tree>>>) -> Result<Self, Self::Error> {
+    fn try_from(inner: Vec<&'tree Node<'tree>>) -> Result<Self, Self::Error> {
         // TODO (y0n3uchy): check all capture items are consecutive
         if inner.is_empty() {
             Err(anyhow::anyhow!(
@@ -125,11 +119,11 @@ impl<'tree> TryFrom<Vec<ConsecutiveNodes<'tree>>> for ConsecutiveNodes<'tree> {
 }
 
 impl<'tree> ConsecutiveNodes<'tree> {
-    pub fn as_vec(&self) -> &Vec<&'tree Box<Node<'tree>>> {
+    pub fn as_vec(&self) -> &Vec<&'tree Node<'tree>> {
         &self.inner
     }
 
-    pub fn push(&mut self, n: &'tree Box<Node<'tree>>) {
+    pub fn push(&mut self, n: &'tree Node<'tree>) {
         self.inner.push(n)
     }
 

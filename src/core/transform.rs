@@ -25,7 +25,7 @@ impl<T> AutofixItem<T>
 where
     T: Queryable,
 {
-    pub fn root_node(&'_ self) -> Box<RootNode<'_>> {
+    pub fn root_node(&'_ self) -> RootNode<'_> {
         self.pattern.root_node()
     }
 
@@ -98,7 +98,7 @@ where
 
     fn walk_metavariable(
         &self,
-        node: &Box<Node>,
+        node: &Node,
         variable_name: &str,
     ) -> Result<Self::Output, anyhow::Error> {
         let id = MetavariableId(variable_name.into());
@@ -115,7 +115,7 @@ where
         })
     }
 
-    fn walk_ellipsis(&self, _node: &Box<Node>) -> Result<Self::Output, anyhow::Error> {
+    fn walk_ellipsis(&self, _node: &Node) -> Result<Self::Output, anyhow::Error> {
         Err(anyhow!(
             "cannot use ellipsis operator inside the transformation query"
         ))
@@ -123,7 +123,7 @@ where
 
     fn walk_ellipsis_metavariable(
         &self,
-        _node: &Box<Node>,
+        _node: &Node,
         _variable_name: &str,
     ) -> Result<Self::Output, anyhow::Error> {
         Err(anyhow!(
@@ -131,7 +131,7 @@ where
         ))
     }
 
-    fn walk_leaf_named_node(&self, node: &Box<Node>) -> Result<Self::Output, anyhow::Error> {
+    fn walk_leaf_named_node(&self, node: &Node) -> Result<Self::Output, anyhow::Error> {
         Ok(PatchedItem {
             body: node.utf8_text().into(),
             start_byte: node.start_byte(),
@@ -139,7 +139,7 @@ where
         })
     }
 
-    fn walk_leaf_unnamed_node(&self, node: &Box<Node>) -> Result<Self::Output, anyhow::Error> {
+    fn walk_leaf_unnamed_node(&self, node: &Node) -> Result<Self::Output, anyhow::Error> {
         Ok(PatchedItem {
             body: node.utf8_text().into(),
             start_byte: node.start_byte(),
@@ -149,7 +149,7 @@ where
 
     fn flatten_intermediate_node(
         &self,
-        node: &Box<Node>,
+        node: &Node,
         children: Vec<Self::Output>,
     ) -> Result<Self::Output, anyhow::Error> {
         let mut body: String = "".into();

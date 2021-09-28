@@ -14,20 +14,20 @@ impl Queryable for Dockerfile {
         tree_sitter_dockerfile_query::language()
     }
 
-    fn unwrap_root<'tree, 'a>(root: &'a Box<RootNode<'tree>>) -> &'a Vec<Box<Node<'tree>>> {
+    fn unwrap_root<'tree, 'a>(root: &'a RootNode<'tree>) -> &'a Vec<Node<'tree>> {
         // see `//third_party/tree-sitter-dockerfile-query/grammar.js`
         &root.as_node().children
     }
 
-    fn is_skippable(node: &Box<Node>) -> bool {
+    fn is_skippable(node: &Node) -> bool {
         node.kind() == "\n"
     }
 
-    fn is_leaf_like(node: &Box<Node>) -> bool {
+    fn is_leaf_like(node: &Node) -> bool {
         Self::is_string_literal(node)
     }
 
-    fn is_string_literal(node: &Box<Node>) -> bool {
+    fn is_string_literal(node: &Node) -> bool {
         matches!(
             node.kind(),
             "shell_fragment" | "double_quoted_string" | "unquoted_string" | "shell_command"

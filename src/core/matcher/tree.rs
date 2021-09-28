@@ -19,7 +19,7 @@ use std::{convert::TryFrom, marker::PhantomData};
 
 pub struct TreeMatcher<'tree, 'query, T: Queryable> {
     traverser: TreeTreverser<'tree>,
-    query: Box<RootNode<'query>>,
+    query: RootNode<'query>,
 
     /// local state for implementing `Iterator`/
     items: Vec<MatchedItem<'tree>>,
@@ -43,11 +43,11 @@ impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
 impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
     fn match_sibillings(
         &self,
-        tsibilings: Vec<&'tree Box<Node<'tree>>>,
-        qsibilings: Vec<&'query Box<Node<'query>>>,
-    ) -> Vec<(MatcherState<'tree>, Option<&Box<Node<'tree>>>)> {
+        tsibilings: Vec<&'tree Node<'tree>>,
+        qsibilings: Vec<&'query Node<'query>>,
+    ) -> Vec<(MatcherState<'tree>, Option<&Node<'tree>>)> {
         let mut queue: Vec<(usize, usize, Vec<UnverifiedMetavariable>)> = vec![(0, 0, vec![])];
-        let mut result: Vec<(MatcherState, Option<&Box<Node<'tree>>>)> = vec![];
+        let mut result: Vec<(MatcherState, Option<&Node<'tree>>)> = vec![];
 
         while let Some((tidx, qidx, captures)) = queue.pop() {
             match (tsibilings.get(tidx), qsibilings.get(qidx)) {
@@ -109,8 +109,8 @@ impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
 
     fn match_subtree(
         &self,
-        tnode: Option<&'tree Box<Node<'tree>>>,
-        qnode: Option<&'query Box<Node<'query>>>,
+        tnode: Option<&'tree Node<'tree>>,
+        qnode: Option<&'query Node<'query>>,
     ) -> Vec<MatcherState<'tree>> {
         match (tnode, qnode) {
             (None, None) => {
@@ -164,8 +164,8 @@ impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
 
     fn match_leaf(
         &self,
-        tnode: &'tree Box<Node<'tree>>,
-        qnode: &'query Box<Node<'query>>,
+        tnode: &'tree Node<'tree>,
+        qnode: &'query Node<'query>,
     ) -> Vec<MatcherState<'tree>> {
         if T::is_string_literal(tnode) && T::is_string_literal(qnode) {
             literal::match_string_pattern(tnode.utf8_text(), qnode.utf8_text())
@@ -199,7 +199,7 @@ impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
         }
     }
 
-    fn variable_name_of(&self, qnode: &Box<Node<'query>>) -> &'query str {
+    fn variable_name_of(&self, qnode: &Node<'query>) -> &'query str {
         qnode
             .children
             .iter()
@@ -222,7 +222,7 @@ where
     type Item = MatchedItem<'tree>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let qnodes: Vec<&Box<Node<'query>>> = T::unwrap_root(&self.query)
+        let qnodes: Vec<&Node<'query>> = T::unwrap_root(&self.query)
             .iter()
             .filter(|n| !T::is_skippable(n))
             .collect();
@@ -233,7 +233,7 @@ where
             }
 
             if let Some((depth, tnode)) = self.traverser.next() {
-                let tnodes: Vec<&Box<Node>> = tnode
+                let tnodes: Vec<&Node<'tree>> = tnode
                     .children
                     .iter()
                     .filter(|n| !T::is_skippable(n))

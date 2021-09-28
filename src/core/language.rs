@@ -15,26 +15,26 @@ pub trait Queryable {
     fn query_language() -> tree_sitter::Language;
 
     /// `unwrap_root` takes a root of the query tree and returns nodes for matching.
-    fn unwrap_root<'tree, 'a>(root: &'a Box<RootNode<'tree>>) -> &'a Vec<Box<Node<'tree>>>;
+    fn unwrap_root<'tree, 'a>(root: &'a RootNode<'tree>) -> &'a Vec<Node<'tree>>;
 
     /// `is_skippable` returns whether the given node could be ignored on matching.
-    fn is_skippable(_node: &Box<Node>) -> bool {
+    fn is_skippable(_node: &Node) -> bool {
         false
     }
 
-    fn is_leaf_like(_node: &Box<Node>) -> bool {
+    fn is_leaf_like(_node: &Node) -> bool {
         false
     }
 
-    fn is_string_literal(_node: &Box<Node>) -> bool {
+    fn is_string_literal(_node: &Node) -> bool {
         false
     }
 
-    fn range(node: &Box<Node>) -> Range {
+    fn range(node: &Node) -> Range {
         Self::default_range(node)
     }
 
-    fn default_range(node: &Box<Node>) -> Range {
+    fn default_range(node: &Node) -> Range {
         if node.utf8_text().ends_with('\n') {
             Range {
                 start: Position {
