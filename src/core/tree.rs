@@ -9,53 +9,42 @@ use crate::core::{
 use anyhow::{anyhow, Result};
 use std::{convert::TryFrom, marker::PhantomData};
 
-use super::node::Node;
+use super::{code::NormalizedSource, node::Node};
 
 pub struct Tree<'tree, T> {
-    pub root: Box<Node<'tree>>,
     pub source: Vec<u8>,
 
     tstree: tree_sitter::Tree,
-    _marker: PhantomData<T>,
+    _marker: PhantomData<&'tree T>,
 }
 
 impl<'tree, T> Tree<'tree, T>
 where
     T: Queryable,
 {
-    pub fn to_view(&self) -> TreeView<T> {
-        TreeView::new(&self.root, &self.source)
+    pub fn root_node<'p>(&'p self) -> Box<Node<'p>> {
+        Node::from_tsnode(self.tstree.root_node(), &self.source)
     }
 }
 
-impl<'tree, T> TryFrom<&str> for Tree<'tree, T>
+impl<'tree, T> TryFrom<NormalizedSource> for Tree<'tree, T>
 where
     T: Queryable,
 {
     type Error = anyhow::Error;
 
-    fn try_from(source: &str) -> Result<Self, anyhow::Error> {
-        let source = if source.as_bytes().len() != 0
-            && source.as_bytes()[source.as_bytes().len() - 1] != b'\n'
-        {
-            [source.as_bytes(), "\n".as_bytes()].concat()
-        } else {
-            source.into()
-        };
-
+    fn try_from(nsource: NormalizedSource) -> Result<Self, anyhow::Error> {
         let mut parser = tree_sitter::Parser::new();
         parser
             .set_language(T::target_language())
             .expect("Error loading hcl grammar");
 
         let tstree = parser
-            .parse(&source, None)
+            .parse(nsource.as_ref(), None)
             .ok_or(anyhow!("failed to load the code"))?;
-        let root = Node::from_tsnode(tstree.root_node(), &source);
 
         Ok(Tree {
-            root,
-            source,
+            source: nsource.into(),
 
             tstree,
             _marker: PhantomData,
@@ -165,10 +154,6 @@ where
             }
             _ => self.walk_intermediate_node(node),
         }
-    }
-
-    fn walk(&self, tree: &'tree Tree<'tree, T>) -> Result<Self::Output, anyhow::Error> {
-        self.handle_node(&tree.root)
     }
 
     fn children_of(&self, node: &Box<Node>) -> usize {

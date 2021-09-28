@@ -36,7 +36,7 @@ impl<'a, W: std::io::Write> Reporter<'a> for ConsoleReporter<'a, W> {
             // print a finding
             writeln!(self.writer, "In {}:", target.canonicalized_path())?;
             writeln!(self.writer, "{:>8} |", "")?;
-            let Range { start: s, end: e } = mitem.area.range::<T>(target.body.as_ref());
+            let Range { start: s, end: e } = mitem.area.range::<T>();
 
             for line_index in (s.row)..=(e.row) {
                 if line_index > lines.len() || (line_index == e.row && e.column == 0) {

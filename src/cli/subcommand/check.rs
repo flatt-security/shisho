@@ -3,6 +3,8 @@
 use crate::cli::encoding::{parse_encoding, LABELS_SORTED};
 use crate::cli::reporter::{ConsoleReporter, JSONReporter, Reporter, ReporterType, SARIFReporter};
 use crate::cli::{CommonOpts, ReportOpts};
+use crate::core::code::NormalizedSource;
+use crate::core::tree::TreeView;
 use crate::core::{
     language::{Dockerfile, Go, Queryable, HCL},
     ruleset::{self, Rule},
@@ -159,8 +161,10 @@ fn handle_typed_rules<'a, E: Reporter<'a>, Lang: Queryable + 'static>(
     target: &Target,
     rules: &Vec<Rule>,
 ) -> Result<usize> {
-    let tree = Tree::<Lang>::try_from(target.body.as_str()).unwrap();
-    let ptree = tree.to_view();
+    let source = NormalizedSource::from(target.body.as_str());
+    let tree = Tree::<Lang>::try_from(source).unwrap();
+    let root = tree.root_node();
+    let ptree = TreeView::new(&root, &tree.source);
 
     let mut total_findings = 0;
     for rule in rules {

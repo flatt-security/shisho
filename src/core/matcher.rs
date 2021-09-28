@@ -22,7 +22,7 @@ where
     items: Vec<MatchedItem<'tree>>,
 
     view: &'tree TreeView<'tree, T>,
-    query: &'query Query<'query, T>,
+    query: &'query Query<T>,
 }
 
 pub type UnverifiedMetavariable<'tree> = (MetavariableId, CaptureItem<'tree>);
@@ -257,7 +257,11 @@ where
     type Item = MatchedItem<'tree>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let qnodes = self.query.query_nodes();
+        let qroot = self.query.root_node();
+        let qnodes: Vec<&Box<Node<'query>>> = T::get_query_nodes(&qroot)
+            .into_iter()
+            .filter(|n| !T::is_skippable(n))
+            .collect();
         loop {
             if let Some(mitem) = self.items.pop() {
                 return Some(mitem);

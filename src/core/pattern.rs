@@ -1,50 +1,48 @@
-use super::{language::Queryable, node::Node};
+use super::{code::NormalizedSource, language::Queryable, node::Node};
 use anyhow::{anyhow, Result};
 use std::{convert::TryFrom, marker::PhantomData};
 
-#[derive(Debug, PartialEq)]
-pub struct Pattern<'tree, T>
+#[derive(Debug)]
+pub struct Pattern<T>
 where
     T: Queryable,
 {
-    pub root: Box<Node<'tree>>,
     pub source: Vec<u8>,
+
+    tstree: tree_sitter::Tree,
     _marker: PhantomData<T>,
 }
 
-impl<'tree, T> TryFrom<String> for Pattern<'tree, T>
+impl<T> TryFrom<NormalizedSource> for Pattern<T>
 where
     T: Queryable,
 {
     type Error = anyhow::Error;
 
-    fn try_from(value: String) -> Result<Self, anyhow::Error> {
-        let source = if value.as_bytes().len() != 0
-            && value.as_bytes()[value.as_bytes().len() - 1] != b'\n'
-        {
-            [value.as_bytes(), "\n".as_bytes()].concat()
-        } else {
-            value.into()
-        };
-
+    fn try_from(source: NormalizedSource) -> Result<Self, anyhow::Error> {
         let mut parser = tree_sitter::Parser::new();
         parser.set_language(T::query_language())?;
 
-        let parsed = parser
-            .parse(&source, None)
+        let tstree = parser
+            .parse(source.as_ref(), None)
             .ok_or(anyhow!("failed to load the code"))?;
 
         Ok(Pattern {
-            root: Node::from_tsnode(parsed.root_node(), source.as_slice()),
-            source,
+            source: source.into(),
+
+            tstree,
             _marker: PhantomData,
         })
     }
 }
-impl<'p, T> Pattern<'p, T>
+impl<T> Pattern<T>
 where
     T: Queryable,
 {
+    pub fn root_node<'p>(&'p self) -> Box<Node<'p>> {
+        Node::from_tsnode(self.tstree.root_node(), &self.source)
+    }
+
     pub fn string_between(&self, start: usize, end: usize) -> Result<String> {
         Ok(String::from_utf8(self.source[start..end].to_vec())?)
     }

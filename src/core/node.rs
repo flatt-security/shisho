@@ -119,7 +119,7 @@ impl<'tree> ConsecutiveNodes<'tree> {
         self.as_vec().last().unwrap().end_position()
     }
 
-    pub fn range<T: Queryable + 'static>(&self, source: &[u8]) -> Range {
+    pub fn range<T: Queryable + 'static>(&self) -> Range {
         Range {
             start: T::range(self.as_vec().first().unwrap()).start,
             end: T::range(self.as_vec().last().unwrap()).end,

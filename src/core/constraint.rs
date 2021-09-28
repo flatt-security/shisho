@@ -9,29 +9,27 @@ use crate::core::{
 };
 
 #[derive(Debug)]
-pub struct Constraint<'a, T>
+pub struct Constraint<T>
 where
     T: Queryable,
 {
     pub target: MetavariableId,
-    pub predicate: Predicate<'a, T>,
+    pub predicate: Predicate<T>,
 }
 
 #[derive(Debug)]
-pub enum Predicate<'a, T>
+pub enum Predicate<T>
 where
     T: Queryable,
 {
-    MatchQuery(Query<'a, T>),
-    NotMatchQuery(Query<'a, T>),
+    MatchQuery(Query<T>),
+    NotMatchQuery(Query<T>),
 
     MatchRegex(Regex),
     NotMatchRegex(Regex),
 }
 
-impl<'a, T> Constraint<'a, T> where T: Queryable {}
-
-impl<'a, T> TryFrom<RawConstraint> for Constraint<'a, T>
+impl<T> TryFrom<RawConstraint> for Constraint<T>
 where
     T: Queryable,
 {

@@ -8,17 +8,17 @@ use std::{
     marker::PhantomData,
 };
 
-use super::node::Node;
+use super::{code::NormalizedSource, node::Node};
 
-pub struct AutofixItem<'p, T>
+pub struct AutofixItem<T>
 where
     T: Queryable,
 {
-    pattern: Pattern<'p, T>,
+    pattern: Pattern<T>,
     _marker: PhantomData<T>,
 }
 
-impl<'p, T> AutofixItem<'p, T>
+impl<T> AutofixItem<T>
 where
     T: Queryable,
 {
@@ -28,12 +28,9 @@ where
             item,
         };
 
-        let patched_item = T::get_query_nodes(&self.pattern.root)
+        let patched_item = T::get_query_nodes(&self.pattern.root_node())
             .into_iter()
             .filter(|x| !T::is_skippable(x))
-            .collect::<Vec<&Box<Node>>>();
-        let patched_item = patched_item
-            .into_iter()
             .map(|node| processor.handle_node(node))
             .collect::<Result<Vec<PatchedItem>>>()?;
 
@@ -49,7 +46,7 @@ pub struct PatchProcessor<'pattern, T>
 where
     T: Queryable,
 {
-    autofix: &'pattern AutofixItem<'pattern, T>,
+    autofix: &'pattern AutofixItem<T>,
     item: &'pattern MatchedItem<'pattern>,
 }
 
@@ -145,14 +142,15 @@ where
     }
 }
 
-impl<'a, T> TryFrom<String> for AutofixItem<'a, T>
+impl<T> TryFrom<String> for AutofixItem<T>
 where
     T: Queryable,
 {
     type Error = anyhow::Error;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        let pattern = Pattern::<T>::try_from(value)?;
+        let source = NormalizedSource::from(value);
+        let pattern = Pattern::<T>::try_from(source)?;
         Ok(Self {
             pattern,
             _marker: PhantomData,
@@ -165,9 +163,9 @@ where
     T: Queryable,
     Self: Sized,
 {
-    fn transform<'a, P>(self, item: &MatchedItem, p: P) -> Result<Self>
+    fn transform<P>(self, item: &MatchedItem, p: P) -> Result<Self>
     where
-        P: TryInto<AutofixItem<'a, T>, Error = anyhow::Error>,
+        P: TryInto<AutofixItem<T>, Error = anyhow::Error>,
     {
         let query = p.try_into()?;
         self.transform_with_query(item, query)

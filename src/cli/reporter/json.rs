@@ -49,7 +49,7 @@ impl<'a, W: std::io::Write> Reporter<'a> for JSONReporter<'a, W> {
                 id: rule.id.clone(),
                 location: Location {
                     file: target.relative_path(),
-                    range: mitem.area.range::<T>(target.body.as_ref()),
+                    range: mitem.area.range::<T>(),
                 },
                 rewrite: vec![],
             };

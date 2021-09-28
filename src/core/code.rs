@@ -40,3 +40,46 @@ where
         }
     }
 }
+
+#[derive(Clone)]
+pub struct NormalizedSource {
+    pub source: Vec<u8>,
+}
+
+impl AsRef<[u8]> for NormalizedSource {
+    fn as_ref(&self) -> &[u8] {
+        &self.source
+    }
+}
+
+impl From<NormalizedSource> for Vec<u8> {
+    fn from(n: NormalizedSource) -> Self {
+        n.source
+    }
+}
+
+impl From<&[u8]> for NormalizedSource {
+    fn from(source: &[u8]) -> Self {
+        if source.len() != 0 && source[source.len() - 1] != b'\n' {
+            Self {
+                source: [source, "\n".as_bytes()].concat(),
+            }
+        } else {
+            Self {
+                source: source.into(),
+            }
+        }
+    }
+}
+
+impl From<String> for NormalizedSource {
+    fn from(source: String) -> Self {
+        source.as_bytes().into()
+    }
+}
+
+impl From<&str> for NormalizedSource {
+    fn from(source: &str) -> Self {
+        source.as_bytes().into()
+    }
+}
