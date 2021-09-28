@@ -1,4 +1,4 @@
-use crate::core::node::{Node, RootNode};
+use crate::core::node::{Node, NodeType, RootNode};
 
 use super::Queryable;
 
@@ -20,7 +20,7 @@ impl Queryable for Dockerfile {
     }
 
     fn is_skippable(node: &Node) -> bool {
-        node.kind() == "\n"
+        node.kind() == NodeType::Normal("\n")
     }
 
     fn is_leaf_like(node: &Node) -> bool {
@@ -30,12 +30,19 @@ impl Queryable for Dockerfile {
     fn is_string_literal(node: &Node) -> bool {
         matches!(
             node.kind(),
-            "shell_fragment" | "double_quoted_string" | "unquoted_string" | "shell_command"
+            NodeType::Normal("shell_fragment")
+                | NodeType::Normal("double_quoted_string")
+                | NodeType::Normal("unquoted_string")
+                | NodeType::Normal("shell_command")
         )
     }
 
-    fn normalize_annonymous_leaf(s: &str) -> String {
-        s.to_ascii_uppercase()
+    fn node_value_eq<'a, 'b>(l: &Node<'a>, r: &Node<'b>) -> bool {
+        if !l.is_named() && !r.is_named() {
+            l.as_str().to_ascii_uppercase() == r.as_str().to_ascii_uppercase()
+        } else {
+            l.as_str() == r.as_str()
+        }
     }
 }
 

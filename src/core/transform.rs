@@ -133,7 +133,7 @@ where
 
     fn walk_leaf_named_node(&self, node: &Node) -> Result<Self::Output, anyhow::Error> {
         Ok(PatchedItem {
-            body: node.utf8_text().into(),
+            body: node.as_str().into(),
             start_byte: node.start_byte(),
             end_byte: node.end_byte(),
         })
@@ -141,7 +141,7 @@ where
 
     fn walk_leaf_unnamed_node(&self, node: &Node) -> Result<Self::Output, anyhow::Error> {
         Ok(PatchedItem {
-            body: node.utf8_text().into(),
+            body: node.as_str().into(),
             start_byte: node.start_byte(),
             end_byte: node.end_byte(),
         })

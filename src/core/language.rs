@@ -35,7 +35,7 @@ pub trait Queryable {
     }
 
     fn default_range(node: &Node) -> Range {
-        if node.utf8_text().ends_with('\n') {
+        if node.as_str().ends_with('\n') {
             Range {
                 start: Position {
                     row: node.start_position().row + 1,
@@ -60,7 +60,7 @@ pub trait Queryable {
         }
     }
 
-    fn normalize_annonymous_leaf(s: &str) -> String {
-        s.to_string()
+    fn node_value_eq<'a, 'b>(l: &Node<'a>, r: &Node<'b>) -> bool {
+        l.as_str().to_string() == r.as_str().to_string()
     }
 }
