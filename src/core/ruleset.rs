@@ -201,12 +201,12 @@ pub fn from_path<P: AsRef<Path>>(ruleset_path: P) -> Result<Vec<RuleSet>> {
     }
 }
 
-fn from_filepath<P: AsRef<Path>>(p: P) -> Result<RuleSet> {
+pub fn from_filepath<P: AsRef<Path>>(p: P) -> Result<RuleSet> {
     let f = File::open(p)?;
     from_reader(f)
 }
 
-fn from_reader<R: std::io::Read>(r: R) -> Result<RuleSet> {
+pub fn from_reader<R: std::io::Read>(r: R) -> Result<RuleSet> {
     let rset: RuleSet = serde_yaml::from_reader(r)?;
     Ok(rset)
 }

@@ -8,14 +8,16 @@ pub use self::docker::Dockerfile;
 pub use self::go::Go;
 pub use self::hcl::HCL;
 
-use super::node::{Node, Range};
+use super::node::{Node, Range, RootNode};
 
 pub trait Queryable {
     fn target_language() -> tree_sitter::Language;
     fn query_language() -> tree_sitter::Language;
 
-    fn get_query_nodes<'tree, 'a>(root: &'a Box<Node<'tree>>) -> &'a Vec<Box<Node<'tree>>>;
+    /// `unwrap_root` takes a root of the query tree and returns nodes for matching.
+    fn unwrap_root<'tree, 'a>(root: &'a Box<RootNode<'tree>>) -> &'a Vec<Box<Node<'tree>>>;
 
+    /// `is_skippable` returns whether the given node could be ignored on matching.
     fn is_skippable(_node: &Box<Node>) -> bool {
         false
     }

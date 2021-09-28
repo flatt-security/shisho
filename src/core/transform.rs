@@ -8,7 +8,10 @@ use std::{
     marker::PhantomData,
 };
 
-use super::{node::Node, source::NormalizedSource};
+use super::{
+    node::{Node, RootNode},
+    source::NormalizedSource,
+};
 
 pub struct AutofixItem<T>
 where
@@ -22,13 +25,17 @@ impl<T> AutofixItem<T>
 where
     T: Queryable,
 {
+    pub fn root_node<'p>(&'p self) -> Box<RootNode<'p>> {
+        self.pattern.root_node()
+    }
+
     pub fn to_patched_snippet<'tree>(&self, item: &'tree MatchedItem) -> Result<String> {
         let processor = PatchProcessor {
             autofix: self,
             item,
         };
 
-        let patched_item = T::get_query_nodes(&self.pattern.root_node())
+        let patched_item = T::unwrap_root(&self.root_node())
             .into_iter()
             .filter(|x| !T::is_skippable(x))
             .map(|node| processor.handle_node(node))

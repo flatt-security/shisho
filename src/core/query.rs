@@ -5,7 +5,7 @@ use std::{
     marker::PhantomData,
 };
 
-use super::{node::Node, source::NormalizedSource};
+use super::{node::RootNode, source::NormalizedSource};
 
 pub const SHISHO_NODE_METAVARIABLE_NAME: &str = "shisho_metavariable_name";
 pub const SHISHO_NODE_METAVARIABLE: &str = "shisho_metavariable";
@@ -28,7 +28,7 @@ impl<T> Query<T>
 where
     T: Queryable,
 {
-    pub fn root_node<'p>(&'p self) -> Box<Node<'p>> {
+    pub fn root_node<'p>(&'p self) -> Box<RootNode<'p>> {
         self.pattern.root_node()
     }
 }

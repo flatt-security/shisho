@@ -11,13 +11,16 @@ use crate::core::{
 };
 use anyhow::{anyhow, Result};
 use itertools::Itertools;
-use std::{collections::HashMap, marker::PhantomData};
+use std::{collections::HashMap, convert::TryFrom, marker::PhantomData};
 
-use super::{node::Node, tree::TreeTreverser};
+use super::{
+    node::{Node, RootNode},
+    tree::TreeTreverser,
+};
 
 pub struct QueryMatcher<'tree, 'query, T: Queryable> {
     traverser: TreeTreverser<'tree>,
-    qroot: Box<Node<'query>>,
+    query: Box<RootNode<'query>>,
 
     items: Vec<MatchedItem<'tree>>,
     _marker: PhantomData<T>,
@@ -27,16 +30,53 @@ pub type UnverifiedMetavariable<'tree> = (MetavariableId, CaptureItem<'tree>);
 
 #[derive(Debug, Default, Clone)]
 pub struct MatcherState<'tree> {
-    pub(crate) subtree: Option<ConsecutiveNodes<'tree>>,
-    pub(crate) captures: Vec<UnverifiedMetavariable<'tree>>,
+    subtree: Option<ConsecutiveNodes<'tree>>,
+    captures: Vec<UnverifiedMetavariable<'tree>>,
+}
+
+impl<'tree> From<MatcherState<'tree>> for Option<MatchedItem<'tree>> {
+    fn from(value: MatcherState<'tree>) -> Self {
+        let mut captures = HashMap::<MetavariableId, CaptureItem>::new();
+
+        let captures_per_mid = value.captures.into_iter().group_by(|k| k.0.clone());
+        for (mid, citems) in captures_per_mid.into_iter() {
+            if mid == MetavariableId("_".into()) {
+                continue;
+            }
+            let capture_items = citems.into_iter().map(|x| x.1).collect();
+            if let Some(c) = fold_capture(capture_items) {
+                captures.insert(mid, c);
+            } else {
+                return None;
+            }
+        }
+
+        Some(MatchedItem {
+            area: value.subtree.unwrap(),
+            captures,
+        })
+    }
+}
+
+fn fold_capture<'tree>(capture_items: Vec<CaptureItem<'tree>>) -> Option<CaptureItem<'tree>> {
+    let mut it = capture_items.into_iter();
+    let first = it.next();
+    it.fold(first, |acc, capture| match acc {
+        Some(acc) => {
+            if acc.as_str() == capture.as_str() {
+                Some(capture)
+            } else {
+                None
+            }
+        }
+        None => None,
+    })
 }
 
 impl<'tree, 'query, T: Queryable> QueryMatcher<'tree, 'query, T> {
     pub fn new(view: &'tree TreeView<'tree, T>, query: &'query Query<T>) -> Self {
-        let qroot = query.root_node();
-
         QueryMatcher {
-            qroot,
+            query: query.root_node(),
             traverser: view.traverse(),
             items: vec![],
 
@@ -58,11 +98,7 @@ impl<'tree, 'query, T: Queryable> QueryMatcher<'tree, 'query, T> {
                     let nodes = tsibilings[..tidx.min(tsibilings.len())].to_vec();
                     result.push((
                         MatcherState {
-                            subtree: if nodes.len() > 0 {
-                                Some(ConsecutiveNodes::from(nodes))
-                            } else {
-                                None
-                            },
+                            subtree: ConsecutiveNodes::try_from(nodes).ok(),
                             captures,
                         },
                         t.map(|t| t.clone()),
@@ -128,7 +164,7 @@ impl<'tree, 'query, T: Queryable> QueryMatcher<'tree, 'query, T> {
                     let mid = MetavariableId(self.variable_name_of(&qnode).to_string());
                     let item = CaptureItem::from(vec![tnode]);
                     vec![MatcherState {
-                        subtree: Some(ConsecutiveNodes::from(vec![tnode])),
+                        subtree: ConsecutiveNodes::try_from(vec![tnode]).ok(),
                         captures: vec![(mid, item)],
                     }]
                 }
@@ -155,7 +191,7 @@ impl<'tree, 'query, T: Queryable> QueryMatcher<'tree, 'query, T> {
                         .filter_map(|(submatch, trailling)| {
                             if trailling.is_none() {
                                 Some(MatcherState {
-                                    subtree: Some(ConsecutiveNodes::from(vec![tnode])),
+                                    subtree: ConsecutiveNodes::try_from(vec![tnode]).ok(),
                                     captures: submatch.captures,
                                 })
                             } else {
@@ -178,7 +214,7 @@ impl<'tree, 'query, T: Queryable> QueryMatcher<'tree, 'query, T> {
             match_string_pattern(tnode.utf8_text(), qnode.utf8_text())
                 .into_iter()
                 .map(|captures| MatcherState {
-                    subtree: Some(ConsecutiveNodes::from(vec![tnode])),
+                    subtree: ConsecutiveNodes::try_from(vec![tnode]).ok(),
                     captures,
                 })
                 .collect()
@@ -197,31 +233,13 @@ impl<'tree, 'query, T: Queryable> QueryMatcher<'tree, 'query, T> {
             };
             if tvalue == qvalue {
                 vec![MatcherState {
-                    subtree: Some(ConsecutiveNodes::from(vec![tnode])),
+                    subtree: ConsecutiveNodes::try_from(vec![tnode]).ok(),
                     captures: vec![],
                 }]
             } else {
                 vec![]
             }
         }
-    }
-
-    fn to_verified_capture(
-        &self,
-        capture_items: Vec<CaptureItem<'tree>>,
-    ) -> Option<CaptureItem<'tree>> {
-        let mut it = capture_items.into_iter();
-        let first = it.next();
-        it.fold(first, |acc, capture| match acc {
-            Some(acc) => {
-                if acc.as_str() == capture.as_str() {
-                    Some(capture)
-                } else {
-                    None
-                }
-            }
-            None => None,
-        })
     }
 
     fn variable_name_of(&self, qnode: &Box<Node<'query>>) -> &'query str {
@@ -247,7 +265,7 @@ where
     type Item = MatchedItem<'tree>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let qnodes: Vec<&Box<Node<'query>>> = T::get_query_nodes(&self.qroot)
+        let qnodes: Vec<&Box<Node<'query>>> = T::unwrap_root(&self.query)
             .into_iter()
             .filter(|n| !T::is_skippable(n))
             .collect();
@@ -261,45 +279,22 @@ where
                 let tnodes: Vec<&Box<Node>> = tnode
                     .children
                     .iter()
-                    .filter(|x| !T::is_skippable(x))
+                    .filter(|n| !T::is_skippable(n))
                     .collect();
-                for tsibilings in (0..tnodes.len())
-                    .into_iter()
-                    .map(|i| tnodes[i..].to_vec())
-                    .chain(if depth == 0 {
-                        vec![vec![tnode]].into_iter()
-                    } else {
-                        vec![].into_iter()
-                    })
-                {
-                    let mut items = vec![];
-                    'mitem: for (mitem, _trailling) in
-                        self.match_sibillings(tsibilings, qnodes.clone())
-                    {
-                        let mut captures = HashMap::<MetavariableId, CaptureItem>::new();
-                        for (mid, capture_items) in mitem
-                            .captures
-                            .into_iter()
-                            .group_by(|k| k.0.clone())
-                            .into_iter()
-                        {
-                            if mid == MetavariableId("_".into()) {
-                                continue;
-                            }
-                            let capture_items = capture_items.into_iter().map(|x| x.1).collect();
-                            if let Some(c) = self.to_verified_capture(capture_items) {
-                                captures.insert(mid, c);
-                            } else {
-                                continue 'mitem;
-                            }
-                        }
-
-                        items.push(MatchedItem {
-                            area: mitem.subtree.unwrap(),
-                            captures,
+                let tcandidates =
+                    (0..tnodes.len())
+                        .map(|i| tnodes[i..].to_vec())
+                        .chain(if depth == 0 {
+                            vec![vec![tnode]].into_iter()
+                        } else {
+                            vec![].into_iter()
                         });
-                    }
-
+                for tsibilings in tcandidates {
+                    let items = self
+                        .match_sibillings(tsibilings, qnodes.clone())
+                        .into_iter()
+                        .filter_map(|(mitem, _)| Option::<MatchedItem>::from(mitem))
+                        .collect::<Vec<MatchedItem>>();
                     self.items.extend(items);
                 }
             } else {
@@ -396,8 +391,7 @@ impl<'tree> From<Vec<&'tree Box<Node<'tree>>>> for CaptureItem<'tree> {
         if value.len() == 0 {
             Self::Empty
         } else {
-            // TODO (y0n3uchy): check all capture items are consecutive
-            Self::Nodes(ConsecutiveNodes::from(value))
+            Self::Nodes(ConsecutiveNodes::try_from(value).unwrap())
         }
     }
 }

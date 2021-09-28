@@ -1,4 +1,4 @@
-use crate::core::node::Node;
+use crate::core::node::{Node, RootNode};
 
 use super::Queryable;
 
@@ -14,9 +14,9 @@ impl Queryable for Dockerfile {
         tree_sitter_dockerfile_query::language()
     }
 
-    fn get_query_nodes<'tree, 'a>(root: &'a Box<Node<'tree>>) -> &'a Vec<Box<Node<'tree>>> {
+    fn unwrap_root<'tree, 'a>(root: &'a Box<RootNode<'tree>>) -> &'a Vec<Box<Node<'tree>>> {
         // see `//third_party/tree-sitter-dockerfile-query/grammar.js`
-        &root.children
+        &root.as_node().children
     }
 
     fn is_skippable(node: &Box<Node>) -> bool {

@@ -1,4 +1,4 @@
-use crate::core::node::{Node, Range};
+use crate::core::node::{Node, Range, RootNode};
 
 use super::Queryable;
 
@@ -14,9 +14,10 @@ impl Queryable for HCL {
         tree_sitter_hcl_query::language()
     }
 
-    fn get_query_nodes<'tree, 'a>(root: &'a Box<Node<'tree>>) -> &'a Vec<Box<Node<'tree>>> {
+    fn unwrap_root<'tree, 'a>(root: &'a Box<RootNode<'tree>>) -> &'a Vec<Box<Node<'tree>>> {
         // see `//third_party/tree-sitter-hcl-query/grammar.js`
         &root
+            .as_node()
             .children
             .get(0)
             .expect("failed to load the code; no root element")

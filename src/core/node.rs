@@ -1,3 +1,5 @@
+use std::convert::TryFrom;
+
 use crate::core::language::Queryable;
 use serde::{Deserialize, Serialize};
 
@@ -70,34 +72,57 @@ impl<'tree> Node<'tree> {
     }
 }
 
+pub struct RootNode<'tree>(Node<'tree>);
+
+impl<'tree> RootNode<'tree> {
+    pub fn new(node: Node<'tree>) -> Self {
+        Self(node)
+    }
+
+    pub fn as_node(&self) -> &Node<'tree> {
+        &self.0
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConsecutiveNodes<'tree> {
     inner: Vec<&'tree Box<Node<'tree>>>,
     source: &'tree [u8],
 }
 
-impl<'tree> From<Vec<&'tree Box<Node<'tree>>>> for ConsecutiveNodes<'tree> {
-    fn from(value: Vec<&'tree Box<Node<'tree>>>) -> Self {
+impl<'tree> TryFrom<Vec<&'tree Box<Node<'tree>>>> for ConsecutiveNodes<'tree> {
+    type Error = anyhow::Error;
+    fn try_from(value: Vec<&'tree Box<Node<'tree>>>) -> Result<Self, Self::Error> {
+        // TODO (y0n3uchy): check all capture items are consecutive
         if value.len() == 0 {
-            panic!("internal error; ConsecutiveNodes was generated from empty vec.");
-        }
-        let source = value.get(0).unwrap().source;
-        ConsecutiveNodes {
-            inner: value,
-            source,
+            Err(anyhow::anyhow!(
+                "internal error; ConsecutiveNodes was generated from empty vec."
+            ))
+        } else {
+            let source = value.get(0).unwrap().source;
+            Ok(ConsecutiveNodes {
+                inner: value,
+                source,
+            })
         }
     }
 }
 
-impl<'tree> From<Vec<ConsecutiveNodes<'tree>>> for ConsecutiveNodes<'tree> {
-    fn from(cns: Vec<ConsecutiveNodes<'tree>>) -> Self {
+impl<'tree> TryFrom<Vec<ConsecutiveNodes<'tree>>> for ConsecutiveNodes<'tree> {
+    type Error = anyhow::Error;
+
+    fn try_from(cns: Vec<ConsecutiveNodes<'tree>>) -> Result<Self, Self::Error> {
+        // TODO (y0n3uchy): check all capture items are consecutive
         if cns.len() == 0 {
-            panic!("internal error; ConsecutiveNodes was generated from empty vec.");
-        }
-        let source = cns.get(0).unwrap().source;
-        ConsecutiveNodes {
-            inner: cns.into_iter().map(|cn| cn.inner).flatten().collect(),
-            source,
+            Err(anyhow::anyhow!(
+                "internal error; ConsecutiveNodes was generated from empty vec."
+            ))
+        } else {
+            let source = cns.get(0).unwrap().source;
+            Ok(ConsecutiveNodes {
+                inner: cns.into_iter().map(|cn| cn.inner).flatten().collect(),
+                source,
+            })
         }
     }
 }
