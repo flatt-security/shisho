@@ -1,6 +1,6 @@
 use crate::core::{
-    code::Code, language::Queryable, matcher::MatchedItem, pattern::Pattern, query::MetavariableId,
-    tree::TreeVisitor,
+    language::Queryable, matcher::MatchedItem, pattern::Pattern, query::MetavariableId,
+    source::Code, tree::TreeVisitor,
 };
 use anyhow::{anyhow, Result};
 use std::{
@@ -8,7 +8,7 @@ use std::{
     marker::PhantomData,
 };
 
-use super::{code::NormalizedSource, node::Node};
+use super::{node::Node, source::NormalizedSource};
 
 pub struct AutofixItem<T>
 where
@@ -42,6 +42,33 @@ where
     }
 }
 
+impl<T> TryFrom<&str> for AutofixItem<T>
+where
+    T: Queryable,
+{
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let source = NormalizedSource::from(value);
+        source.try_into()
+    }
+}
+
+impl<T> TryFrom<NormalizedSource> for AutofixItem<T>
+where
+    T: Queryable,
+{
+    type Error = anyhow::Error;
+
+    fn try_from(source: NormalizedSource) -> Result<Self, Self::Error> {
+        let pattern = Pattern::<T>::try_from(source)?;
+        Ok(Self {
+            pattern,
+            _marker: PhantomData,
+        })
+    }
+}
+
 pub struct PatchProcessor<'pattern, T>
 where
     T: Queryable,
@@ -68,7 +95,11 @@ where
         variable_name: &str,
     ) -> Result<Self::Output, anyhow::Error> {
         let id = MetavariableId(variable_name.into());
-        let value = self.item.value_of(&id).unwrap_or_default();
+        let value = self
+            .item
+            .capture_of(&id)
+            .map(|x| x.as_str())
+            .unwrap_or_default();
         // .ok_or(anyhow!("metavariable not found"))?;
         Ok(PatchedItem {
             body: value.into(),
@@ -138,33 +169,6 @@ where
             body,
             start_byte: node.start_byte(),
             end_byte: node.end_byte(),
-        })
-    }
-}
-
-impl<T> TryFrom<&str> for AutofixItem<T>
-where
-    T: Queryable,
-{
-    type Error = anyhow::Error;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let source = NormalizedSource::from(value);
-        source.try_into()
-    }
-}
-
-impl<T> TryFrom<NormalizedSource> for AutofixItem<T>
-where
-    T: Queryable,
-{
-    type Error = anyhow::Error;
-
-    fn try_from(source: NormalizedSource) -> Result<Self, Self::Error> {
-        let pattern = Pattern::<T>::try_from(source)?;
-        Ok(Self {
-            pattern,
-            _marker: PhantomData,
         })
     }
 }

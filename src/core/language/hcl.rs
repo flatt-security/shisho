@@ -73,7 +73,7 @@ mod tests {
     use crate::core::query::MetavariableId;
     use crate::core::transform::Transformable;
     use crate::core::tree::{Tree, TreeView};
-    use crate::core::{code::Code, query::Query};
+    use crate::core::{query::Query, source::Code};
     use std::convert::TryFrom;
 
     use super::*;
@@ -355,7 +355,11 @@ mod tests {
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
-            assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("2"));
+            assert_eq!(
+                c[0].capture_of(&MetavariableId("X".into()))
+                    .map(|x| x.as_str()),
+                Some("2")
+            );
         }
 
         {
@@ -379,7 +383,11 @@ mod tests {
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
-            assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("2, 3, 4"));
+            assert_eq!(
+                c[0].capture_of(&MetavariableId("X".into()))
+                    .map(|x| x.as_str()),
+                Some("2, 3, 4")
+            );
         }
     }
 
@@ -410,11 +418,13 @@ mod tests {
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 2);
             assert_eq!(
-                c[0].value_of(&MetavariableId("X".into())),
+                c[0].capture_of(&MetavariableId("X".into()))
+                    .map(|x| x.as_str()),
                 Some("\"hello1\"")
             );
             assert_eq!(
-                c[1].value_of(&MetavariableId("X".into())),
+                c[1].capture_of(&MetavariableId("X".into()))
+                    .map(|x| x.as_str()),
                 Some("\"hello2\"")
             );
         }
@@ -442,7 +452,8 @@ mod tests {
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
             assert_eq!(
-                c[0].value_of(&MetavariableId("X".into())),
+                c[0].capture_of(&MetavariableId("X".into()))
+                    .map(|x| x.as_str()),
                 Some("2, 3, 4, 5")
             );
         }
@@ -456,8 +467,16 @@ mod tests {
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
-            assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("2"));
-            assert_eq!(c[0].value_of(&MetavariableId("Y".into())), Some("4"));
+            assert_eq!(
+                c[0].capture_of(&MetavariableId("X".into()))
+                    .map(|x| x.as_str()),
+                Some("2")
+            );
+            assert_eq!(
+                c[0].capture_of(&MetavariableId("Y".into()))
+                    .map(|x| x.as_str()),
+                Some("4")
+            );
         }
     }
 
@@ -492,13 +511,19 @@ mod tests {
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
             assert_eq!(
-                c[0].value_of(&MetavariableId("X".into())),
+                c[0].capture_of(&MetavariableId("X".into()))
+                    .map(|x| x.as_str()),
                 Some("key1 = value1")
             );
-            assert_eq!(c[0].value_of(&MetavariableId("Y".into())), Some("value2"));
+            assert_eq!(
+                c[0].capture_of(&MetavariableId("Y".into()))
+                    .map(|x| x.as_str()),
+                Some("value2")
+            );
 
             assert_eq!(
-                c[0].value_of(&MetavariableId("Z".into())),
+                c[0].capture_of(&MetavariableId("Z".into()))
+                    .map(|x| x.as_str()),
                 Some(
                     r#"key3 = value3
                     key4 = value4"#
@@ -529,7 +554,11 @@ mod tests {
                 let session = ptree.matches(&query);
                 let c = session.collect::<Vec<MatchedItem>>();
                 assert_eq!(c.len(), 1);
-                assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("0012"));
+                assert_eq!(
+                    c[0].capture_of(&MetavariableId("X".into()))
+                        .map(|x| x.as_str()),
+                    Some("0012")
+                );
             }
 
             {
@@ -542,8 +571,16 @@ mod tests {
                 let session = ptree.matches(&query);
                 let c = session.collect::<Vec<MatchedItem>>();
                 assert_eq!(c.len(), 1);
-                assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("0012"));
-                assert_eq!(c[0].value_of(&MetavariableId("Y".into())), Some(""));
+                assert_eq!(
+                    c[0].capture_of(&MetavariableId("X".into()))
+                        .map(|x| x.as_str()),
+                    Some("0012")
+                );
+                assert_eq!(
+                    c[0].capture_of(&MetavariableId("Y".into()))
+                        .map(|x| x.as_str()),
+                    Some("")
+                );
             }
         }
     }
@@ -576,8 +613,16 @@ mod tests {
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
-            assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("var.list"));
-            assert_eq!(c[0].value_of(&MetavariableId("Y".into())), Some("s"));
+            assert_eq!(
+                c[0].capture_of(&MetavariableId("X".into()))
+                    .map(|x| x.as_str()),
+                Some("var.list")
+            );
+            assert_eq!(
+                c[0].capture_of(&MetavariableId("Y".into()))
+                    .map(|x| x.as_str()),
+                Some("s")
+            );
         }
         {
             let query = Query::<HCL>::try_from(
@@ -591,8 +636,16 @@ mod tests {
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 2);
-            assert_eq!(c[1].value_of(&MetavariableId("X".into())), Some("var.list"));
-            assert_eq!(c[1].value_of(&MetavariableId("Y".into())), Some("s, ss"));
+            assert_eq!(
+                c[1].capture_of(&MetavariableId("X".into()))
+                    .map(|x| x.as_str()),
+                Some("var.list")
+            );
+            assert_eq!(
+                c[1].capture_of(&MetavariableId("Y".into()))
+                    .map(|x| x.as_str()),
+                Some("s, ss")
+            );
         }
         {
             let query = Query::<HCL>::try_from(
@@ -606,8 +659,16 @@ mod tests {
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
-            assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("var.list"));
-            assert_eq!(c[0].value_of(&MetavariableId("Y".into())), Some("s"));
+            assert_eq!(
+                c[0].capture_of(&MetavariableId("X".into()))
+                    .map(|x| x.as_str()),
+                Some("var.list")
+            );
+            assert_eq!(
+                c[0].capture_of(&MetavariableId("Y".into()))
+                    .map(|x| x.as_str()),
+                Some("s")
+            );
         }
     }
 

@@ -5,7 +5,7 @@ use std::{
     marker::PhantomData,
 };
 
-use super::{code::NormalizedSource, node::Node};
+use super::{node::Node, source::NormalizedSource};
 
 pub const SHISHO_NODE_METAVARIABLE_NAME: &str = "shisho_metavariable_name";
 pub const SHISHO_NODE_METAVARIABLE: &str = "shisho_metavariable";

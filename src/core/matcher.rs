@@ -11,18 +11,16 @@ use crate::core::{
 };
 use anyhow::{anyhow, Result};
 use itertools::Itertools;
-use std::collections::HashMap;
+use std::{collections::HashMap, marker::PhantomData};
 
-use super::node::Node;
+use super::{node::Node, tree::TreeTreverser};
 
-pub struct QueryMatcher<'tree, 'query, T>
-where
-    T: Queryable,
-{
+pub struct QueryMatcher<'tree, 'query, T: Queryable> {
+    traverser: TreeTreverser<'tree>,
+    qroot: Box<Node<'query>>,
+
     items: Vec<MatchedItem<'tree>>,
-
-    view: &'tree TreeView<'tree, T>,
-    query: &'query Query<T>,
+    _marker: PhantomData<T>,
 }
 
 pub type UnverifiedMetavariable<'tree> = (MetavariableId, CaptureItem<'tree>);
@@ -33,21 +31,17 @@ pub struct MatcherState<'tree> {
     pub(crate) captures: Vec<UnverifiedMetavariable<'tree>>,
 }
 
-impl<'tree, 'query, T> QueryMatcher<'tree, 'query, T>
-where
-    T: Queryable,
-{
+impl<'tree, 'query, T: Queryable> QueryMatcher<'tree, 'query, T> {
     pub fn new(view: &'tree TreeView<'tree, T>, query: &'query Query<T>) -> Self {
+        let qroot = query.root_node();
+
         QueryMatcher {
-            query,
-            view,
-
+            qroot,
+            traverser: view.traverse(),
             items: vec![],
-        }
-    }
 
-    fn yield_next_sibilings(&self) -> Option<Vec<&'tree Box<Node<'tree>>>> {
-        todo!()
+            _marker: PhantomData,
+        }
     }
 
     fn match_sibillings(
@@ -220,7 +214,7 @@ where
         let first = it.next();
         it.fold(first, |acc, capture| match acc {
             Some(acc) => {
-                if self.is_equivalent_capture(&acc, &capture) {
+                if acc.as_str() == capture.as_str() {
                     Some(capture)
                 } else {
                     None
@@ -228,10 +222,6 @@ where
             }
             None => None,
         })
-    }
-
-    fn is_equivalent_capture(&self, a: &CaptureItem<'tree>, b: &CaptureItem<'tree>) -> bool {
-        a.as_str() == b.as_str()
     }
 
     fn variable_name_of(&self, qnode: &Box<Node<'query>>) -> &'query str {
@@ -257,22 +247,31 @@ where
     type Item = MatchedItem<'tree>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let qroot = self.query.root_node();
-        let qnodes: Vec<&Box<Node<'query>>> = T::get_query_nodes(&qroot)
+        let qnodes: Vec<&Box<Node<'query>>> = T::get_query_nodes(&self.qroot)
             .into_iter()
             .filter(|n| !T::is_skippable(n))
             .collect();
+
         loop {
             if let Some(mitem) = self.items.pop() {
                 return Some(mitem);
             }
 
-            if let Some(tnodes) = self.yield_next_sibilings() {
-                let tnodes: Vec<&Box<Node>> =
-                    tnodes.into_iter().filter(|x| !T::is_skippable(x)).collect();
-                for i in 0..tnodes.len() {
-                    let tsibilings = tnodes[i..].to_vec();
-
+            if let Some((depth, tnode)) = self.traverser.next() {
+                let tnodes: Vec<&Box<Node>> = tnode
+                    .children
+                    .iter()
+                    .filter(|x| !T::is_skippable(x))
+                    .collect();
+                for tsibilings in (0..tnodes.len())
+                    .into_iter()
+                    .map(|i| tnodes[i..].to_vec())
+                    .chain(if depth == 0 {
+                        vec![vec![tnode]].into_iter()
+                    } else {
+                        vec![].into_iter()
+                    })
+                {
                     let mut items = vec![];
                     'mitem: for (mitem, _trailling) in
                         self.match_sibillings(tsibilings, qnodes.clone())
@@ -296,7 +295,6 @@ where
                         }
 
                         items.push(MatchedItem {
-                            source: self.view.source,
                             area: mitem.subtree.unwrap(),
                             captures,
                         });
@@ -313,22 +311,11 @@ where
 
 #[derive(Debug)]
 pub struct MatchedItem<'tree> {
-    pub source: &'tree [u8],
     pub area: ConsecutiveNodes<'tree>,
     pub captures: HashMap<MetavariableId, CaptureItem<'tree>>,
 }
 
 impl<'tree> MatchedItem<'tree> {
-    pub fn value_of(&'tree self, id: &MetavariableId) -> Option<&'tree str> {
-        let capture = self.captures.get(&id)?;
-
-        match capture {
-            CaptureItem::Empty => None,
-            CaptureItem::Literal(s) => Some(s.as_str()),
-            CaptureItem::Nodes(n) => Some(n.utf8_text().unwrap()),
-        }
-    }
-
     pub fn capture_of(&self, id: &MetavariableId) -> Option<&CaptureItem> {
         self.captures.get(&id)
     }
@@ -356,7 +343,7 @@ impl<'tree> MatchedItem<'tree> {
                         "match-query predicate for string literals is not supported"
                     )),
                     CaptureItem::Nodes(n) => Ok(n.as_vec().into_iter().any(|node| {
-                        let ptree = TreeView::<T>::new((*node).clone(), self.source);
+                        let ptree = TreeView::<T>::from((*node).clone());
                         let matches = ptree.matches(q).collect::<Vec<MatchedItem>>();
                         matches.len() > 0
                     })),
@@ -370,16 +357,18 @@ impl<'tree> MatchedItem<'tree> {
                         "match-query predicate for string literals is not supported"
                     )),
                     CaptureItem::Nodes(n) => Ok(n.as_vec().into_iter().all(|node| {
-                        let ptree = TreeView::<T>::new((*node).clone(), self.source);
+                        let ptree = TreeView::<T>::from((*node).clone());
                         let matches = ptree.matches(q).collect::<Vec<MatchedItem>>();
                         matches.len() == 0
                     })),
                 }
             }
 
-            Predicate::MatchRegex(r) => Ok(r.is_match(self.value_of(&constraint.target).unwrap())),
+            Predicate::MatchRegex(r) => {
+                Ok(r.is_match(self.capture_of(&constraint.target).unwrap().as_str()))
+            }
             Predicate::NotMatchRegex(r) => {
-                Ok(!r.is_match(self.value_of(&constraint.target).unwrap()))
+                Ok(!r.is_match(self.capture_of(&constraint.target).unwrap().as_str()))
             }
         }
     }

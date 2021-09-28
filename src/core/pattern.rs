@@ -1,6 +1,9 @@
-use super::{code::NormalizedSource, language::Queryable, node::Node};
+use super::{language::Queryable, node::Node, source::NormalizedSource};
 use anyhow::{anyhow, Result};
-use std::{convert::TryFrom, marker::PhantomData};
+use std::{
+    convert::{TryFrom, TryInto},
+    marker::PhantomData,
+};
 
 #[derive(Debug)]
 pub struct Pattern<T>
@@ -11,6 +14,19 @@ where
 
     tstree: tree_sitter::Tree,
     _marker: PhantomData<T>,
+}
+
+impl<T> Pattern<T>
+where
+    T: Queryable,
+{
+    pub fn root_node<'p>(&'p self) -> Box<Node<'p>> {
+        Node::from_tsnode(self.tstree.root_node(), &self.source)
+    }
+
+    pub fn string_between(&self, start: usize, end: usize) -> Result<String> {
+        Ok(String::from_utf8(self.source[start..end].to_vec())?)
+    }
 }
 
 impl<T> TryFrom<NormalizedSource> for Pattern<T>
@@ -35,15 +51,15 @@ where
         })
     }
 }
-impl<T> Pattern<T>
+
+impl<T> TryFrom<&str> for Pattern<T>
 where
     T: Queryable,
 {
-    pub fn root_node<'p>(&'p self) -> Box<Node<'p>> {
-        Node::from_tsnode(self.tstree.root_node(), &self.source)
-    }
+    type Error = anyhow::Error;
 
-    pub fn string_between(&self, start: usize, end: usize) -> Result<String> {
-        Ok(String::from_utf8(self.source[start..end].to_vec())?)
+    fn try_from(source: &str) -> Result<Self, anyhow::Error> {
+        let source = NormalizedSource::from(source);
+        source.try_into()
     }
 }

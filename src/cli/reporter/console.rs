@@ -1,6 +1,6 @@
 use super::Reporter;
 use crate::core::{
-    code::Code, language::Queryable, matcher::MatchedItem, node::Range, ruleset::Rule,
+    language::Queryable, matcher::MatchedItem, node::Range, ruleset::Rule, source::Code,
     target::Target, transform::Transformable,
 };
 use ansi_term::{Color, Style};

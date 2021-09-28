@@ -8,11 +8,12 @@ use crate::core::{
 };
 use anyhow::{anyhow, Result};
 use std::{
+    collections::VecDeque,
     convert::{TryFrom, TryInto},
     marker::PhantomData,
 };
 
-use super::{code::NormalizedSource, node::Node};
+use super::{node::Node, source::NormalizedSource};
 
 pub struct Tree<'tree, T> {
     pub source: Vec<u8>,
@@ -93,6 +94,10 @@ where
         'tree: 'query,
     {
         QueryMatcher::new(self, query).into_iter()
+    }
+
+    pub fn traverse(&'tree self) -> TreeTreverser<'tree> {
+        TreeTreverser::new(&self.root)
     }
 }
 
@@ -200,5 +205,34 @@ where
 
     fn children_of(&self, node: &Box<Node>) -> usize {
         node.children.len()
+    }
+}
+
+pub struct TreeTreverser<'a> {
+    queue: VecDeque<(usize, &'a Box<Node<'a>>)>,
+}
+
+impl<'a> TreeTreverser<'a> {
+    #[inline]
+    pub fn new(root: &'a Box<Node<'a>>) -> Self {
+        Self {
+            queue: VecDeque::from(vec![(0, root)]),
+        }
+    }
+}
+
+impl<'a> Iterator for TreeTreverser<'a> {
+    type Item = (usize, &'a Box<Node<'a>>);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some((depth, node)) = self.queue.pop_front() {
+            let children = node.children.iter();
+            self.queue.extend(children.map(|child| (depth + 1, child)));
+
+            Some((depth, node))
+        } else {
+            None
+        }
     }
 }

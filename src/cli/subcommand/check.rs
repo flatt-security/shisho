@@ -3,7 +3,7 @@
 use crate::cli::encoding::{parse_encoding, LABELS_SORTED};
 use crate::cli::reporter::{ConsoleReporter, JSONReporter, Reporter, ReporterType, SARIFReporter};
 use crate::cli::{CommonOpts, ReportOpts};
-use crate::core::code::NormalizedSource;
+use crate::core::source::NormalizedSource;
 use crate::core::tree::TreeView;
 use crate::core::{
     language::{Dockerfile, Go, Queryable, HCL},
