@@ -1,6 +1,6 @@
 use super::Reporter;
 use crate::core::{
-    code::Code, language::Queryable, matcher::MatchedItem, node::Range, ruleset::Rule,
+    language::Queryable, matcher::MatchedItem, node::Range, ruleset::Rule, source::Code,
     target::Target, transform::Transformable,
 };
 use anyhow::Result;
@@ -49,14 +49,14 @@ impl<'a, W: std::io::Write> Reporter<'a> for JSONReporter<'a, W> {
                 id: rule.id.clone(),
                 location: Location {
                     file: target.relative_path(),
-                    range: mitem.area.range::<T>(target.body.as_ref()),
+                    range: mitem.area.range::<T>(),
                 },
                 rewrite: vec![],
             };
 
             for rewrite in rule.get_rewrite_options()? {
                 let old_code: Code<T> = target.body.clone().into();
-                let new_code = old_code.transform(&mitem, rewrite)?;
+                let new_code = old_code.transform(&mitem, rewrite.as_str())?;
 
                 let diff = TextDiff::from_lines(target.body.as_str(), new_code.as_str())
                     .unified_diff()

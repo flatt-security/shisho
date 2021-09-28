@@ -29,8 +29,6 @@ where
     NotMatchRegex(Regex),
 }
 
-impl<T> Constraint<T> where T: Queryable {}
-
 impl<T> TryFrom<RawConstraint> for Constraint<T>
 where
     T: Queryable,

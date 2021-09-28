@@ -88,14 +88,8 @@ impl<'a, W: std::io::Write> Reporter<'a> for SARIFReporter<'a, W> {
                             )
                             .region(
                                 sarif::RegionBuilder::default()
-                                    .start_line(
-                                        mitem.area.range::<T>(target.body.as_ref()).start.row
-                                            as i64,
-                                    )
-                                    .start_column(
-                                        mitem.area.range::<T>(target.body.as_ref()).start.column
-                                            as i64,
-                                    )
+                                    .start_line(mitem.area.range::<T>().start.row as i64)
+                                    .start_column(mitem.area.range::<T>().start.column as i64)
                                     .build()?,
                             )
                             .build()?,

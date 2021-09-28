@@ -1,3 +1,5 @@
+use crate::core::node::{Node, RootNode};
+
 use super::Queryable;
 
 #[derive(Debug, Clone)]
@@ -12,27 +14,24 @@ impl Queryable for Go {
         tree_sitter_go_query::language()
     }
 
-    fn get_query_nodes<'tree>(root: &'tree tree_sitter::Tree) -> Vec<tree_sitter::Node<'tree>> {
+    fn unwrap_root<'tree, 'a>(root: &'a RootNode<'tree>) -> &'a Vec<Node<'tree>> {
         // see `//third_party/tree-sitter-go-query/grammar.js`
-        let source_file = root.root_node();
-
-        let mut cursor = source_file.walk();
-        source_file.children(&mut cursor).collect()
+        &root.as_node().children
     }
 
-    fn is_skippable(node: &tree_sitter::Node) -> bool {
+    fn is_skippable(node: &Node) -> bool {
         node.kind() == "\n"
     }
 
-    fn is_leaf_like(node: &tree_sitter::Node) -> bool {
+    fn is_leaf_like(node: &Node) -> bool {
         Self::is_string_literal(node)
     }
 
-    fn is_string_literal(node: &tree_sitter::Node) -> bool {
-        match node.kind() {
-            "interpreted_string_literal" | "raw_string_literal" => true,
-            _ => false,
-        }
+    fn is_string_literal(node: &Node) -> bool {
+        matches!(
+            node.kind(),
+            "interpreted_string_literal" | "raw_string_literal"
+        )
     }
 }
 
@@ -40,9 +39,10 @@ impl Queryable for Go {
 mod tests {
     use crate::core::matcher::MatchedItem;
     use crate::core::transform::Transformable;
+    use crate::core::tree::TreeView;
     use crate::core::{
-        code::Code,
         query::{MetavariableId, Query},
+        source::Code,
         tree::Tree,
     };
     use std::convert::TryFrom;
@@ -57,7 +57,7 @@ mod tests {
             let tree =
                 Tree::<Go>::try_from(r#"for _, x := range iter { fmt.Printf("%s", x) }"#).unwrap();
 
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 1);
         }
@@ -69,7 +69,7 @@ mod tests {
             let tree =
                 Tree::<Go>::try_from(r#"for _, x := range iter { fmt.Printf("%s", x) }"#).unwrap();
 
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 1);
         }
@@ -99,7 +99,7 @@ mod tests {
             )
             .unwrap();
 
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 1);
         }
@@ -123,7 +123,7 @@ mod tests {
             )
             .unwrap();
 
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 1);
         }
@@ -134,35 +134,47 @@ mod tests {
         {
             let query = Query::<Go>::try_from(r#"fmt.Printf("%s%d", :[X], 2)"#).unwrap();
             let tree = Tree::<Go>::try_from(r#"fmt.Printf("%s%d", "test", 2)"#).unwrap();
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
 
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
-            assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("\"test\""));
+            assert_eq!(
+                c[0].capture_of(&MetavariableId("X".into()))
+                    .map(|x| x.as_str()),
+                Some("\"test\"")
+            );
         }
         {
             let query = Query::<Go>::try_from(r#"f("%s%d", :[...X])"#).unwrap();
             {
                 let tree = Tree::<Go>::try_from(r#"f("%s%d", 1, 2)"#).unwrap();
-                let ptree = tree.to_partial();
+                let ptree = TreeView::from(&tree);
                 let session = ptree.matches(&query);
 
                 let c = session.collect::<Vec<MatchedItem>>();
                 assert_eq!(c.len(), 1);
-                assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("1, 2"));
+                assert_eq!(
+                    c[0].capture_of(&MetavariableId("X".into()))
+                        .map(|x| x.as_str()),
+                    Some("1, 2")
+                );
             }
         }
 
         {
             let query = Query::<Go>::try_from(r#"f("%s%d", :[...X], 3)"#).unwrap();
             let tree = Tree::<Go>::try_from(r#"f("%s%d", 1, 2, 3)"#).unwrap();
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
 
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
-            assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("1, 2"));
+            assert_eq!(
+                c[0].capture_of(&MetavariableId("X".into()))
+                    .map(|x| x.as_str()),
+                Some("1, 2")
+            );
         }
     }
 
@@ -170,14 +182,18 @@ mod tests {
     fn test_object_call_expression() {
         {
             let tree = Tree::<Go>::try_from(r#"fmt.Printf("%s%d", "test", 2)"#).unwrap();
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
             {
                 let query = Query::<Go>::try_from(r#":[X].Printf("%s%d", :[...])"#).unwrap();
                 let session = ptree.matches(&query);
 
                 let c = session.collect::<Vec<MatchedItem>>();
                 assert_eq!(c.len(), 1);
-                assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("fmt"));
+                assert_eq!(
+                    c[0].capture_of(&MetavariableId("X".into()))
+                        .map(|x| x.as_str()),
+                    Some("fmt")
+                );
             }
 
             {
@@ -187,7 +203,8 @@ mod tests {
                 let c = session.collect::<Vec<MatchedItem>>();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
-                    c[0].value_of(&MetavariableId("X".into())),
+                    c[0].capture_of(&MetavariableId("X".into()))
+                        .map(|x| x.as_str()),
                     Some("fmt.Printf")
                 );
             }
@@ -202,7 +219,7 @@ mod tests {
                 r#"func (r *Receiver) f(a int, b string, c int) int { return 1 }"#,
             )
             .unwrap();
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
             {
                 let query = Query::<Go>::try_from(
                     r#"func (:[X] *Receiver) f(a int, b string, c int) int { return 1 }"#,
@@ -212,7 +229,11 @@ mod tests {
 
                 let c = session.collect::<Vec<MatchedItem>>();
                 assert_eq!(c.len(), 1);
-                assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("r"));
+                assert_eq!(
+                    c[0].capture_of(&MetavariableId("X".into()))
+                        .map(|x| x.as_str()),
+                    Some("r")
+                );
             }
             {
                 let query =
@@ -223,7 +244,8 @@ mod tests {
                 let c = session.collect::<Vec<MatchedItem>>();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
-                    c[0].value_of(&MetavariableId("X".into())),
+                    c[0].capture_of(&MetavariableId("X".into()))
+                        .map(|x| x.as_str()),
                     Some("a int, b string, c int")
                 );
             }
@@ -236,7 +258,11 @@ mod tests {
 
                 let c = session.collect::<Vec<MatchedItem>>();
                 assert_eq!(c.len(), 1);
-                assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("b string"));
+                assert_eq!(
+                    c[0].capture_of(&MetavariableId("X".into()))
+                        .map(|x| x.as_str()),
+                    Some("b string")
+                );
             }
         }
     }
@@ -245,15 +271,23 @@ mod tests {
     fn test_array() {
         {
             let tree = Tree::<Go>::try_from(r#"[]int {1, 2, 3, 4, 5}"#).unwrap();
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
             {
                 let query = Query::<Go>::try_from(r#"[] :[X] {1, 2, :[Y], 4, 5}"#).unwrap();
                 let session = ptree.matches(&query);
 
                 let c = session.collect::<Vec<MatchedItem>>();
                 assert_eq!(c.len(), 1);
-                assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("int"));
-                assert_eq!(c[0].value_of(&MetavariableId("Y".into())), Some("3"));
+                assert_eq!(
+                    c[0].capture_of(&MetavariableId("X".into()))
+                        .map(|x| x.as_str()),
+                    Some("int")
+                );
+                assert_eq!(
+                    c[0].capture_of(&MetavariableId("Y".into()))
+                        .map(|x| x.as_str()),
+                    Some("3")
+                );
             }
             {
                 let query = Query::<Go>::try_from(r#"[] int {1, 2, :[...Y], 5}"#).unwrap();
@@ -261,7 +295,11 @@ mod tests {
 
                 let c = session.collect::<Vec<MatchedItem>>();
                 assert_eq!(c.len(), 1);
-                assert_eq!(c[0].value_of(&MetavariableId("Y".into())), Some("3, 4"));
+                assert_eq!(
+                    c[0].capture_of(&MetavariableId("Y".into()))
+                        .map(|x| x.as_str()),
+                    Some("3, 4")
+                );
             }
         }
     }
@@ -270,23 +308,31 @@ mod tests {
     fn test_string() {
         {
             let tree = Tree::<Go>::try_from(r#"a := "xoxp-test""#).unwrap();
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
             let query = Query::<Go>::try_from(r#""xoxp-:[X]""#).unwrap();
             let session = ptree.matches(&query);
 
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
-            assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("test"));
+            assert_eq!(
+                c[0].capture_of(&MetavariableId("X".into()))
+                    .map(|x| x.as_str()),
+                Some("test")
+            );
         }
         {
             let tree = Tree::<Go>::try_from(r#"a := `xoxp-test`"#).unwrap();
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
             let query = Query::<Go>::try_from(r#"`xoxp-:[X]`"#).unwrap();
             let session = ptree.matches(&query);
 
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
-            assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("test"));
+            assert_eq!(
+                c[0].capture_of(&MetavariableId("X".into()))
+                    .map(|x| x.as_str()),
+                Some("test")
+            );
         }
     }
 
@@ -295,7 +341,7 @@ mod tests {
         {
             {
                 let tree = Tree::<Go>::try_from(r#"if true == false { a := 2; b := 3 }"#).unwrap();
-                let ptree = tree.to_partial();
+                let ptree = TreeView::from(&tree);
 
                 let query = Query::<Go>::try_from(r#"if :[X] { :[...Y] }"#).unwrap();
                 let session = ptree.matches(&query);
@@ -303,11 +349,13 @@ mod tests {
                 let c = session.collect::<Vec<MatchedItem>>();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
-                    c[0].value_of(&MetavariableId("X".into())),
+                    c[0].capture_of(&MetavariableId("X".into()))
+                        .map(|x| x.as_str()),
                     Some("true == false")
                 );
                 assert_eq!(
-                    c[0].value_of(&MetavariableId("Y".into())),
+                    c[0].capture_of(&MetavariableId("Y".into()))
+                        .map(|x| x.as_str()),
                     Some("a := 2; b := 3")
                 );
             }
@@ -316,7 +364,7 @@ mod tests {
         {
             let tree =
                 Tree::<Go>::try_from(r#"if err := nil; true == false { a := 2; b := 3 }"#).unwrap();
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
 
             let query = Query::<Go>::try_from(r#"if :[X]; :[Y] { :[...Z] }"#).unwrap();
             let session = ptree.matches(&query);
@@ -324,15 +372,18 @@ mod tests {
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
             assert_eq!(
-                c[0].value_of(&MetavariableId("X".into())),
+                c[0].capture_of(&MetavariableId("X".into()))
+                    .map(|x| x.as_str()),
                 Some("err := nil")
             );
             assert_eq!(
-                c[0].value_of(&MetavariableId("Y".into())),
+                c[0].capture_of(&MetavariableId("Y".into()))
+                    .map(|x| x.as_str()),
                 Some("true == false")
             );
             assert_eq!(
-                c[0].value_of(&MetavariableId("Z".into())),
+                c[0].capture_of(&MetavariableId("Z".into()))
+                    .map(|x| x.as_str()),
                 Some("a := 2; b := 3")
             );
         }
@@ -342,7 +393,7 @@ mod tests {
                 r#"if err := nil; true == false { a := 2; b := 3 } else { c := 4 }"#,
             )
             .unwrap();
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
             let query = Query::<Go>::try_from(r#"if :[X] { :[...] }"#).unwrap();
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
@@ -356,7 +407,7 @@ mod tests {
 
         let tree_base = code.clone();
         let tree = Tree::<Go>::try_from(tree_base.as_str()).unwrap();
-        let ptree = tree.to_partial();
+        let ptree = TreeView::from(&tree);
 
         let query = Query::<Go>::try_from(r#":[X] || :[X]"#).unwrap();
 

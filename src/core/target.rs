@@ -60,19 +60,6 @@ impl Target {
         }
     }
 
-    pub fn iter_from(
-        p: PathBuf,
-        encoding: Option<&'static Encoding>,
-    ) -> impl Iterator<Item = Self> {
-        WalkDir::new(p)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .map(|e| e.into_path())
-            .filter(|p| p.is_file())
-            .map(move |p| Target::from(Some(p), encoding.clone()))
-            .filter_map(|e| e.ok())
-    }
-
     pub fn is_file(&self) -> bool {
         self.path.is_some()
     }
@@ -91,5 +78,20 @@ impl Target {
             Some("Dockerfile") => Some(Language::Dockerfile),
             _ => None,
         }
+    }
+}
+
+impl Target {
+    pub fn iter_from(
+        p: PathBuf,
+        encoding: Option<&'static Encoding>,
+    ) -> impl Iterator<Item = Self> {
+        WalkDir::new(p)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .map(|e| e.into_path())
+            .filter(|p| p.is_file())
+            .map(move |p| Target::from(Some(p), encoding))
+            .filter_map(|e| e.ok())
     }
 }

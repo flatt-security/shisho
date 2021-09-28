@@ -1,6 +1,6 @@
 use super::Reporter;
 use crate::core::{
-    code::Code, language::Queryable, matcher::MatchedItem, node::Range, ruleset::Rule,
+    language::Queryable, matcher::MatchedItem, node::Range, ruleset::Rule, source::Code,
     target::Target, transform::Transformable,
 };
 use ansi_term::{Color, Style};
@@ -22,7 +22,7 @@ impl<'a, W: std::io::Write> Reporter<'a> for ConsoleReporter<'a, W> {
         target: &Target,
         items: Vec<(&Rule, MatchedItem)>,
     ) -> Result<()> {
-        let lines = target.body.split("\n").collect::<Vec<&str>>();
+        let lines = target.body.split('\n').collect::<Vec<&str>>();
 
         for (rule, mitem) in items {
             // print metadata of the matched items
@@ -36,7 +36,7 @@ impl<'a, W: std::io::Write> Reporter<'a> for ConsoleReporter<'a, W> {
             // print a finding
             writeln!(self.writer, "In {}:", target.canonicalized_path())?;
             writeln!(self.writer, "{:>8} |", "")?;
-            let Range { start: s, end: e } = mitem.area.range::<T>(target.body.as_ref());
+            let Range { start: s, end: e } = mitem.area.range::<T>();
 
             for line_index in (s.row)..=(e.row) {
                 if line_index > lines.len() || (line_index == e.row && e.column == 0) {
@@ -87,7 +87,7 @@ impl<'a, W: std::io::Write> Reporter<'a> for ConsoleReporter<'a, W> {
                 }
                 writeln!(self.writer, "Suggested changes ({}):", idx + 1)?;
                 let old_code: Code<T> = target.body.clone().into();
-                let new_code = old_code.transform(&mitem, rewrite)?;
+                let new_code = old_code.transform(&mitem, rewrite.as_str())?;
 
                 let diff = TextDiff::from_lines(target.body.as_str(), new_code.as_str());
                 for (group_idx, group) in diff.grouped_ops(1).iter().enumerate() {
@@ -131,9 +131,9 @@ impl<'a, W: std::io::Write> Reporter<'a> for ConsoleReporter<'a, W> {
                             )?;
                             for (emphasized, value) in change.iter_strings_lossy() {
                                 if emphasized {
-                                    write!(self.writer, "{}", s.clone().underline().paint(value))?;
+                                    write!(self.writer, "{}", s.underline().paint(value))?;
                                 } else {
-                                    write!(self.writer, "{}", s.clone().paint(value))?;
+                                    write!(self.writer, "{}", s.paint(value))?;
                                 }
                             }
                             if change.missing_newline() {
@@ -145,7 +145,7 @@ impl<'a, W: std::io::Write> Reporter<'a> for ConsoleReporter<'a, W> {
             }
 
             // print a separator between matched items
-            writeln!(self.writer, "")?;
+            writeln!(self.writer)?;
         }
 
         Ok(())

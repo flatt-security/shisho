@@ -1,4 +1,4 @@
-use crate::core::node::Range;
+use crate::core::node::{Node, Range, RootNode};
 
 use super::Queryable;
 
@@ -14,57 +14,43 @@ impl Queryable for HCL {
         tree_sitter_hcl_query::language()
     }
 
-    fn get_query_nodes<'tree>(root: &'tree tree_sitter::Tree) -> Vec<tree_sitter::Node<'tree>> {
-        // TODO (y0n3uchy): this should be done more strictly.
-
+    fn unwrap_root<'tree, 'a>(root: &'a RootNode<'tree>) -> &'a Vec<Node<'tree>> {
         // see `//third_party/tree-sitter-hcl-query/grammar.js`
-        let source_file = root.root_node();
-        let body = source_file
-            .child(0)
-            .expect("failed to load the code; no root element");
-
-        let mut cursor = source_file.walk();
-        body.children(&mut cursor).collect()
+        &root
+            .as_node()
+            .children
+            .get(0)
+            .expect("failed to load the code; no root element")
+            .children
     }
 
-    fn is_leaf_like(node: &tree_sitter::Node) -> bool {
+    fn is_leaf_like(node: &Node) -> bool {
         Self::is_string_literal(node)
     }
 
-    fn is_string_literal(node: &tree_sitter::Node) -> bool {
-        match node.kind() {
-            "string_literal" | "quoted_template" => true,
-            _ => false,
-        }
+    fn is_string_literal(node: &Node) -> bool {
+        matches!(node.kind(), "string_literal" | "quoted_template")
     }
 
-    fn is_skippable(node: &tree_sitter::Node) -> bool {
+    fn is_skippable(node: &Node) -> bool {
         node.kind() == "\n"
     }
 
-    fn range(node: &tree_sitter::Node, source: &[u8]) -> Range {
+    fn range(node: &Node) -> Range {
         match node.kind() {
             "attribute" => {
-                let bracket = node
-                    .children(&mut node.walk())
-                    .skip(node.child_count() - 2)
-                    .next()
-                    .unwrap();
-                let start = Self::default_range(node, source).start;
-                let end = Self::range(&bracket, source).end;
+                let bracket = node.children.get(node.children.len() - 2).unwrap();
+                let start = Self::default_range(node).start;
+                let end = Self::range(bracket).end;
                 Range { start, end }
             }
             "block" => {
-                let bracket = node
-                    .children(&mut node.walk())
-                    .skip(node.child_count() - 2)
-                    .next()
-                    .unwrap();
-                let start = Self::default_range(node, source).start;
-                let end = Self::range(&bracket, source).end;
+                let bracket = node.children.get(node.children.len() - 2).unwrap();
+                let start = Self::default_range(node).start;
+                let end = Self::range(bracket).end;
                 Range { start, end }
             }
-            _ => Self::default_range(node, source),
+            _ => Self::default_range(node),
         }
     }
 }
@@ -74,8 +60,8 @@ mod tests {
     use crate::core::matcher::MatchedItem;
     use crate::core::query::MetavariableId;
     use crate::core::transform::Transformable;
-    use crate::core::tree::Tree;
-    use crate::core::{code::Code, query::Query};
+    use crate::core::tree::{Tree, TreeView};
+    use crate::core::{query::Query, source::Code};
     use std::convert::TryFrom;
 
     use super::*;
@@ -86,7 +72,7 @@ mod tests {
             let query = Query::<HCL>::try_from(r#"encrypted = true"#).unwrap();
             let tree = Tree::<HCL>::try_from(r#"encrypted = true"#).unwrap();
 
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 1);
         }
@@ -96,7 +82,7 @@ mod tests {
             let tree =
                 Tree::<HCL>::try_from(r#"resource "rtype" "rname" { attr = "value" }"#).unwrap();
 
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 1);
         }
@@ -107,7 +93,7 @@ mod tests {
             let tree =
                 Tree::<HCL>::try_from(r#"resource "rtype" "rname" { attr = "value" }"#).unwrap();
 
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 1);
         }
@@ -129,7 +115,7 @@ mod tests {
             )
             .unwrap();
 
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             let result = session.collect::<Vec<MatchedItem>>();
             assert_eq!(result.len(), 1);
@@ -154,7 +140,7 @@ mod tests {
             )
             .unwrap();
 
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 2);
         }
@@ -190,7 +176,7 @@ mod tests {
             "#,
             )
             .unwrap();
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
 
             let query = Query::<HCL>::try_from(
                 r#"
@@ -223,7 +209,7 @@ mod tests {
             )
             .unwrap();
 
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 1);
         }
@@ -268,7 +254,7 @@ mod tests {
             )
             .unwrap();
 
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             assert_eq!(session.collect::<Vec<MatchedItem>>().len(), 3);
         }
@@ -304,7 +290,7 @@ mod tests {
             "#,
             )
             .unwrap();
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
 
             {
                 let query = Query::<HCL>::try_from(
@@ -353,11 +339,15 @@ mod tests {
             )
             .unwrap();
 
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
-            assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("2"));
+            assert_eq!(
+                c[0].capture_of(&MetavariableId("X".into()))
+                    .map(|x| x.as_str()),
+                Some("2")
+            );
         }
 
         {
@@ -377,11 +367,15 @@ mod tests {
             )
             .unwrap();
 
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
-            assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("2, 3, 4"));
+            assert_eq!(
+                c[0].capture_of(&MetavariableId("X".into()))
+                    .map(|x| x.as_str()),
+                Some("2, 3, 4")
+            );
         }
     }
 
@@ -407,16 +401,18 @@ mod tests {
             )
             .unwrap();
 
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 2);
             assert_eq!(
-                c[0].value_of(&MetavariableId("X".into())),
+                c[0].capture_of(&MetavariableId("X".into()))
+                    .map(|x| x.as_str()),
                 Some("\"hello1\"")
             );
             assert_eq!(
-                c[1].value_of(&MetavariableId("X".into())),
+                c[1].capture_of(&MetavariableId("X".into()))
+                    .map(|x| x.as_str()),
                 Some("\"hello2\"")
             );
         }
@@ -432,7 +428,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        let ptree = tree.to_partial();
+        let ptree = TreeView::from(&tree);
         {
             let query = Query::<HCL>::try_from(
                 r#"
@@ -444,7 +440,8 @@ mod tests {
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
             assert_eq!(
-                c[0].value_of(&MetavariableId("X".into())),
+                c[0].capture_of(&MetavariableId("X".into()))
+                    .map(|x| x.as_str()),
                 Some("2, 3, 4, 5")
             );
         }
@@ -458,8 +455,16 @@ mod tests {
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
-            assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("2"));
-            assert_eq!(c[0].value_of(&MetavariableId("Y".into())), Some("4"));
+            assert_eq!(
+                c[0].capture_of(&MetavariableId("X".into()))
+                    .map(|x| x.as_str()),
+                Some("2")
+            );
+            assert_eq!(
+                c[0].capture_of(&MetavariableId("Y".into()))
+                    .map(|x| x.as_str()),
+                Some("4")
+            );
         }
     }
 
@@ -478,7 +483,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        let ptree = tree.to_partial();
+        let ptree = TreeView::from(&tree);
         {
             let query = Query::<HCL>::try_from(
                 r#"
@@ -494,13 +499,19 @@ mod tests {
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
             assert_eq!(
-                c[0].value_of(&MetavariableId("X".into())),
+                c[0].capture_of(&MetavariableId("X".into()))
+                    .map(|x| x.as_str()),
                 Some("key1 = value1")
             );
-            assert_eq!(c[0].value_of(&MetavariableId("Y".into())), Some("value2"));
+            assert_eq!(
+                c[0].capture_of(&MetavariableId("Y".into()))
+                    .map(|x| x.as_str()),
+                Some("value2")
+            );
 
             assert_eq!(
-                c[0].value_of(&MetavariableId("Z".into())),
+                c[0].capture_of(&MetavariableId("Z".into()))
+                    .map(|x| x.as_str()),
                 Some(
                     r#"key3 = value3
                     key4 = value4"#
@@ -520,7 +531,7 @@ mod tests {
             "#,
             )
             .unwrap();
-            let ptree = tree.to_partial();
+            let ptree = TreeView::from(&tree);
             {
                 let query = Query::<HCL>::try_from(
                     r#"
@@ -531,7 +542,11 @@ mod tests {
                 let session = ptree.matches(&query);
                 let c = session.collect::<Vec<MatchedItem>>();
                 assert_eq!(c.len(), 1);
-                assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("0012"));
+                assert_eq!(
+                    c[0].capture_of(&MetavariableId("X".into()))
+                        .map(|x| x.as_str()),
+                    Some("0012")
+                );
             }
 
             {
@@ -544,8 +559,16 @@ mod tests {
                 let session = ptree.matches(&query);
                 let c = session.collect::<Vec<MatchedItem>>();
                 assert_eq!(c.len(), 1);
-                assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("0012"));
-                assert_eq!(c[0].value_of(&MetavariableId("Y".into())), Some(""));
+                assert_eq!(
+                    c[0].capture_of(&MetavariableId("X".into()))
+                        .map(|x| x.as_str()),
+                    Some("0012")
+                );
+                assert_eq!(
+                    c[0].capture_of(&MetavariableId("Y".into()))
+                        .map(|x| x.as_str()),
+                    Some("")
+                );
             }
         }
     }
@@ -566,7 +589,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        let ptree = tree.to_partial();
+        let ptree = TreeView::from(&tree);
         {
             let query = Query::<HCL>::try_from(
                 r#"
@@ -578,8 +601,16 @@ mod tests {
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
-            assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("var.list"));
-            assert_eq!(c[0].value_of(&MetavariableId("Y".into())), Some("s"));
+            assert_eq!(
+                c[0].capture_of(&MetavariableId("X".into()))
+                    .map(|x| x.as_str()),
+                Some("var.list")
+            );
+            assert_eq!(
+                c[0].capture_of(&MetavariableId("Y".into()))
+                    .map(|x| x.as_str()),
+                Some("s")
+            );
         }
         {
             let query = Query::<HCL>::try_from(
@@ -593,8 +624,16 @@ mod tests {
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 2);
-            assert_eq!(c[1].value_of(&MetavariableId("X".into())), Some("var.list"));
-            assert_eq!(c[1].value_of(&MetavariableId("Y".into())), Some("s, ss"));
+            assert_eq!(
+                c[1].capture_of(&MetavariableId("X".into()))
+                    .map(|x| x.as_str()),
+                Some("var.list")
+            );
+            assert_eq!(
+                c[1].capture_of(&MetavariableId("Y".into()))
+                    .map(|x| x.as_str()),
+                Some("s, ss")
+            );
         }
         {
             let query = Query::<HCL>::try_from(
@@ -608,8 +647,16 @@ mod tests {
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 1);
-            assert_eq!(c[0].value_of(&MetavariableId("X".into())), Some("var.list"));
-            assert_eq!(c[0].value_of(&MetavariableId("Y".into())), Some("s"));
+            assert_eq!(
+                c[0].capture_of(&MetavariableId("X".into()))
+                    .map(|x| x.as_str()),
+                Some("var.list")
+            );
+            assert_eq!(
+                c[0].capture_of(&MetavariableId("Y".into()))
+                    .map(|x| x.as_str()),
+                Some("s")
+            );
         }
     }
 
@@ -619,7 +666,7 @@ mod tests {
 
         let tree_base = code.clone();
         let tree = Tree::<HCL>::try_from(tree_base.as_str()).unwrap();
-        let ptree = tree.to_partial();
+        let ptree = TreeView::from(&tree);
 
         let query = Query::<HCL>::try_from(r#"resource "rtype" "rname" { attr = :[_] }"#).unwrap();
         let session = ptree.matches(&query);
@@ -644,7 +691,7 @@ mod tests {
 
         let tree_base = code.clone();
         let tree = Tree::<HCL>::try_from(tree_base.as_str()).unwrap();
-        let ptree = tree.to_partial();
+        let ptree = TreeView::from(&tree);
 
         let query = Query::<HCL>::try_from("resource \"rtype\" \"rname\" { attr = :[X] }\nresource \"rtype\" \"another\" { attr = :[Y] }\n")
             .unwrap();

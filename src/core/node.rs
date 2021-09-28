@@ -1,7 +1,7 @@
+use std::convert::TryFrom;
+
 use crate::core::language::Queryable;
 use serde::{Deserialize, Serialize};
-#[derive(Debug, Clone, PartialEq)]
-pub struct ConsecutiveNodes<'tree>(Vec<tree_sitter::Node<'tree>>);
 
 /// `Range` describes a range over a source code in a same manner as [Language Server Protocol](https://microsoft.github.io/language-server-protocol/specifications/specification-current/#range).
 #[derive(Debug, Serialize, Deserialize)]
@@ -16,28 +16,115 @@ pub struct Position {
     pub column: usize,
 }
 
-impl<'tree> From<Vec<tree_sitter::Node<'tree>>> for ConsecutiveNodes<'tree> {
-    fn from(value: Vec<tree_sitter::Node<'tree>>) -> Self {
-        if value.len() == 0 {
-            panic!("internal error; ConsecutiveNodes was generated from empty vec.");
+#[derive(Debug, Clone, PartialEq)]
+pub struct Node<'tree> {
+    inner: tree_sitter::Node<'tree>,
+    pub(crate) source: &'tree [u8],
+
+    pub children: Vec<Node<'tree>>,
+}
+
+impl<'tree> Node<'tree> {
+    pub fn kind(&self) -> &'tree str {
+        self.inner.kind()
+    }
+
+    pub fn start_byte(&self) -> usize {
+        self.inner.start_byte()
+    }
+
+    pub fn end_byte(&self) -> usize {
+        self.inner.end_byte()
+    }
+
+    pub fn start_position(&self) -> tree_sitter::Point {
+        self.inner.start_position()
+    }
+
+    pub fn end_position(&self) -> tree_sitter::Point {
+        self.inner.end_position()
+    }
+
+    pub fn utf8_text(&self) -> &'tree str {
+        core::str::from_utf8(&self.source[self.start_byte()..self.end_byte()]).unwrap()
+    }
+
+    pub fn is_named(&self) -> bool {
+        self.inner.is_named()
+    }
+
+    pub fn from_tsnode(tsnode: tree_sitter::Node<'tree>, source: &'tree [u8]) -> Self {
+        let children: Vec<Self> = tsnode
+            .children(&mut tsnode.walk())
+            .map(|c| Self::from_tsnode(c, source))
+            .collect();
+        Node {
+            inner: tsnode,
+            children,
+            source,
         }
-        ConsecutiveNodes(value)
     }
 }
 
-impl<'tree> From<Vec<ConsecutiveNodes<'tree>>> for ConsecutiveNodes<'tree> {
-    fn from(cns: Vec<ConsecutiveNodes<'tree>>) -> Self {
-        ConsecutiveNodes(cns.into_iter().map(|cn| cn.0).flatten().collect())
+pub struct RootNode<'tree>(Node<'tree>);
+
+impl<'tree> RootNode<'tree> {
+    pub fn new(node: Node<'tree>) -> Self {
+        Self(node)
+    }
+
+    pub fn as_node(&self) -> &Node<'tree> {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ConsecutiveNodes<'tree> {
+    inner: Vec<&'tree Node<'tree>>,
+    source: &'tree [u8],
+}
+
+impl<'tree> TryFrom<Vec<&'tree Node<'tree>>> for ConsecutiveNodes<'tree> {
+    type Error = anyhow::Error;
+    fn try_from(inner: Vec<&'tree Node<'tree>>) -> Result<Self, Self::Error> {
+        // TODO (y0n3uchy): check all capture items are consecutive
+        if inner.is_empty() {
+            Err(anyhow::anyhow!(
+                "internal error; ConsecutiveNodes was generated from empty vec."
+            ))
+        } else {
+            let source = inner.get(0).unwrap().source;
+            Ok(ConsecutiveNodes { inner, source })
+        }
+    }
+}
+
+impl<'tree> TryFrom<Vec<ConsecutiveNodes<'tree>>> for ConsecutiveNodes<'tree> {
+    type Error = anyhow::Error;
+
+    fn try_from(cns: Vec<ConsecutiveNodes<'tree>>) -> Result<Self, Self::Error> {
+        // TODO (y0n3uchy): check all capture items are consecutive
+        if cns.is_empty() {
+            Err(anyhow::anyhow!(
+                "internal error; ConsecutiveNodes was generated from empty vec."
+            ))
+        } else {
+            let source = cns.get(0).unwrap().source;
+            Ok(ConsecutiveNodes {
+                inner: cns.into_iter().map(|cn| cn.inner).flatten().collect(),
+                source,
+            })
+        }
     }
 }
 
 impl<'tree> ConsecutiveNodes<'tree> {
-    pub fn as_vec(&self) -> &Vec<tree_sitter::Node<'tree>> {
-        &self.0
+    pub fn as_vec(&self) -> &Vec<&'tree Node<'tree>> {
+        &self.inner
     }
 
-    pub fn push(&mut self, n: tree_sitter::Node<'tree>) {
-        self.0.push(n)
+    pub fn push(&mut self, n: &'tree Node<'tree>) {
+        self.inner.push(n)
     }
 
     pub fn start_position(&self) -> tree_sitter::Point {
@@ -48,10 +135,10 @@ impl<'tree> ConsecutiveNodes<'tree> {
         self.as_vec().last().unwrap().end_position()
     }
 
-    pub fn range<T: Queryable + 'static>(&self, source: &[u8]) -> Range {
+    pub fn range<T: Queryable + 'static>(&self) -> Range {
         Range {
-            start: T::range(self.as_vec().first().unwrap(), source).start,
-            end: T::range(self.as_vec().last().unwrap(), source).end,
+            start: T::range(self.as_vec().first().unwrap()).start,
+            end: T::range(self.as_vec().last().unwrap()).end,
         }
     }
 
@@ -63,7 +150,7 @@ impl<'tree> ConsecutiveNodes<'tree> {
         self.as_vec().last().unwrap().end_byte()
     }
 
-    pub fn utf8_text<'a>(&self, source: &'a [u8]) -> Result<&'a str, core::str::Utf8Error> {
-        core::str::from_utf8(&source[self.start_byte()..self.end_byte()])
+    pub fn utf8_text(&self) -> Result<&str, core::str::Utf8Error> {
+        core::str::from_utf8(&self.source[self.start_byte()..self.end_byte()])
     }
 }

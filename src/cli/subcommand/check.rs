@@ -3,6 +3,8 @@
 use crate::cli::encoding::{parse_encoding, LABELS_SORTED};
 use crate::cli::reporter::{ConsoleReporter, JSONReporter, Reporter, ReporterType, SARIFReporter};
 use crate::cli::{CommonOpts, ReportOpts};
+use crate::core::source::NormalizedSource;
+use crate::core::tree::TreeView;
 use crate::core::{
     language::{Dockerfile, Go, Queryable, HCL},
     ruleset::{self, Rule},
@@ -142,25 +144,26 @@ pub(crate) fn handle_rulemap<'a>(
 fn handle_rules<'a, E: Reporter<'a>>(
     reporter: &mut E,
     target: &Target,
-    rules: &Vec<Rule>,
+    rules: &[Rule],
     as_lang: &ruleset::Language,
 ) -> Result<usize> {
     match as_lang {
-        ruleset::Language::HCL => handle_typed_rules::<E, HCL>(reporter, &target, rules),
+        ruleset::Language::HCL => handle_typed_rules::<E, HCL>(reporter, target, rules),
         ruleset::Language::Dockerfile => {
-            handle_typed_rules::<E, Dockerfile>(reporter, &target, rules)
+            handle_typed_rules::<E, Dockerfile>(reporter, target, rules)
         }
-        ruleset::Language::Go => handle_typed_rules::<E, Go>(reporter, &target, rules),
+        ruleset::Language::Go => handle_typed_rules::<E, Go>(reporter, target, rules),
     }
 }
 
 fn handle_typed_rules<'a, E: Reporter<'a>, Lang: Queryable + 'static>(
     reporter: &mut E,
     target: &Target,
-    rules: &Vec<Rule>,
+    rules: &[Rule],
 ) -> Result<usize> {
-    let tree = Tree::<Lang>::try_from(target.body.as_str()).unwrap();
-    let ptree = tree.to_partial();
+    let source = NormalizedSource::from(target.body.as_str());
+    let tree = Tree::<Lang>::try_from(source).unwrap();
+    let ptree = TreeView::from(&tree);
 
     let mut total_findings = 0;
     for rule in rules {

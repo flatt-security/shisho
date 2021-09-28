@@ -1,52 +1,69 @@
-use crate::core::language::Queryable;
+use super::{
+    language::Queryable,
+    node::{Node, RootNode},
+    source::NormalizedSource,
+};
 use anyhow::{anyhow, Result};
-use std::marker::PhantomData;
+use std::{
+    convert::{TryFrom, TryInto},
+    marker::PhantomData,
+};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Pattern<T>
 where
     T: Queryable,
 {
-    raw_bytes: Vec<u8>,
+    pub source: Vec<u8>,
+
+    tstree: tree_sitter::Tree,
     _marker: PhantomData<T>,
 }
 
-impl<T> AsRef<[u8]> for Pattern<T>
+impl<T> Pattern<T>
 where
     T: Queryable,
 {
-    fn as_ref(&self) -> &[u8] {
-        &self.raw_bytes
+    pub fn root_node(&'_ self) -> RootNode<'_> {
+        RootNode::new(Node::from_tsnode(self.tstree.root_node(), &self.source))
+    }
+
+    pub fn string_between(&self, start: usize, end: usize) -> Result<String> {
+        Ok(String::from_utf8(self.source[start..end].to_vec())?)
     }
 }
 
-impl<'a, T> From<&'a str> for Pattern<T>
+impl<T> TryFrom<NormalizedSource> for Pattern<T>
 where
     T: Queryable,
 {
-    fn from(value: &'a str) -> Self {
-        let value = value.to_string();
-        Pattern {
-            raw_bytes: if value.as_bytes()[value.as_bytes().len() - 1] != b'\n' {
-                [value.as_bytes(), "\n".as_bytes()].concat()
-            } else {
-                value.into()
-            },
-            _marker: PhantomData,
-        }
-    }
-}
+    type Error = anyhow::Error;
 
-impl<'a, T> Pattern<T>
-where
-    T: Queryable,
-{
-    pub fn to_tstree(&self) -> Result<tree_sitter::Tree> {
+    fn try_from(source: NormalizedSource) -> Result<Self, anyhow::Error> {
         let mut parser = tree_sitter::Parser::new();
         parser.set_language(T::query_language())?;
 
-        parser
-            .parse(&self.raw_bytes, None)
-            .ok_or(anyhow!("failed to parse query"))
+        let tstree = parser
+            .parse(source.as_ref(), None)
+            .ok_or(anyhow!("failed to load the code"))?;
+
+        Ok(Pattern {
+            source: source.into(),
+
+            tstree,
+            _marker: PhantomData,
+        })
+    }
+}
+
+impl<T> TryFrom<&str> for Pattern<T>
+where
+    T: Queryable,
+{
+    type Error = anyhow::Error;
+
+    fn try_from(source: &str) -> Result<Self, anyhow::Error> {
+        let source = NormalizedSource::from(source);
+        source.try_into()
     }
 }

@@ -1,6 +1,6 @@
 use crate::core::{
     language::Queryable,
-    matcher::{MatchedItem, QueryMatcher},
+    matcher::{MatchedItem, TreeMatcher},
     query::{
         Query, SHISHO_NODE_ELLIPSIS, SHISHO_NODE_ELLIPSIS_METAVARIABLE, SHISHO_NODE_METAVARIABLE,
         SHISHO_NODE_METAVARIABLE_NAME,
@@ -8,49 +8,80 @@ use crate::core::{
 };
 use anyhow::{anyhow, Result};
 use std::{
+    collections::VecDeque,
     convert::{TryFrom, TryInto},
     marker::PhantomData,
 };
 
-pub struct Tree<T> {
-    pub(crate) tstree: tree_sitter::Tree,
+use super::{node::Node, source::NormalizedSource};
 
-    raw: Vec<u8>,
-    _marker: PhantomData<T>,
+pub struct Tree<'tree, T> {
+    pub source: Vec<u8>,
+
+    tstree: tree_sitter::Tree,
+    _marker: PhantomData<&'tree T>,
 }
 
-impl<T> Tree<T>
+impl<'tree, T> Tree<'tree, T>
 where
     T: Queryable,
 {
-    pub fn new(tree: tree_sitter::Tree, raw: Vec<u8>) -> Tree<T> {
-        Tree {
-            tstree: tree,
-            raw,
+    pub fn root_node(&'_ self) -> Node<'_> {
+        Node::from_tsnode(self.tstree.root_node(), &self.source)
+    }
+}
+
+impl<'tree, T> TryFrom<NormalizedSource> for Tree<'tree, T>
+where
+    T: Queryable,
+{
+    type Error = anyhow::Error;
+
+    fn try_from(nsource: NormalizedSource) -> Result<Self, anyhow::Error> {
+        let mut parser = tree_sitter::Parser::new();
+        parser
+            .set_language(T::target_language())
+            .expect("Error loading hcl grammar");
+
+        let tstree = parser
+            .parse(nsource.as_ref(), None)
+            .ok_or(anyhow!("failed to load the code"))?;
+
+        Ok(Tree {
+            source: nsource.into(),
+
+            tstree,
             _marker: PhantomData,
-        }
-    }
-
-    pub fn to_partial<'tree>(&'tree self) -> PartialTree<'tree, T> {
-        PartialTree::new(self.tstree.root_node(), self.raw.as_slice())
+        })
     }
 }
 
-pub struct PartialTree<'tree, T> {
-    pub(crate) root: tree_sitter::Node<'tree>,
-
-    raw: &'tree [u8],
-    _marker: PhantomData<T>,
-}
-
-impl<'tree, T> PartialTree<'tree, T>
+impl<'tree, T> TryFrom<&str> for Tree<'tree, T>
 where
     T: Queryable,
 {
-    pub fn new(top: tree_sitter::Node<'tree>, raw: &'tree [u8]) -> PartialTree<'tree, T> {
-        PartialTree {
-            root: top,
-            raw,
+    type Error = anyhow::Error;
+
+    fn try_from(nsource: &str) -> Result<Self, anyhow::Error> {
+        let nsource = NormalizedSource::from(nsource);
+        nsource.try_into()
+    }
+}
+
+pub struct TreeView<'tree, T> {
+    pub root: Node<'tree>,
+    pub source: &'tree [u8],
+    _marker: PhantomData<T>,
+}
+
+impl<'tree, T> TreeView<'tree, T>
+where
+    T: Queryable,
+{
+    pub fn new(root: Node<'tree>, source: &'tree [u8]) -> TreeView<'tree, T> {
+        TreeView {
+            root,
+            source,
             _marker: PhantomData,
         }
     }
@@ -62,104 +93,56 @@ where
     where
         'tree: 'query,
     {
-        QueryMatcher::new(self, query).into_iter()
+        TreeMatcher::new(self, query)
     }
 
-    pub fn value_of(&self, node: &tree_sitter::Node<'tree>) -> &str {
-        node.utf8_text(self.raw).unwrap()
-    }
-}
-
-impl<'tree, T> AsRef<[u8]> for PartialTree<'tree, T>
-where
-    T: Queryable,
-{
-    fn as_ref(&self) -> &[u8] {
-        self.raw
+    pub fn traverse(&'tree self) -> TreeTreverser<'tree> {
+        TreeTreverser::new(&self.root)
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub struct RawTree<T>
+impl<'tree, T> From<&'tree Tree<'tree, T>> for TreeView<'tree, T>
 where
     T: Queryable,
 {
-    raw_bytes: Vec<u8>,
-    _marker: PhantomData<T>,
-}
-
-impl<'a, T> From<&'a str> for RawTree<T>
-where
-    T: Queryable,
-{
-    fn from(value: &'a str) -> Self {
-        let value = value.to_string();
-        RawTree {
-            raw_bytes: if value.as_bytes().len() != 0
-                && value.as_bytes()[value.as_bytes().len() - 1] != b'\n'
-            {
-                [value.as_bytes(), "\n".as_bytes()].concat()
-            } else {
-                value.into()
-            },
+    fn from(t: &'tree Tree<'tree, T>) -> Self {
+        TreeView {
+            root: t.root_node(),
+            source: &t.source,
             _marker: PhantomData,
         }
     }
 }
 
-impl<'a, T> TryFrom<RawTree<T>> for Tree<T>
+impl<'tree, T> From<Node<'tree>> for TreeView<'tree, T>
 where
     T: Queryable,
 {
-    type Error = anyhow::Error;
-
-    fn try_from(value: RawTree<T>) -> Result<Self, anyhow::Error> {
-        let mut parser = tree_sitter::Parser::new();
-        parser
-            .set_language(T::target_language())
-            .expect("Error loading hcl grammar");
-
-        let parsed = parser
-            .parse(&value.raw_bytes, None)
-            .ok_or(anyhow!("failed to load the code"))?;
-
-        Ok(Tree::new(parsed, value.raw_bytes))
-    }
-}
-
-impl<T> TryFrom<&str> for Tree<T>
-where
-    T: Queryable,
-{
-    type Error = anyhow::Error;
-
-    fn try_from(value: &str) -> Result<Self, anyhow::Error> {
-        let r = RawTree::from(value);
-        r.try_into()
+    fn from(t: Node<'tree>) -> Self {
+        let source = t.source;
+        TreeView {
+            root: t,
+            source,
+            _marker: PhantomData,
+        }
     }
 }
 
 #[allow(unused)]
-pub trait TSTreeVisitor<'tree, T>
+pub trait TreeVisitor<'tree, T>
 where
     T: Queryable,
 {
     type Output;
 
-    fn walk_leaf_named_node(&self, node: tree_sitter::Node) -> Result<Self::Output, anyhow::Error>;
+    fn walk_leaf_named_node(&self, node: &Node) -> Result<Self::Output, anyhow::Error>;
 
-    fn walk_leaf_unnamed_node(
-        &self,
-        node: tree_sitter::Node,
-    ) -> Result<Self::Output, anyhow::Error>;
+    fn walk_leaf_unnamed_node(&self, node: &Node) -> Result<Self::Output, anyhow::Error>;
 
-    fn walk_intermediate_node(
-        &self,
-        node: tree_sitter::Node,
-    ) -> Result<Self::Output, anyhow::Error> {
-        let mut cursor = node.walk();
+    fn walk_intermediate_node(&self, node: &Node) -> Result<Self::Output, anyhow::Error> {
         let children = node
-            .children(&mut cursor)
+            .children
+            .iter()
             .map(|child| self.handle_node(child))
             .collect::<Result<Vec<Self::Output>, anyhow::Error>>()?;
 
@@ -168,32 +151,34 @@ where
 
     fn flatten_intermediate_node(
         &self,
-        node: tree_sitter::Node,
+        node: &Node,
         children: Vec<Self::Output>,
     ) -> Result<Self::Output, anyhow::Error>;
 
-    fn walk_ellipsis(&self, node: tree_sitter::Node) -> Result<Self::Output, anyhow::Error>;
+    fn walk_ellipsis(&self, node: &Node) -> Result<Self::Output, anyhow::Error>;
 
     fn walk_ellipsis_metavariable(
         &self,
-        node: tree_sitter::Node,
+        node: &Node,
         variable_name: &str,
     ) -> Result<Self::Output, anyhow::Error>;
 
     fn walk_metavariable(
         &self,
-        node: tree_sitter::Node,
+        node: &Node,
         variable_name: &str,
     ) -> Result<Self::Output, anyhow::Error>;
 
-    fn handle_node(&self, node: tree_sitter::Node) -> Result<Self::Output, anyhow::Error> {
+    fn handle_node(&self, node: &Node) -> Result<Self::Output, anyhow::Error> {
         match node.kind() {
             SHISHO_NODE_ELLIPSIS => self.walk_ellipsis(node),
             s if s == SHISHO_NODE_ELLIPSIS_METAVARIABLE || s == SHISHO_NODE_METAVARIABLE => {
                 let variable_name = node
-                    .named_children(&mut node.walk())
+                    .children
+                    .iter()
+                    .filter(|c| c.is_named())
                     .find(|child| child.kind() == SHISHO_NODE_METAVARIABLE_NAME)
-                    .map(|child| self.value_of(&child))
+                    .map(|child| child.utf8_text())
                     .ok_or(anyhow!(
                         "{} did not have {}",
                         SHISHO_NODE_ELLIPSIS_METAVARIABLE,
@@ -207,7 +192,7 @@ where
                     panic!("invalid state")
                 }
             }
-            _ if (self.children_of(node) == 0 || T::is_leaf_like(&node)) => {
+            _ if (self.children_of(node) == 0 || T::is_leaf_like(node)) => {
                 if node.is_named() {
                     self.walk_leaf_named_node(node)
                 } else {
@@ -218,13 +203,36 @@ where
         }
     }
 
-    fn walk(&self, tree: &'tree tree_sitter::Tree) -> Result<Self::Output, anyhow::Error> {
-        self.handle_node(tree.root_node())
+    fn children_of(&self, node: &Node) -> usize {
+        node.children.len()
     }
+}
 
-    fn value_of(&self, node: &tree_sitter::Node) -> &'tree str;
+pub struct TreeTreverser<'a> {
+    queue: VecDeque<(usize, &'a Node<'a>)>,
+}
 
-    fn children_of(&self, node: tree_sitter::Node) -> usize {
-        node.child_count()
+impl<'a> TreeTreverser<'a> {
+    #[inline]
+    pub fn new(root: &'a Node<'a>) -> Self {
+        Self {
+            queue: VecDeque::from(vec![(0, root)]),
+        }
+    }
+}
+
+impl<'a> Iterator for TreeTreverser<'a> {
+    type Item = (usize, &'a Node<'a>);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some((depth, node)) = self.queue.pop_front() {
+            let children = node.children.iter();
+            self.queue.extend(children.map(|child| (depth + 1, child)));
+
+            Some((depth, node))
+        } else {
+            None
+        }
     }
 }
