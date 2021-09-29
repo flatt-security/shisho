@@ -61,6 +61,6 @@ pub trait Queryable {
     }
 
     fn node_value_eq<'a, 'b>(l: &Node<'a>, r: &Node<'b>) -> bool {
-        l.as_str().to_string() == r.as_str().to_string()
+        *l.as_str() == *r.as_str()
     }
 }

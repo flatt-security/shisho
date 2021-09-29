@@ -1,0 +1,10 @@
+version: "1"
+rules:
+  - id: rule-01
+    language: go
+    message: |
+      N/A
+    pattern: |
+      :[X] && :[X]
+    rewrite: |
+      :[X]
