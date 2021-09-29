@@ -1,65 +1,32 @@
-use crate::core::{language::Queryable, pattern::Pattern};
-use anyhow::Result;
-use std::{
-    convert::{TryFrom, TryInto},
-    marker::PhantomData,
-};
-
-use super::{node::RootNode, source::NormalizedSource};
+use crate::core::{language::Queryable, node::RootNode, pattern::Pattern};
 
 #[derive(Debug)]
-pub struct Query<T>
+pub struct Query<'a, T>
 where
     T: Queryable,
 {
-    pattern: Pattern<T>,
-    _marker: PhantomData<T>,
+    pub root_node: RootNode<'a>,
+    pattern: &'a Pattern<T>,
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct MetavariableId(pub String);
 
-impl<T> Query<T>
+impl<'a, T> From<&'a Pattern<T>> for Query<'a, T>
 where
-    T: Queryable,
+    T: Queryable + 'static,
 {
-    pub fn root_node(&'_ self) -> RootNode<'_> {
-        self.pattern.root_node()
+    fn from(pattern: &'a Pattern<T>) -> Self {
+        let root_node = pattern.to_root_node();
+        Query { root_node, pattern }
     }
 }
 
-impl<T> TryFrom<&str> for Query<T>
+impl<T> Pattern<T>
 where
-    T: Queryable,
+    T: Queryable + 'static,
 {
-    type Error = anyhow::Error;
-
-    fn try_from(source: &str) -> Result<Self, anyhow::Error> {
-        let source = NormalizedSource::from(source);
-        source.try_into()
-    }
-}
-
-impl<T> TryFrom<NormalizedSource> for Query<T>
-where
-    T: Queryable,
-{
-    type Error = anyhow::Error;
-
-    fn try_from(source: NormalizedSource) -> Result<Self, anyhow::Error> {
-        let pattern = Pattern::<T>::try_from(source)?;
-        Ok(pattern.into())
-    }
-}
-
-impl<T> From<Pattern<T>> for Query<T>
-where
-    T: Queryable,
-{
-    fn from(pattern: Pattern<T>) -> Self {
-        Query {
-            pattern,
-            _marker: PhantomData,
-        }
+    pub fn as_query(&'_ self) -> Query<'_, T> {
+        self.into()
     }
 }

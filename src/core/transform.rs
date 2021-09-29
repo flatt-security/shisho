@@ -1,41 +1,33 @@
 use crate::core::{
-    language::Queryable, matcher::MatchedItem, pattern::Pattern, query::MetavariableId,
-    source::Code, tree::TreeVisitor,
+    language::Queryable,
+    matcher::MatchedItem,
+    node::{Node, RootNode},
+    pattern::Pattern,
+    query::MetavariableId,
+    source::Code,
+    tree::TreeVisitor,
 };
 use anyhow::{anyhow, Result};
-use std::{
-    convert::{TryFrom, TryInto},
-    marker::PhantomData,
-};
 
-use super::{
-    node::{Node, RootNode},
-    source::NormalizedSource,
-};
-
-pub struct AutofixItem<T>
+pub struct AutofixItem<'a, T>
 where
     T: Queryable,
 {
-    pattern: Pattern<T>,
-    _marker: PhantomData<T>,
+    pub root_node: RootNode<'a>,
+    pattern: &'a Pattern<T>,
 }
 
-impl<T> AutofixItem<T>
+impl<'a, T> AutofixItem<'a, T>
 where
     T: Queryable,
 {
-    pub fn root_node(&'_ self) -> RootNode<'_> {
-        self.pattern.root_node()
-    }
-
     pub fn to_patched_snippet<'tree>(&self, item: &'tree MatchedItem) -> Result<String> {
         let processor = PatchProcessor {
             autofix: self,
             item,
         };
 
-        let patched_item = T::unwrap_root(&self.root_node())
+        let patched_item = T::unwrap_root(&self.root_node)
             .iter()
             .filter(|x| !T::is_skippable(x))
             .map(|node| processor.handle_node(node))
@@ -49,30 +41,22 @@ where
     }
 }
 
-impl<T> TryFrom<&str> for AutofixItem<T>
+impl<'a, T> From<&'a Pattern<T>> for AutofixItem<'a, T>
 where
-    T: Queryable,
+    T: Queryable + 'static,
 {
-    type Error = anyhow::Error;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let source = NormalizedSource::from(value);
-        source.try_into()
+    fn from(pattern: &'a Pattern<T>) -> Self {
+        let root_node = pattern.to_root_node();
+        Self { pattern, root_node }
     }
 }
 
-impl<T> TryFrom<NormalizedSource> for AutofixItem<T>
+impl<T> Pattern<T>
 where
-    T: Queryable,
+    T: Queryable + 'static,
 {
-    type Error = anyhow::Error;
-
-    fn try_from(source: NormalizedSource) -> Result<Self, Self::Error> {
-        let pattern = Pattern::<T>::try_from(source)?;
-        Ok(Self {
-            pattern,
-            _marker: PhantomData,
-        })
+    pub fn as_autofix(&'_ self) -> AutofixItem<'_, T> {
+        self.into()
     }
 }
 
@@ -80,7 +64,7 @@ pub struct PatchProcessor<'pattern, T>
 where
     T: Queryable,
 {
-    autofix: &'pattern AutofixItem<T>,
+    autofix: &'pattern AutofixItem<'pattern, T>,
     item: &'pattern MatchedItem<'pattern>,
 }
 
@@ -180,14 +164,14 @@ where
 
 pub trait Transformable<T>
 where
-    T: Queryable,
+    T: Queryable + 'static,
     Self: Sized,
 {
-    fn transform<P>(self, item: &MatchedItem, p: P) -> Result<Self>
+    fn transform<'a, P>(self, item: &MatchedItem, p: P) -> Result<Self>
     where
-        P: TryInto<AutofixItem<T>, Error = anyhow::Error>,
+        P: Into<AutofixItem<'a, T>>,
     {
-        let query = p.try_into()?;
+        let query = p.into();
         self.transform_with_query(item, query)
     }
 
@@ -196,7 +180,7 @@ where
 
 impl<T> Transformable<T> for Code<T>
 where
-    T: Queryable,
+    T: Queryable + 'static,
 {
     fn transform_with_query(self, item: &MatchedItem, query: AutofixItem<T>) -> Result<Self> {
         let current_code = self.as_str().as_bytes();

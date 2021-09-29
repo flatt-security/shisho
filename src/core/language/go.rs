@@ -1,6 +1,5 @@
-use crate::core::node::{Node, NodeType, RootNode};
-
 use super::Queryable;
+use crate::core::node::{Node, NodeType, RootNode};
 
 #[derive(Debug, Clone)]
 pub struct Go;
@@ -38,13 +37,10 @@ impl Queryable for Go {
 #[cfg(test)]
 mod tests {
     use crate::core::matcher::MatchedItem;
+    use crate::core::pattern::Pattern;
     use crate::core::transform::Transformable;
     use crate::core::tree::TreeView;
-    use crate::core::{
-        query::{MetavariableId, Query},
-        source::Code,
-        tree::Tree,
-    };
+    use crate::core::{query::MetavariableId, source::Code, tree::Tree};
     use std::convert::TryFrom;
 
     use super::*;
@@ -53,7 +49,10 @@ mod tests {
     fn test_basic_query() {
         {
             let query =
-                Query::<Go>::try_from(r#"for _, x := range iter { fmt.Printf("%s", x) }"#).unwrap();
+                Pattern::<Go>::try_from(r#"for _, x := range iter { fmt.Printf("%s", x) }"#)
+                    .unwrap();
+            let query = query.as_query();
+
             let tree =
                 Tree::<Go>::try_from(r#"for _, x := range iter { fmt.Printf("%s", x) }"#).unwrap();
 
@@ -64,8 +63,10 @@ mod tests {
 
         {
             let query =
-                Query::<Go>::try_from(r#"for _, x := range iter { fmt.Printf("%s", :[VAR]) }"#)
+                Pattern::<Go>::try_from(r#"for _, x := range iter { fmt.Printf("%s", :[VAR]) }"#)
                     .unwrap();
+            let query = query.as_query();
+
             let tree =
                 Tree::<Go>::try_from(r#"for _, x := range iter { fmt.Printf("%s", x) }"#).unwrap();
 
@@ -78,12 +79,14 @@ mod tests {
     #[test]
     fn test_query_with_simple_metavariable() {
         {
-            let query = Query::<Go>::try_from(
+            let query = Pattern::<Go>::try_from(
                 r#"for _, :[VAR] := range iter {
                 :[...]
             }"#,
             )
             .unwrap();
+            let query = query.as_query();
+
             let tree = Tree::<Go>::try_from(
                 r#"
                 for _, x := range iter { 
@@ -105,7 +108,7 @@ mod tests {
         }
 
         {
-            let query = Query::<Go>::try_from(
+            let query = Pattern::<Go>::try_from(
                 r#"
                 :[TMP] := :[X]
                 :[X] = :[Y]
@@ -113,6 +116,7 @@ mod tests {
             "#,
             )
             .unwrap();
+            let query = query.as_query();
 
             let tree = Tree::<Go>::try_from(
                 r#"
@@ -132,7 +136,9 @@ mod tests {
     #[test]
     fn test_function_call_expression() {
         {
-            let query = Query::<Go>::try_from(r#"fmt.Printf("%s%d", :[X], 2)"#).unwrap();
+            let query = Pattern::<Go>::try_from(r#"fmt.Printf("%s%d", :[X], 2)"#).unwrap();
+            let query = query.as_query();
+
             let tree = Tree::<Go>::try_from(r#"fmt.Printf("%s%d", "test", 2)"#).unwrap();
             let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
@@ -146,7 +152,9 @@ mod tests {
             );
         }
         {
-            let query = Query::<Go>::try_from(r#"f("%s%d", :[...X])"#).unwrap();
+            let query = Pattern::<Go>::try_from(r#"f("%s%d", :[...X])"#).unwrap();
+            let query = query.as_query();
+
             {
                 let tree = Tree::<Go>::try_from(r#"f("%s%d", 1, 2)"#).unwrap();
                 let ptree = TreeView::from(&tree);
@@ -163,7 +171,9 @@ mod tests {
         }
 
         {
-            let query = Query::<Go>::try_from(r#"f("%s%d", :[...X], 3)"#).unwrap();
+            let query = Pattern::<Go>::try_from(r#"f("%s%d", :[...X], 3)"#).unwrap();
+            let query = query.as_query();
+
             let tree = Tree::<Go>::try_from(r#"f("%s%d", 1, 2, 3)"#).unwrap();
             let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
@@ -184,7 +194,9 @@ mod tests {
             let tree = Tree::<Go>::try_from(r#"fmt.Printf("%s%d", "test", 2)"#).unwrap();
             let ptree = TreeView::from(&tree);
             {
-                let query = Query::<Go>::try_from(r#":[X].Printf("%s%d", :[...])"#).unwrap();
+                let query = Pattern::<Go>::try_from(r#":[X].Printf("%s%d", :[...])"#).unwrap();
+                let query = query.as_query();
+
                 let session = ptree.matches(&query);
 
                 let c = session.collect::<Vec<MatchedItem>>();
@@ -197,7 +209,9 @@ mod tests {
             }
 
             {
-                let query = Query::<Go>::try_from(r#":[X]("%s%d", :[...])"#).unwrap();
+                let query = Pattern::<Go>::try_from(r#":[X]("%s%d", :[...])"#).unwrap();
+                let query = query.as_query();
+
                 let session = ptree.matches(&query);
 
                 let c = session.collect::<Vec<MatchedItem>>();
@@ -221,10 +235,12 @@ mod tests {
             .unwrap();
             let ptree = TreeView::from(&tree);
             {
-                let query = Query::<Go>::try_from(
+                let query = Pattern::<Go>::try_from(
                     r#"func (:[X] *Receiver) f(a int, b string, c int) int { return 1 }"#,
                 )
                 .unwrap();
+                let query = query.as_query();
+
                 let session = ptree.matches(&query);
 
                 let c = session.collect::<Vec<MatchedItem>>();
@@ -237,8 +253,10 @@ mod tests {
             }
             {
                 let query =
-                    Query::<Go>::try_from(r#"func (r *Receiver) f(:[...X]) int { return 1 }"#)
+                    Pattern::<Go>::try_from(r#"func (r *Receiver) f(:[...X]) int { return 1 }"#)
                         .unwrap();
+                let query = query.as_query();
+
                 let session = ptree.matches(&query);
 
                 let c = session.collect::<Vec<MatchedItem>>();
@@ -250,10 +268,12 @@ mod tests {
                 );
             }
             {
-                let query = Query::<Go>::try_from(
+                let query = Pattern::<Go>::try_from(
                     r#"func (r *Receiver) f(a int, :[...X], c int) int { return 1 }"#,
                 )
                 .unwrap();
+                let query = query.as_query();
+
                 let session = ptree.matches(&query);
 
                 let c = session.collect::<Vec<MatchedItem>>();
@@ -273,7 +293,9 @@ mod tests {
             let tree = Tree::<Go>::try_from(r#"[]int {1, 2, 3, 4, 5}"#).unwrap();
             let ptree = TreeView::from(&tree);
             {
-                let query = Query::<Go>::try_from(r#"[] :[X] {1, 2, :[Y], 4, 5}"#).unwrap();
+                let query = Pattern::<Go>::try_from(r#"[] :[X] {1, 2, :[Y], 4, 5}"#).unwrap();
+                let query = query.as_query();
+
                 let session = ptree.matches(&query);
 
                 let c = session.collect::<Vec<MatchedItem>>();
@@ -290,7 +312,9 @@ mod tests {
                 );
             }
             {
-                let query = Query::<Go>::try_from(r#"[] int {1, 2, :[...Y], 5}"#).unwrap();
+                let query = Pattern::<Go>::try_from(r#"[] int {1, 2, :[...Y], 5}"#).unwrap();
+                let query = query.as_query();
+
                 let session = ptree.matches(&query);
 
                 let c = session.collect::<Vec<MatchedItem>>();
@@ -309,7 +333,10 @@ mod tests {
         {
             let tree = Tree::<Go>::try_from(r#"a := "xoxp-test""#).unwrap();
             let ptree = TreeView::from(&tree);
-            let query = Query::<Go>::try_from(r#""xoxp-:[X]""#).unwrap();
+
+            let query = Pattern::<Go>::try_from(r#""xoxp-:[X]""#).unwrap();
+            let query = query.as_query();
+
             let session = ptree.matches(&query);
 
             let c = session.collect::<Vec<MatchedItem>>();
@@ -323,7 +350,10 @@ mod tests {
         {
             let tree = Tree::<Go>::try_from(r#"a := `xoxp-test`"#).unwrap();
             let ptree = TreeView::from(&tree);
-            let query = Query::<Go>::try_from(r#"`xoxp-:[X]`"#).unwrap();
+
+            let query = Pattern::<Go>::try_from(r#"`xoxp-:[X]`"#).unwrap();
+            let query = query.as_query();
+
             let session = ptree.matches(&query);
 
             let c = session.collect::<Vec<MatchedItem>>();
@@ -343,7 +373,9 @@ mod tests {
                 let tree = Tree::<Go>::try_from(r#"if true == false { a := 2; b := 3 }"#).unwrap();
                 let ptree = TreeView::from(&tree);
 
-                let query = Query::<Go>::try_from(r#"if :[X] { :[...Y] }"#).unwrap();
+                let query = Pattern::<Go>::try_from(r#"if :[X] { :[...Y] }"#).unwrap();
+                let query = query.as_query();
+
                 let session = ptree.matches(&query);
 
                 let c = session.collect::<Vec<MatchedItem>>();
@@ -366,7 +398,9 @@ mod tests {
                 Tree::<Go>::try_from(r#"if err := nil; true == false { a := 2; b := 3 }"#).unwrap();
             let ptree = TreeView::from(&tree);
 
-            let query = Query::<Go>::try_from(r#"if :[X]; :[Y] { :[...Z] }"#).unwrap();
+            let query = Pattern::<Go>::try_from(r#"if :[X]; :[Y] { :[...Z] }"#).unwrap();
+            let query = query.as_query();
+
             let session = ptree.matches(&query);
 
             let c = session.collect::<Vec<MatchedItem>>();
@@ -394,7 +428,10 @@ mod tests {
             )
             .unwrap();
             let ptree = TreeView::from(&tree);
-            let query = Query::<Go>::try_from(r#"if :[X] { :[...] }"#).unwrap();
+
+            let query = Pattern::<Go>::try_from(r#"if :[X] { :[...] }"#).unwrap();
+            let query = query.as_query();
+
             let session = ptree.matches(&query);
             let c = session.collect::<Vec<MatchedItem>>();
             assert_eq!(c.len(), 0);
@@ -409,13 +446,15 @@ mod tests {
         let tree = Tree::<Go>::try_from(tree_base.as_str()).unwrap();
         let ptree = TreeView::from(&tree);
 
-        let query = Query::<Go>::try_from(r#":[X] || :[X]"#).unwrap();
+        let query = Pattern::<Go>::try_from(r#":[X] || :[X]"#).unwrap();
+        let query = query.as_query();
 
         let session = ptree.matches(&query);
         let mut c = session.collect::<Vec<MatchedItem>>();
         assert_eq!(c.len(), 1);
 
-        let from_code = code.transform(&c.pop().unwrap(), ":[X]");
+        let autofix = Pattern::<Go>::try_from(":[X]").unwrap();
+        let from_code = code.transform(&c.pop().unwrap(), autofix.as_autofix());
         assert!(from_code.is_ok());
 
         assert_eq!(from_code.unwrap().as_str(), "func a() { b := 1 }",);

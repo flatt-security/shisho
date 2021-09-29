@@ -51,7 +51,8 @@ mod tests {
     use super::*;
     use crate::core::{
         matcher::MatchedItem,
-        query::{MetavariableId, Query},
+        pattern::Pattern,
+        query::{MetavariableId},
         tree::{Tree, TreeView},
     };
     use std::convert::TryFrom;
@@ -59,7 +60,8 @@ mod tests {
     #[test]
     fn test_from_instruction() {
         {
-            let query = Query::<Dockerfile>::try_from(r#"FROM :[A]"#).unwrap();
+            let query = Pattern::<Dockerfile>::try_from(r#"FROM :[A]"#).unwrap();
+            let query = query.as_query();
             let tree = Tree::<Dockerfile>::try_from(r#"FROM name"#).unwrap();
             let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
@@ -73,7 +75,8 @@ mod tests {
         }
 
         {
-            let query = Query::<Dockerfile>::try_from(r#"FROM :[A]::[B]"#).unwrap();
+            let query = Pattern::<Dockerfile>::try_from(r#"FROM :[A]::[B]"#).unwrap();
+            let query = query.as_query();
             let tree = Tree::<Dockerfile>::try_from(r#"FROM name:tag"#).unwrap();
             let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
@@ -92,7 +95,8 @@ mod tests {
         }
 
         {
-            let query = Query::<Dockerfile>::try_from(r#"FROM :[A]::[B]@:[HASH]"#).unwrap();
+            let query = Pattern::<Dockerfile>::try_from(r#"FROM :[A]::[B]@:[HASH]"#).unwrap();
+            let query = query.as_query();
             let tree = Tree::<Dockerfile>::try_from(r#"FROM name:tag@hash"#).unwrap();
             let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
@@ -117,7 +121,8 @@ mod tests {
 
         {
             let query =
-                Query::<Dockerfile>::try_from(r#"FROM :[A]::[B]@:[HASH] as :[ALIAS]"#).unwrap();
+                Pattern::<Dockerfile>::try_from(r#"FROM :[A]::[B]@:[HASH] as :[ALIAS]"#).unwrap();
+            let query = query.as_query();
             let tree = Tree::<Dockerfile>::try_from(r#"FROM name:tag@hash as alias"#).unwrap();
             let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);
@@ -149,7 +154,8 @@ mod tests {
     #[test]
     fn test_run_instruction() {
         {
-            let query = Query::<Dockerfile>::try_from(r#"RUN :[X]"#).unwrap();
+            let query = Pattern::<Dockerfile>::try_from(r#"RUN :[X]"#).unwrap();
+            let query = query.as_query();
             let tree =
                 Tree::<Dockerfile>::try_from(r#"RUN echo "hosts: files dns" > /etc/nsswitch.conf"#)
                     .unwrap();
@@ -164,7 +170,8 @@ mod tests {
             );
         }
         {
-            let query = Query::<Dockerfile>::try_from(r#"RUN :[X]"#).unwrap();
+            let query = Pattern::<Dockerfile>::try_from(r#"RUN :[X]"#).unwrap();
+            let query = query.as_query();
             let cmd = r#"RUN apt-get update && apt-get install -y \
             aufs-tools \
             automake \
@@ -185,7 +192,8 @@ mod tests {
     #[test]
     fn test_copy_instruction() {
         {
-            let query = Query::<Dockerfile>::try_from(r#"COPY :[X] :[Y]"#).unwrap();
+            let query = Pattern::<Dockerfile>::try_from(r#"COPY :[X] :[Y]"#).unwrap();
+            let query = query.as_query();
             let tree = Tree::<Dockerfile>::try_from(r#"COPY ./ /app"#).unwrap();
             let ptree = TreeView::from(&tree);
             let session = ptree.matches(&query);

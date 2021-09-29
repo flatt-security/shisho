@@ -11,7 +11,7 @@ use std::{
 };
 
 use super::{
-    node::{Node, NodeType},
+    node::{Node, NodeType, RootNode},
     source::NormalizedSource,
 };
 
@@ -26,8 +26,8 @@ impl<'tree, T> Tree<'tree, T>
 where
     T: Queryable,
 {
-    pub fn root_node(&'_ self) -> Node<'_> {
-        Node::from_tsnode(self.tstree.root_node(), &self.source)
+    pub fn to_root_node(&'_ self) -> RootNode<'_> {
+        RootNode::from_tstree(&self.tstree, &self.source)
     }
 }
 
@@ -69,7 +69,7 @@ where
 }
 
 pub struct TreeView<'tree, T> {
-    pub root: Node<'tree>,
+    pub view_root: Node<'tree>,
     pub source: &'tree [u8],
     _marker: PhantomData<T>,
 }
@@ -78,9 +78,9 @@ impl<'tree, T> TreeView<'tree, T>
 where
     T: Queryable,
 {
-    pub fn new(root: Node<'tree>, source: &'tree [u8]) -> TreeView<'tree, T> {
+    pub fn new(view_root: Node<'tree>, source: &'tree [u8]) -> TreeView<'tree, T> {
         TreeView {
-            root,
+            view_root,
             source,
             _marker: PhantomData,
         }
@@ -88,7 +88,7 @@ where
 
     pub fn matches<'query>(
         &'tree self,
-        query: &'query Query<T>,
+        query: &'query Query<'query, T>,
     ) -> impl Iterator<Item = MatchedItem<'tree>> + 'query
     where
         'tree: 'query,
@@ -97,7 +97,7 @@ where
     }
 
     pub fn traverse(&'tree self) -> TreeTreverser<'tree> {
-        TreeTreverser::new(&self.root)
+        TreeTreverser::new(&self.view_root)
     }
 }
 
@@ -107,7 +107,7 @@ where
 {
     fn from(t: &'tree Tree<'tree, T>) -> Self {
         TreeView {
-            root: t.root_node(),
+            view_root: t.to_root_node().into(),
             source: &t.source,
             _marker: PhantomData,
         }
@@ -121,7 +121,7 @@ where
     fn from(t: Node<'tree>) -> Self {
         let source = t.source;
         TreeView {
-            root: t,
+            view_root: t,
             source,
             _marker: PhantomData,
         }

@@ -1,12 +1,14 @@
 use anyhow::Result;
 use regex::Regex;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 
 use crate::core::{
     language::Queryable,
-    query::{MetavariableId, Query},
+    query::MetavariableId,
     ruleset::{RawConstraint, RawPredicate},
 };
+
+use super::pattern::Pattern;
 
 #[derive(Debug)]
 pub struct Constraint<T>
@@ -22,8 +24,8 @@ pub enum Predicate<T>
 where
     T: Queryable,
 {
-    MatchQuery(Query<T>),
-    NotMatchQuery(Query<T>),
+    MatchQuery(Pattern<T>),
+    NotMatchQuery(Pattern<T>),
 
     MatchRegex(Regex),
     NotMatchRegex(Regex),
@@ -31,18 +33,18 @@ where
 
 impl<T> TryFrom<RawConstraint> for Constraint<T>
 where
-    T: Queryable,
+    T: Queryable + 'static,
 {
     type Error = anyhow::Error;
 
     fn try_from(rc: RawConstraint) -> Result<Self, Self::Error> {
         let predicate = match rc.should {
             RawPredicate::Match => {
-                let p = rc.pattern.as_str().try_into()?;
+                let p = Pattern::<T>::try_from(rc.pattern.as_str())?;
                 Predicate::MatchQuery(p)
             }
             RawPredicate::NotMatch => {
-                let p = rc.pattern.as_str().try_into()?;
+                let p = Pattern::<T>::try_from(rc.pattern.as_str())?;
                 Predicate::NotMatchQuery(p)
             }
             RawPredicate::MatchRegex => {
