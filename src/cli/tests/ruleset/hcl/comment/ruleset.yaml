@@ -5,7 +5,7 @@ rules:
     message: |
       test
     pattern: |
-      resource  "aws_ebs_volume" :[NAME] {
+      resource "comment_test" :[NAME] {
         :[...]
         // hoge
         :[...]

@@ -1,3 +1,3 @@
-resource "aws_ebs_volume" "volume" {
+resource "comment_test" "volume" {
   size = 1
 }
