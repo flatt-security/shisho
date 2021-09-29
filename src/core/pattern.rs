@@ -1,8 +1,4 @@
-use super::{
-    language::Queryable,
-    node::{Node, RootNode},
-    source::NormalizedSource,
-};
+use super::{language::Queryable, node::RootNode, source::NormalizedSource};
 use anyhow::{anyhow, Result};
 use std::{
     convert::{TryFrom, TryInto},
@@ -24,8 +20,8 @@ impl<T> Pattern<T>
 where
     T: Queryable,
 {
-    pub fn root_node(&'_ self) -> RootNode<'_> {
-        RootNode::new(Node::from_tsnode(self.tstree.root_node(), &self.source))
+    pub fn to_root_node(&'_ self) -> RootNode<'_> {
+        RootNode::from_tstree(&self.tstree, &self.source)
     }
 
     pub fn string_between(&self, start: usize, end: usize) -> Result<String> {

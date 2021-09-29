@@ -61,6 +61,7 @@ impl Queryable for HCL {
 #[cfg(test)]
 mod tests {
     use crate::core::matcher::MatchedItem;
+    use crate::core::pattern::Pattern;
     use crate::core::query::MetavariableId;
     use crate::core::transform::Transformable;
     use crate::core::tree::{Tree, TreeView};
@@ -129,7 +130,7 @@ mod tests {
     #[test]
     fn test_query_with_simple_metavariable() {
         {
-            let query = Query::<HCL>::try_from(r#"attr = :[X]"#).unwrap();
+            let query = Query::from(&Pattern::<HCL>::try_from(r#"attr = :[X]"#).unwrap());
             let tree = Tree::<HCL>::try_from(
                 r#"resource "rtype" "rname" { 
                 attr = "value"

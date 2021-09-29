@@ -47,7 +47,10 @@ impl<'tree> MatchedItem<'tree> {
         self.captures.get(id)
     }
 
-    pub fn satisfies_all<T: Queryable>(&self, constraints: &[Constraint<T>]) -> Result<bool> {
+    pub fn satisfies_all<T: Queryable + 'static>(
+        &self,
+        constraints: &[Constraint<T>],
+    ) -> Result<bool> {
         for c in constraints {
             if !self.satisfies(c)? {
                 return Ok(false);
@@ -56,7 +59,7 @@ impl<'tree> MatchedItem<'tree> {
         Ok(true)
     }
 
-    pub fn satisfies<T: Queryable>(&self, constraint: &Constraint<T>) -> Result<bool> {
+    pub fn satisfies<T: Queryable + 'static>(&self, constraint: &Constraint<T>) -> Result<bool> {
         if !self.captures.contains_key(&constraint.target) {
             return Ok(false);
         }
@@ -71,7 +74,7 @@ impl<'tree> MatchedItem<'tree> {
                     )),
                     CaptureItem::Nodes(n) => Ok(n.as_vec().iter().any(|node| {
                         let ptree = TreeView::<T>::from((*node).clone());
-                        !ptree.matches(q).count() == 0
+                        !ptree.matches(&q.into()).count() == 0
                     })),
                 }
             }
@@ -84,7 +87,7 @@ impl<'tree> MatchedItem<'tree> {
                     )),
                     CaptureItem::Nodes(n) => Ok(n.as_vec().iter().all(|node| {
                         let ptree = TreeView::<T>::from((*node).clone());
-                        ptree.matches(q).count() == 0
+                        ptree.matches(&q.into()).count() == 0
                     })),
                 }
             }

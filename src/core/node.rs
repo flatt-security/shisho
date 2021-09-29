@@ -103,7 +103,23 @@ impl<'tree> Node<'tree> {
     }
 }
 
+#[derive(Debug)]
 pub struct RootNode<'tree>(Node<'tree>);
+
+impl<'tree> RootNode<'tree> {
+    pub fn from_tstree(tstree: &'tree tree_sitter::Tree, source: &'tree [u8]) -> Self {
+        let tsnode = tstree.root_node();
+        let children: Vec<Node<'tree>> = tsnode
+            .children(&mut tsnode.walk())
+            .map(|c| Node::from_tsnode(c, source))
+            .collect();
+        RootNode::new(Node {
+            inner: tsnode,
+            children,
+            source,
+        })
+    }
+}
 
 impl<'tree> RootNode<'tree> {
     pub fn new(node: Node<'tree>) -> Self {
@@ -112,6 +128,12 @@ impl<'tree> RootNode<'tree> {
 
     pub fn as_node(&self) -> &Node<'tree> {
         &self.0
+    }
+}
+
+impl<'tree> From<RootNode<'tree>> for Node<'tree> {
+    fn from(r: RootNode<'tree>) -> Self {
+        r.0
     }
 }
 

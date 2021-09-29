@@ -17,7 +17,7 @@ pub struct TreeMatcher<'tree, 'query, T: Queryable> {
     traverser: TreeTreverser<'tree>,
 
     /// Query
-    query: RootNode<'query>,
+    query: &'query RootNode<'query>,
 
     /// local state for implementing `Iterator`/    
     items: Vec<MatchedItem<'tree>>,
@@ -29,7 +29,7 @@ pub struct TreeMatcher<'tree, 'query, T: Queryable> {
 impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
     pub fn new(view: &'tree TreeView<'tree, T>, query: &'query Query<T>) -> Self {
         TreeMatcher {
-            query: query.root_node(),
+            query: &query.root_node,
             traverser: view.traverse(),
             items: vec![],
 

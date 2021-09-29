@@ -4,7 +4,8 @@ use std::{convert::TryFrom, fs::File, path::Path, str::FromStr};
 use walkdir::WalkDir;
 
 use crate::core::{
-    constraint::Constraint, language::Queryable, matcher::MatchedItem, query::Query, tree::TreeView,
+    constraint::Constraint, language::Queryable, matcher::MatchedItem, pattern::Pattern,
+    tree::TreeView,
 };
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -78,9 +79,9 @@ impl Rule {
         let patterns = self.get_patterns()?;
         let mut matches = vec![];
         for p in patterns {
-            let query = Query::<T>::try_from(p.as_str())?;
+            let p = Pattern::<T>::try_from(p.as_str())?;
             matches.extend(
-                tree.matches(&query)
+                tree.matches(&p.as_query())
                     .filter(|x| x.satisfies_all(&constraints).unwrap_or(false)),
             );
         }
