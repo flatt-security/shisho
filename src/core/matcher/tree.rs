@@ -254,7 +254,7 @@ where
     type Item = MatchedItem<'tree>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let qnodes: Vec<&Node<'query>> = T::unwrap_root(&self.query)
+        let qnodes: Vec<&Node<'query>> = T::unwrap_root(self.query)
             .iter()
             .filter(|n| !T::is_skippable(n))
             .collect();
