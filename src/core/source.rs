@@ -44,6 +44,14 @@ where
 #[derive(Clone)]
 pub struct NormalizedSource {
     pub source: Vec<u8>,
+    with_extra_newline: bool,
+}
+
+impl NormalizedSource {
+    #[inline]
+    pub fn with_extra_newline(&self) -> bool {
+        self.with_extra_newline
+    }
 }
 
 impl AsRef<[u8]> for NormalizedSource {
@@ -63,10 +71,12 @@ impl From<&[u8]> for NormalizedSource {
         if !source.is_empty() && source[source.len() - 1] != b'\n' {
             Self {
                 source: [source, "\n".as_bytes()].concat(),
+                with_extra_newline: true,
             }
         } else {
             Self {
                 source: source.into(),
+                with_extra_newline: false,
             }
         }
     }
