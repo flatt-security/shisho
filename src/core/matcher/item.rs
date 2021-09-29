@@ -21,7 +21,7 @@ impl<'tree> CaptureItem<'tree> {
         match self {
             CaptureItem::Empty => "",
             CaptureItem::Literal(s) => s.as_str(),
-            CaptureItem::Nodes(n) => n.utf8_text().unwrap(),
+            CaptureItem::Nodes(n) => n.as_str().unwrap(),
         }
     }
 }

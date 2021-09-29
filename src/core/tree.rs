@@ -17,6 +17,7 @@ use super::{
 
 pub struct Tree<'tree, T> {
     pub source: Vec<u8>,
+    with_extra_newline: bool,
 
     tstree: tree_sitter::Tree,
     _marker: PhantomData<&'tree T>,
@@ -27,7 +28,7 @@ where
     T: Queryable,
 {
     pub fn to_root_node(&'_ self) -> RootNode<'_> {
-        RootNode::from_tstree(&self.tstree, &self.source)
+        RootNode::from_tstree(&self.tstree, &self.source, self.with_extra_newline)
     }
 }
 
@@ -47,8 +48,10 @@ where
             .parse(nsource.as_ref(), None)
             .ok_or(anyhow!("failed to load the code"))?;
 
+        let with_extra_newline = nsource.with_extra_newline();
         Ok(Tree {
             source: nsource.into(),
+            with_extra_newline,
 
             tstree,
             _marker: PhantomData,

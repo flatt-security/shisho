@@ -25,8 +25,9 @@ pub struct Position {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Node<'tree> {
     inner: tree_sitter::Node<'tree>,
-    pub(crate) source: &'tree [u8],
+    with_extra_newline: bool,
 
+    pub(crate) source: &'tree [u8],
     pub children: Vec<Node<'tree>>,
 }
 
@@ -83,20 +84,30 @@ impl<'tree> Node<'tree> {
     }
 
     pub fn as_str(&self) -> &'tree str {
-        core::str::from_utf8(&self.source[self.start_byte()..self.end_byte()]).unwrap()
+        let last = if self.with_extra_newline {
+            self.end_byte() - 1
+        } else {
+            self.end_byte()
+        };
+        core::str::from_utf8(&self.source[self.start_byte()..last]).unwrap()
     }
 
     pub fn is_named(&self) -> bool {
         self.inner.is_named()
     }
 
-    pub fn from_tsnode(tsnode: tree_sitter::Node<'tree>, source: &'tree [u8]) -> Self {
+    pub fn from_tsnode(
+        tsnode: tree_sitter::Node<'tree>,
+        source: &'tree [u8],
+        extra_newline_byte: Option<usize>,
+    ) -> Self {
         let children: Vec<Self> = tsnode
             .children(&mut tsnode.walk())
-            .map(|c| Self::from_tsnode(c, source))
+            .map(|c| Self::from_tsnode(c, source, extra_newline_byte))
             .collect();
         Node {
             inner: tsnode,
+            with_extra_newline: extra_newline_byte == Some(tsnode.end_byte() - 1),
             children,
             source,
         }
@@ -107,14 +118,29 @@ impl<'tree> Node<'tree> {
 pub struct RootNode<'tree>(Node<'tree>);
 
 impl<'tree> RootNode<'tree> {
-    pub fn from_tstree(tstree: &'tree tree_sitter::Tree, source: &'tree [u8]) -> Self {
+    pub fn from_tstree(
+        tstree: &'tree tree_sitter::Tree,
+        source: &'tree [u8],
+        with_extra_newline: bool,
+    ) -> Self {
         let tsnode = tstree.root_node();
         let children: Vec<Node<'tree>> = tsnode
             .children(&mut tsnode.walk())
-            .map(|c| Node::from_tsnode(c, source))
+            .map(|c| {
+                Node::from_tsnode(
+                    c,
+                    source,
+                    if with_extra_newline {
+                        Some(source.len() - 1)
+                    } else {
+                        None
+                    },
+                )
+            })
             .collect();
         RootNode::new(Node {
             inner: tsnode,
+            with_extra_newline,
             children,
             source,
         })
@@ -209,7 +235,18 @@ impl<'tree> ConsecutiveNodes<'tree> {
         self.as_vec().last().unwrap().end_byte()
     }
 
-    pub fn utf8_text(&self) -> Result<&str, core::str::Utf8Error> {
-        core::str::from_utf8(&self.source[self.start_byte()..self.end_byte()])
+    #[inline]
+    pub fn with_extra_newline(&self) -> bool {
+        self.as_vec().last().unwrap().with_extra_newline
+    }
+
+    #[inline]
+    pub fn as_str(&self) -> Result<&str, core::str::Utf8Error> {
+        let last = if self.with_extra_newline() {
+            self.end_byte() - 1
+        } else {
+            self.end_byte()
+        };
+        core::str::from_utf8(&self.source[self.start_byte()..last])
     }
 }

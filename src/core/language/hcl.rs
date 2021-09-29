@@ -1,4 +1,4 @@
-use crate::core::node::{Node, NodeType, Range, RootNode};
+use crate::core::node::{Node, NodeType, RootNode};
 
 use super::Queryable;
 
@@ -31,30 +31,12 @@ impl Queryable for HCL {
     fn is_string_literal(node: &Node) -> bool {
         matches!(
             node.kind(),
-            NodeType::Normal("string_literal") | NodeType::Normal("quoted_template")
+            NodeType::Normal("string_lit") | NodeType::Normal("quoted_template")
         )
     }
 
     fn is_skippable(node: &Node) -> bool {
         node.kind() == NodeType::Normal("\n")
-    }
-
-    fn range(node: &Node) -> Range {
-        match node.kind() {
-            NodeType::Normal("attribute") => {
-                let bracket = node.children.get(node.children.len() - 2).unwrap();
-                let start = Self::default_range(node).start;
-                let end = Self::range(bracket).end;
-                Range { start, end }
-            }
-            NodeType::Normal("block") => {
-                let bracket = node.children.get(node.children.len() - 2).unwrap();
-                let start = Self::default_range(node).start;
-                let end = Self::range(bracket).end;
-                Range { start, end }
-            }
-            _ => Self::default_range(node),
-        }
     }
 }
 
@@ -629,7 +611,6 @@ mod tests {
             let query = Pattern::<HCL>::try_from(
                 r#"
                 attr = [for :[Y] in :[X] : upper(:[Y]) if :[Y] != ""]
-                }
             "#,
             )
             .unwrap();
@@ -716,7 +697,7 @@ mod tests {
         assert_eq!(c.len(), 1);
 
         let autofix =
-            Pattern::<HCL>::try_from("resource \"rtype\" \"rname\" { attr = \"changed\" }\n")
+            Pattern::<HCL>::try_from("resource \"rtype\" \"rname\" { attr = \"changed\" }")
                 .unwrap();
         let from_code = code.transform(&c.pop().unwrap(), autofix.as_autofix());
         assert!(from_code.is_ok());
@@ -729,13 +710,13 @@ mod tests {
 
     #[test]
     fn metavariable_transform() {
-        let code = Code::<HCL>::from("resource \"rtype\" \"rname\" { attr = \"one\" }\nresource \"rtype\" \"another\" { attr = \"two\" }\n");
+        let code = Code::<HCL>::from("resource \"rtype\" \"rname\" { attr = \"one\" }\nresource \"rtype\" \"another\" { attr = \"two\" }");
 
         let tree_base = code.clone();
         let tree = Tree::<HCL>::try_from(tree_base.as_str()).unwrap();
         let ptree = TreeView::from(&tree);
 
-        let query = Pattern::<HCL>::try_from("resource \"rtype\" \"rname\" { attr = :[X] }\nresource \"rtype\" \"another\" { attr = :[Y] }\n")
+        let query = Pattern::<HCL>::try_from("resource \"rtype\" \"rname\" { attr = :[X] }\nresource \"rtype\" \"another\" { attr = :[Y] }")
             .unwrap();
         let query = query.as_query();
 
@@ -743,13 +724,13 @@ mod tests {
         let mut c = session.collect::<Vec<MatchedItem>>();
         assert_eq!(c.len(), 1);
 
-        let autofix = Pattern::<HCL>::try_from("resource \"rtype\" \"rname\" { attr = :[Y] }\nresource \"rtype\" \"another\" { attr = :[X] }\n").unwrap();
+        let autofix = Pattern::<HCL>::try_from("resource \"rtype\" \"rname\" { attr = :[Y] }\nresource \"rtype\" \"another\" { attr = :[X] }").unwrap();
         let from_code = code.transform(&c.pop().unwrap(), autofix.as_autofix());
         assert!(from_code.is_ok());
 
         assert_eq!(
             from_code.unwrap().as_str(),
-            "resource \"rtype\" \"rname\" { attr = \"two\" }\nresource \"rtype\" \"another\" { attr = \"one\" }\n",
+            "resource \"rtype\" \"rname\" { attr = \"two\" }\nresource \"rtype\" \"another\" { attr = \"one\" }",
         );
     }
 }

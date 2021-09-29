@@ -1,0 +1,12 @@
+version: "1"
+rules:
+  - id: "test"
+    language: hcl
+    message: |
+      test
+    pattern: |
+      resource  "aws_ebs_volume" :[NAME] {
+        :[...]
+        // hoge
+        :[...]
+      }

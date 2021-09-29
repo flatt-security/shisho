@@ -27,17 +27,14 @@ where
             item,
         };
 
-        let patched_item = T::unwrap_root(&self.root_node)
+        let pitems = T::unwrap_root(&self.root_node)
             .iter()
-            .filter(|x| !T::is_skippable(x))
             .map(|node| processor.handle_node(node))
             .collect::<Result<Vec<PatchedItem>>>()?;
 
-        Ok(patched_item
-            .into_iter()
-            .map(|item| item.body)
-            .collect::<Vec<String>>()
-            .join(""))
+        Ok(processor
+            .flatten_patched_item(0, self.root_node.as_node().end_byte(), pitems)?
+            .body)
     }
 }
 
@@ -68,10 +65,43 @@ where
     item: &'pattern MatchedItem<'pattern>,
 }
 
+#[derive(Debug)]
 pub struct PatchedItem {
     pub body: String,
     pub start_byte: usize,
     pub end_byte: usize,
+}
+
+impl<'tree, T> PatchProcessor<'tree, T>
+where
+    T: Queryable,
+{
+    fn flatten_patched_item(
+        &self,
+        start_byte: usize,
+        end_byte: usize,
+        children: Vec<PatchedItem>,
+    ) -> Result<PatchedItem, anyhow::Error> {
+        let mut body: String = "".into();
+        let mut end: usize = start_byte;
+
+        for child in children {
+            body += self
+                .autofix
+                .pattern
+                .string_between(end, child.start_byte)?
+                .as_str();
+            body += child.body.as_str();
+            end = child.end_byte;
+        }
+        body += self.autofix.pattern.string_between(end, end_byte)?.as_str();
+
+        Ok(PatchedItem {
+            body,
+            start_byte: start_byte,
+            end_byte: end_byte,
+        })
+    }
 }
 
 impl<'tree, T> TreeVisitor<'tree, T> for PatchProcessor<'tree, T>
@@ -136,29 +166,7 @@ where
         node: &Node,
         children: Vec<Self::Output>,
     ) -> Result<Self::Output, anyhow::Error> {
-        let mut body: String = "".into();
-        let mut end: usize = node.start_byte();
-
-        for child in children {
-            body += self
-                .autofix
-                .pattern
-                .string_between(end, child.start_byte)?
-                .as_str();
-            body += child.body.as_str();
-            end = child.end_byte;
-        }
-        body += self
-            .autofix
-            .pattern
-            .string_between(end, node.end_byte())?
-            .as_str();
-
-        Ok(PatchedItem {
-            body,
-            start_byte: node.start_byte(),
-            end_byte: node.end_byte(),
-        })
+        self.flatten_patched_item(node.start_byte(), node.end_byte(), children)
     }
 }
 
