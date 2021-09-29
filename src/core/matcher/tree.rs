@@ -87,19 +87,44 @@ impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
                     ))
                 }
 
+                (None, Some(qchild)) => match qchild.kind() {
+                    NodeType::Ellipsis => {
+                        let nodes = tsibilings[..tidx.min(tsibilings.len())].to_vec();
+                        result.push((
+                            MatcherState {
+                                subtree: ConsecutiveNodes::try_from(nodes).ok(),
+                                captures,
+                            },
+                            None,
+                        ))
+                    }
+                    NodeType::EllipsisMetavariable(mid) => {
+                        let nodes = tsibilings[..tidx.min(tsibilings.len())].to_vec();
+                        result.push((
+                            MatcherState {
+                                subtree: ConsecutiveNodes::try_from(nodes).ok(),
+                                captures: [
+                                    captures.clone(),
+                                    vec![(mid, CaptureItem::from(vec![]))],
+                                ]
+                                .concat(),
+                            },
+                            None,
+                        ))
+                    }
+                    _ => {}
+                },
                 (Some(tchild), Some(qchild)) => match qchild.kind() {
                     NodeType::Ellipsis => {
-                        let mut captured_nodes = vec![];
+                        // NOTE: this loop must end with `tsibilings.len()`
                         for tcidx in tidx..=tsibilings.len() {
                             queue.push((tcidx, qidx + 1, captures.clone()));
-                            if let Some(tchild) = tsibilings.get(tcidx) {
-                                captured_nodes.push(tchild);
-                            }
                         }
                     }
                     NodeType::EllipsisMetavariable(mid) => {
                         let mut captured_nodes = vec![];
-                        for tcidx in tidx..(tsibilings.len() + 1) {
+                        // NOTE: this loop must end with `tsibilings.len()`
+                        for tcidx in tidx..=tsibilings.len() {
                             queue.push((
                                 tcidx,
                                 qidx + 1,
@@ -124,7 +149,6 @@ impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
                         }
                     }
                 },
-                _ => (),
             }
         }
         result
