@@ -11,11 +11,15 @@ use crate::core::{
 
 use std::{convert::TryFrom, marker::PhantomData};
 
+/// `TreeMatcher` iterates possible matches between query and tree to traverse.
 pub struct TreeMatcher<'tree, 'query, T: Queryable> {
+    /// Tree to traverse
     traverser: TreeTreverser<'tree>,
+
+    /// Query
     query: RootNode<'query>,
 
-    /// local state for implementing `Iterator`/
+    /// local state for implementing `Iterator`/    
     items: Vec<MatchedItem<'tree>>,
 
     /// just a marker
