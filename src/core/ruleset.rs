@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod test;
+
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, fs::File, path::Path, str::FromStr};
@@ -190,7 +193,13 @@ pub fn from_path<P: AsRef<Path>>(ruleset_path: P) -> Result<Vec<RuleSet>> {
             .into_iter()
             .filter_map(|e| e.ok())
             .map(|e| e.into_path())
-            .filter(|p| p.is_file())
+            .filter(|p| {
+                p.is_file()
+                    && matches!(
+                        p.extension().map(|e| e.to_str().unwrap()),
+                        Some("yaml") | Some("yml")
+                    )
+            })
             .map(from_filepath)
             .collect::<Result<Vec<RuleSet>>>()
     } else {
