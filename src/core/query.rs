@@ -7,11 +7,6 @@ use std::{
 
 use super::{node::RootNode, source::NormalizedSource};
 
-pub const SHISHO_NODE_METAVARIABLE_NAME: &str = "shisho_metavariable_name";
-pub const SHISHO_NODE_METAVARIABLE: &str = "shisho_metavariable";
-pub const SHISHO_NODE_ELLIPSIS_METAVARIABLE: &str = "shisho_ellipsis_metavariable";
-pub const SHISHO_NODE_ELLIPSIS: &str = "shisho_ellipsis";
-
 #[derive(Debug)]
 pub struct Query<T>
 where

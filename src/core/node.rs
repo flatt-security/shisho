@@ -3,6 +3,12 @@ use std::convert::TryFrom;
 use crate::core::language::Queryable;
 use serde::{Deserialize, Serialize};
 
+use super::query::MetavariableId;
+
+const SHISHO_NODE_METAVARIABLE_NAME: &str = "shisho_metavariable_name";
+const SHISHO_NODE_METAVARIABLE: &str = "shisho_metavariable";
+const SHISHO_NODE_ELLIPSIS_METAVARIABLE: &str = "shisho_ellipsis_metavariable";
+const SHISHO_NODE_ELLIPSIS: &str = "shisho_ellipsis";
 /// `Range` describes a range over a source code in a same manner as [Language Server Protocol](https://microsoft.github.io/language-server-protocol/specifications/specification-current/#range).
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Range {
@@ -24,9 +30,40 @@ pub struct Node<'tree> {
     pub children: Vec<Node<'tree>>,
 }
 
+#[derive(Debug, PartialEq)]
+pub enum NodeType {
+    Metavariable(MetavariableId),
+    EllipsisMetavariable(MetavariableId),
+    Ellipsis,
+    Normal(&'static str),
+}
+
+fn get_metavariable_id<'a>(node: &'a Node<'_>) -> &'a str {
+    node.children
+        .iter()
+        .find(|child| child.kind() == NodeType::Normal(SHISHO_NODE_METAVARIABLE_NAME))
+        .map(|child| child.as_str())
+        .expect(
+            format!(
+                "{} did not have {}",
+                SHISHO_NODE_ELLIPSIS_METAVARIABLE, SHISHO_NODE_METAVARIABLE_NAME
+            )
+            .as_str(),
+        )
+}
+
 impl<'tree> Node<'tree> {
-    pub fn kind(&self) -> &'tree str {
-        self.inner.kind()
+    pub fn kind(&self) -> NodeType {
+        match self.inner.kind() {
+            s if s == SHISHO_NODE_METAVARIABLE => {
+                NodeType::Metavariable(MetavariableId(get_metavariable_id(self).to_string()))
+            }
+            s if s == SHISHO_NODE_ELLIPSIS => NodeType::Ellipsis,
+            s if s == SHISHO_NODE_ELLIPSIS_METAVARIABLE => NodeType::EllipsisMetavariable(
+                MetavariableId(get_metavariable_id(self).to_string()),
+            ),
+            s => NodeType::Normal(s),
+        }
     }
 
     pub fn start_byte(&self) -> usize {
@@ -45,7 +82,7 @@ impl<'tree> Node<'tree> {
         self.inner.end_position()
     }
 
-    pub fn utf8_text(&self) -> &'tree str {
+    pub fn as_str(&self) -> &'tree str {
         core::str::from_utf8(&self.source[self.start_byte()..self.end_byte()]).unwrap()
     }
 

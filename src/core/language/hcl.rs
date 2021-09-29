@@ -1,4 +1,4 @@
-use crate::core::node::{Node, Range, RootNode};
+use crate::core::node::{Node, NodeType, Range, RootNode};
 
 use super::Queryable;
 
@@ -29,22 +29,25 @@ impl Queryable for HCL {
     }
 
     fn is_string_literal(node: &Node) -> bool {
-        matches!(node.kind(), "string_literal" | "quoted_template")
+        matches!(
+            node.kind(),
+            NodeType::Normal("string_literal") | NodeType::Normal("quoted_template")
+        )
     }
 
     fn is_skippable(node: &Node) -> bool {
-        node.kind() == "\n"
+        node.kind() == NodeType::Normal("\n")
     }
 
     fn range(node: &Node) -> Range {
         match node.kind() {
-            "attribute" => {
+            NodeType::Normal("attribute") => {
                 let bracket = node.children.get(node.children.len() - 2).unwrap();
                 let start = Self::default_range(node).start;
                 let end = Self::range(bracket).end;
                 Range { start, end }
             }
-            "block" => {
+            NodeType::Normal("block") => {
                 let bracket = node.children.get(node.children.len() - 2).unwrap();
                 let start = Self::default_range(node).start;
                 let end = Self::range(bracket).end;

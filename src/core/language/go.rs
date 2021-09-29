@@ -1,4 +1,4 @@
-use crate::core::node::{Node, RootNode};
+use crate::core::node::{Node, NodeType, RootNode};
 
 use super::Queryable;
 
@@ -20,7 +20,7 @@ impl Queryable for Go {
     }
 
     fn is_skippable(node: &Node) -> bool {
-        node.kind() == "\n"
+        node.kind() == NodeType::Normal("\n")
     }
 
     fn is_leaf_like(node: &Node) -> bool {
@@ -30,7 +30,7 @@ impl Queryable for Go {
     fn is_string_literal(node: &Node) -> bool {
         matches!(
             node.kind(),
-            "interpreted_string_literal" | "raw_string_literal"
+            NodeType::Normal("interpreted_string_literal") | NodeType::Normal("raw_string_literal")
         )
     }
 }

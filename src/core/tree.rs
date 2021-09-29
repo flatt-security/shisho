@@ -1,10 +1,7 @@
 use crate::core::{
     language::Queryable,
     matcher::{MatchedItem, TreeMatcher},
-    query::{
-        Query, SHISHO_NODE_ELLIPSIS, SHISHO_NODE_ELLIPSIS_METAVARIABLE, SHISHO_NODE_METAVARIABLE,
-        SHISHO_NODE_METAVARIABLE_NAME,
-    },
+    query::Query,
 };
 use anyhow::{anyhow, Result};
 use std::{
@@ -13,7 +10,10 @@ use std::{
     marker::PhantomData,
 };
 
-use super::{node::Node, source::NormalizedSource};
+use super::{
+    node::{Node, NodeType},
+    source::NormalizedSource,
+};
 
 pub struct Tree<'tree, T> {
     pub source: Vec<u8>,
@@ -171,27 +171,9 @@ where
 
     fn handle_node(&self, node: &Node) -> Result<Self::Output, anyhow::Error> {
         match node.kind() {
-            SHISHO_NODE_ELLIPSIS => self.walk_ellipsis(node),
-            s if s == SHISHO_NODE_ELLIPSIS_METAVARIABLE || s == SHISHO_NODE_METAVARIABLE => {
-                let variable_name = node
-                    .children
-                    .iter()
-                    .filter(|c| c.is_named())
-                    .find(|child| child.kind() == SHISHO_NODE_METAVARIABLE_NAME)
-                    .map(|child| child.utf8_text())
-                    .ok_or(anyhow!(
-                        "{} did not have {}",
-                        SHISHO_NODE_ELLIPSIS_METAVARIABLE,
-                        SHISHO_NODE_METAVARIABLE_NAME
-                    ))?;
-                if s == SHISHO_NODE_ELLIPSIS_METAVARIABLE {
-                    self.walk_ellipsis_metavariable(node, variable_name)
-                } else if s == SHISHO_NODE_METAVARIABLE {
-                    self.walk_metavariable(node, variable_name)
-                } else {
-                    panic!("invalid state")
-                }
-            }
+            NodeType::Ellipsis => self.walk_ellipsis(node),
+            NodeType::EllipsisMetavariable(mid) => self.walk_ellipsis_metavariable(node, &mid.0),
+            NodeType::Metavariable(mid) => self.walk_metavariable(node, &mid.0),
             _ if (self.children_of(node) == 0 || T::is_leaf_like(node)) => {
                 if node.is_named() {
                     self.walk_leaf_named_node(node)
