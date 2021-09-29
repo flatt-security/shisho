@@ -8,4 +8,5 @@ pub mod subcommand;
 
 mod encoding;
 
+#[cfg(test)]
 mod tests;
