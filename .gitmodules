@@ -1,6 +1,6 @@
 [submodule "third_party/tree-sitter-hcl"]
 path = third_party/tree-sitter-hcl
-url = https://github.com/MichaHoffmann/tree-sitter-hcl
+url = https://github.com/flatt-security/tree-sitter-hcl
 [submodule "third_party/tree-sitter-hcl-query"]
 path = third_party/tree-sitter-hcl-query
 url = https://github.com/flatt-security/tree-sitter-hcl-query
