@@ -28,12 +28,22 @@ impl<'a, W: std::io::Write> Reporter<'a> for ConsoleReporter<'a, W> {
 
         for (rule, mitem) in items {
             // print metadata of the matched items
-            writeln!(
-                self.writer,
-                "{}: {}",
-                Color::Red.paint(format!("[{}]", rule.id)),
-                Color::White.bold().paint(rule.message.clone().trim_end())
-            )?;
+
+            if let Some(title) = &rule.title {
+                writeln!(
+                    self.writer,
+                    "{}: {}",
+                    Color::Red.paint(format!("[{} ({})]", title.to_string(), rule.id)),
+                    Color::White.bold().paint(rule.message.clone().trim_end())
+                )?;
+            } else {
+                writeln!(
+                    self.writer,
+                    "{}: {}",
+                    Color::Red.paint(format!("[{}]", rule.id)),
+                    Color::White.bold().paint(rule.message.clone().trim_end())
+                )?;
+            }
 
             // print a finding
             writeln!(self.writer, "In {}:", target.canonicalized_path())?;

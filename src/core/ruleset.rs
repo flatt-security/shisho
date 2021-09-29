@@ -19,6 +19,8 @@ pub struct Rule {
     pub id: String,
 
     pub language: Language,
+
+    pub title: Option<String>,
     pub message: String,
 
     #[serde(default)]
@@ -51,6 +53,7 @@ impl Rule {
             message,
             language,
             constraints,
+            title: None,
 
             patterns,
             pattern: None,
