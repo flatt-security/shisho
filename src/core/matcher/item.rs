@@ -60,13 +60,13 @@ impl<'tree> MatchedItem<'tree> {
     }
 
     pub fn satisfies<T: Queryable + 'static>(&self, constraint: &Constraint<T>) -> Result<bool> {
-        if !self.captures.contains_key(&constraint.target) {
-            return Ok(false);
-        }
-
+        let captured_item = self.capture_of(&constraint.target);
         match &constraint.predicate {
             Predicate::MatchQuery(q) => {
-                let captured_item = self.capture_of(&constraint.target).unwrap();
+                if captured_item.is_none() {
+                    return Ok(false);
+                }
+                let captured_item = captured_item.unwrap();
                 match captured_item {
                     CaptureItem::Empty => Ok(false),
                     CaptureItem::Literal(_) => Err(anyhow::anyhow!(
@@ -79,7 +79,10 @@ impl<'tree> MatchedItem<'tree> {
                 }
             }
             Predicate::NotMatchQuery(q) => {
-                let captured_item = self.capture_of(&constraint.target).unwrap();
+                if captured_item.is_none() {
+                    return Ok(true);
+                }
+                let captured_item = captured_item.unwrap();
                 match captured_item {
                     CaptureItem::Empty => Ok(true),
                     CaptureItem::Literal(_) => Err(anyhow::anyhow!(
@@ -93,10 +96,16 @@ impl<'tree> MatchedItem<'tree> {
             }
 
             Predicate::MatchRegex(r) => {
-                Ok(r.is_match(self.capture_of(&constraint.target).unwrap().as_str()))
+                if captured_item.is_none() {
+                    return Ok(false);
+                }
+                Ok(r.is_match(captured_item.unwrap().as_str()))
             }
             Predicate::NotMatchRegex(r) => {
-                Ok(!r.is_match(self.capture_of(&constraint.target).unwrap().as_str()))
+                if captured_item.is_none() {
+                    return Ok(true);
+                }
+                Ok(!r.is_match(captured_item.unwrap().as_str()))
             }
         }
     }

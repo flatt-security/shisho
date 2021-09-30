@@ -27,18 +27,26 @@ pub struct Rule {
     pub message: String,
 
     #[serde(default)]
-    patterns: Vec<String>,
-    pattern: Option<String>,
-
-    #[serde(default)]
     pub tags: Vec<Tag>,
 
     #[serde(default)]
-    pub constraints: Vec<RawConstraint>,
+    patterns: Vec<RawPatternWithConstraints>,
+
+    pattern: Option<String>,
+    #[serde(default)]
+    constraints: Vec<RawConstraint>,
 
     #[serde(default)]
     rewrite_options: Vec<String>,
     rewrite: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct RawPatternWithConstraints {
+    pub pattern: String,
+
+    #[serde(default)]
+    pub constraints: Vec<RawConstraint>,
 }
 
 impl Rule {
@@ -46,8 +54,7 @@ impl Rule {
         id: String,
         language: Language,
         message: String,
-        patterns: Vec<String>,
-        constraints: Vec<RawConstraint>,
+        patterns: Vec<RawPatternWithConstraints>,
         rewrite_options: Vec<String>,
         tags: Vec<Tag>,
     ) -> Self {
@@ -55,16 +62,17 @@ impl Rule {
             id,
             message,
             language,
-            constraints,
+
             title: None,
 
             patterns,
-            pattern: None,
-
             rewrite_options,
-            rewrite: None,
-
             tags,
+
+            // these params are just for YAMLs
+            pattern: None,
+            constraints: vec![],
+            rewrite: None,
         }
     }
 
@@ -76,27 +84,29 @@ impl Rule {
         T: Queryable,
         'tree: 'item,
     {
-        let constraints = self
-            .constraints
-            .iter()
-            .map(|x| Constraint::try_from(x.clone()))
-            .collect::<Result<Vec<Constraint<T>>>>()?;
-
         let patterns = self.get_patterns()?;
         let mut matches = vec![];
-        for p in patterns {
-            let p = Pattern::<T>::try_from(p.as_str())?;
-            matches.extend(
-                tree.matches(&p.as_query())
-                    .filter(|x| x.satisfies_all(&constraints).unwrap_or(false)),
-            );
+        for rp in patterns {
+            let p = Pattern::<T>::try_from(rp.pattern.as_str())?;
+            let constraints = rp
+                .constraints
+                .iter()
+                .map(|x| Constraint::try_from(x.clone()))
+                .collect::<Result<Vec<Constraint<T>>>>()?;
+            matches.extend(tree.matches(&p.as_query()).filter(|x| {
+                // TODO (y0n3uchy): is this unwrap_or okay? do we need to emit errors?
+                x.satisfies_all(&constraints).unwrap_or(false)
+            }));
         }
         Ok(matches)
     }
 
-    pub fn get_patterns(&self) -> Result<Vec<String>> {
+    pub fn get_patterns(&self) -> Result<Vec<RawPatternWithConstraints>> {
         match (&self.pattern, &self.patterns) {
-            (Some(p), patterns) if patterns.is_empty() => Ok(vec![p.to_string()]),
+            (Some(p), patterns) if patterns.is_empty() => Ok(vec![RawPatternWithConstraints {
+                pattern: p.to_string(),
+                constraints: self.constraints.clone(),
+            }]),
             (None, patterns) if !patterns.is_empty() => Ok(patterns.clone()),
             _ => Err(anyhow::anyhow!(
                 "You can use only one of `pattern` or `patterns`."

@@ -3,7 +3,7 @@
 use crate::cli::encoding::{parse_encoding, LABELS_SORTED};
 use crate::cli::reporter::{ConsoleReporter, JSONReporter, Reporter, ReporterType, SARIFReporter};
 use crate::cli::{subcommand::check::handle_rulemap, CommonOpts, ReportOpts};
-use crate::core::ruleset::{self, Rule};
+use crate::core::ruleset::{self, RawPatternWithConstraints, Rule};
 use ansi_term::Color;
 use anyhow::Result;
 use encoding_rs::Encoding;
@@ -64,8 +64,10 @@ fn handle_opts(opts: FindOpts) -> Result<usize> {
         "inline".into(),
         opts.lang,
         "matched with the given rule".into(),
-        vec![opts.pattern],
-        vec![],
+        vec![RawPatternWithConstraints {
+            pattern: opts.pattern,
+            constraints: vec![],
+        }],
         opts.rewrite.map_or(vec![], |x| vec![x]),
         vec![],
     );
