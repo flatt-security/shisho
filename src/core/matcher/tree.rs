@@ -88,7 +88,7 @@ impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
                 }
 
                 (None, Some(qchild)) => match qchild.kind() {
-                    NodeType::Ellipsis => {
+                    NodeType::Ellipsis if qidx == qsibilings.len() - 1 => {
                         let nodes = tsibilings[..tidx.min(tsibilings.len())].to_vec();
                         result.push((
                             MatcherState {
@@ -98,7 +98,7 @@ impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
                             None,
                         ))
                     }
-                    NodeType::EllipsisMetavariable(mid) => {
+                    NodeType::EllipsisMetavariable(mid) if qidx == qsibilings.len() - 1 => {
                         let nodes = tsibilings[..tidx.min(tsibilings.len())].to_vec();
                         result.push((
                             MatcherState {
