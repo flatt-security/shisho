@@ -11,7 +11,7 @@ use std::{
 };
 
 use super::{
-    node::{Node, NodeType, RootNode},
+    node::{Node, RootNode},
     source::NormalizedSource,
 };
 
@@ -128,68 +128,6 @@ where
             source,
             _marker: PhantomData,
         }
-    }
-}
-
-#[allow(unused)]
-pub trait TreeVisitor<'tree, T>
-where
-    T: Queryable,
-{
-    type Output;
-
-    fn walk_leaf_named_node(&self, node: &Node) -> Result<Self::Output, anyhow::Error>;
-
-    fn walk_leaf_unnamed_node(&self, node: &Node) -> Result<Self::Output, anyhow::Error>;
-
-    fn walk_intermediate_node(&self, node: &Node) -> Result<Self::Output, anyhow::Error> {
-        let children = node
-            .children
-            .iter()
-            .map(|child| self.handle_node(child))
-            .collect::<Result<Vec<Self::Output>, anyhow::Error>>()?;
-
-        self.flatten_intermediate_node(node, children)
-    }
-
-    fn flatten_intermediate_node(
-        &self,
-        node: &Node,
-        children: Vec<Self::Output>,
-    ) -> Result<Self::Output, anyhow::Error>;
-
-    fn walk_ellipsis(&self, node: &Node) -> Result<Self::Output, anyhow::Error>;
-
-    fn walk_ellipsis_metavariable(
-        &self,
-        node: &Node,
-        variable_name: &str,
-    ) -> Result<Self::Output, anyhow::Error>;
-
-    fn walk_metavariable(
-        &self,
-        node: &Node,
-        variable_name: &str,
-    ) -> Result<Self::Output, anyhow::Error>;
-
-    fn handle_node(&self, node: &Node) -> Result<Self::Output, anyhow::Error> {
-        match node.kind() {
-            NodeType::Ellipsis => self.walk_ellipsis(node),
-            NodeType::EllipsisMetavariable(mid) => self.walk_ellipsis_metavariable(node, &mid.0),
-            NodeType::Metavariable(mid) => self.walk_metavariable(node, &mid.0),
-            _ if (self.children_of(node) == 0 || T::is_leaf_like(node)) => {
-                if node.is_named() {
-                    self.walk_leaf_named_node(node)
-                } else {
-                    self.walk_leaf_unnamed_node(node)
-                }
-            }
-            _ => self.walk_intermediate_node(node),
-        }
-    }
-
-    fn children_of(&self, node: &Node) -> usize {
-        node.children.len()
     }
 }
 
