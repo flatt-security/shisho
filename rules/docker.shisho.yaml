@@ -5,5 +5,7 @@ rules:
     message: |
       `latest` tag is used. Consider to use more concrete tag.
     patterns:
-      - FROM :[_]:latest
-      - FROM :[_]:latest as :[_]
+      - pattern: |
+          FROM :[_]:latest
+      - pattern: |
+          FROM :[_]:latest as :[_]
