@@ -38,7 +38,7 @@ impl Queryable for Go {
 mod tests {
     use crate::core::matcher::MatchedItem;
     use crate::core::pattern::Pattern;
-    use crate::core::transform::Transformable;
+    use crate::core::rewriter::Rewritable;
     use crate::core::tree::TreeView;
     use crate::core::{query::MetavariableId, source::Code, tree::Tree};
     use std::convert::TryFrom;
@@ -454,7 +454,7 @@ mod tests {
         assert_eq!(c.len(), 1);
 
         let autofix = Pattern::<Go>::try_from(":[X]").unwrap();
-        let from_code = code.transform(&c.pop().unwrap(), autofix.as_autofix());
+        let from_code = code.to_rewritten_form(&c.pop().unwrap(), autofix.as_autofix());
         assert!(from_code.is_ok());
 
         assert_eq!(from_code.unwrap().as_str(), "func a() { b := 1 }",);
