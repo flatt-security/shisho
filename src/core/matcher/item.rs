@@ -60,44 +60,39 @@ impl<'tree> MatchedItem<'tree> {
     }
 
     pub fn satisfies<T: Queryable + 'static>(&self, constraint: &Constraint<T>) -> Result<bool> {
-        if !self.captures.contains_key(&constraint.target) {
-            return Ok(false);
+        let captured_item = self.capture_of(&constraint.target);
+        if captured_item.is_none() {
+            return Err(anyhow::anyhow!(
+                "uncaptured variable was specified as constraint target: {}",
+                constraint.target.0
+            ));
         }
+        let captured_item = captured_item.unwrap();
 
         match &constraint.predicate {
-            Predicate::MatchQuery(q) => {
-                let captured_item = self.capture_of(&constraint.target).unwrap();
-                match captured_item {
-                    CaptureItem::Empty => Ok(false),
-                    CaptureItem::Literal(_) => Err(anyhow::anyhow!(
-                        "match-query predicate for string literals is not supported"
-                    )),
-                    CaptureItem::Nodes(n) => Ok(n.as_vec().iter().any(|node| {
-                        let ptree = TreeView::<T>::from((*node).clone());
-                        !ptree.matches(&q.into()).count() == 0
-                    })),
-                }
-            }
-            Predicate::NotMatchQuery(q) => {
-                let captured_item = self.capture_of(&constraint.target).unwrap();
-                match captured_item {
-                    CaptureItem::Empty => Ok(true),
-                    CaptureItem::Literal(_) => Err(anyhow::anyhow!(
-                        "match-query predicate for string literals is not supported"
-                    )),
-                    CaptureItem::Nodes(n) => Ok(n.as_vec().iter().all(|node| {
-                        let ptree = TreeView::<T>::from((*node).clone());
-                        ptree.matches(&q.into()).count() == 0
-                    })),
-                }
-            }
+            Predicate::MatchQuery(q) => match captured_item {
+                CaptureItem::Empty => Ok(false),
+                CaptureItem::Literal(_) => Err(anyhow::anyhow!(
+                    "match-query predicate for string literals is not supported"
+                )),
+                CaptureItem::Nodes(n) => Ok(n.as_vec().iter().any(|node| {
+                    let ptree = TreeView::<T>::from((*node).clone());
+                    !ptree.matches(&q.into()).count() == 0
+                })),
+            },
+            Predicate::NotMatchQuery(q) => match captured_item {
+                CaptureItem::Empty => Ok(true),
+                CaptureItem::Literal(_) => Err(anyhow::anyhow!(
+                    "match-query predicate for string literals is not supported"
+                )),
+                CaptureItem::Nodes(n) => Ok(n.as_vec().iter().all(|node| {
+                    let ptree = TreeView::<T>::from((*node).clone());
+                    ptree.matches(&q.into()).count() == 0
+                })),
+            },
 
-            Predicate::MatchRegex(r) => {
-                Ok(r.is_match(self.capture_of(&constraint.target).unwrap().as_str()))
-            }
-            Predicate::NotMatchRegex(r) => {
-                Ok(!r.is_match(self.capture_of(&constraint.target).unwrap().as_str()))
-            }
+            Predicate::MatchRegex(r) => Ok(r.is_match(captured_item.as_str())),
+            Predicate::NotMatchRegex(r) => Ok(!r.is_match(captured_item.as_str())),
         }
     }
 }

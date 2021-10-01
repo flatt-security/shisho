@@ -120,8 +120,8 @@ where
             .item
             .capture_of(&id)
             .map(|x| x.as_str())
+            // TODO: should be handle this None like `.ok_or(anyhow!("metavariable not found"))?;`?
             .unwrap_or_default();
-        // .ok_or(anyhow!("metavariable not found"))?;
         Ok(PatchedItem {
             body: value.into(),
             start_byte: node.start_byte(),
