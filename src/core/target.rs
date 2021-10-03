@@ -52,9 +52,13 @@ impl Target {
     }
 
     pub fn relative_path(&self) -> String {
+        self.relative_path_from(&env::current_dir().unwrap())
+    }
+
+    fn relative_path_from(&self, base: &PathBuf) -> String {
         if let Some(ref p) = self.path {
             let p = p.canonicalize().unwrap();
-            let p = diff_paths(p, env::current_dir().unwrap()).unwrap();
+            let p = diff_paths(p, base).unwrap();
             p.to_string_lossy().to_string()
         } else {
             "/dev/stdin".to_string()
@@ -94,5 +98,35 @@ impl Target {
             .filter(|p| p.is_file())
             .map(move |p| Target::from(Some(p), encoding))
             .filter_map(|e| e.ok())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::Target;
+
+    #[test]
+    fn test_relative_path() {
+        {
+            let t = Target {
+                path: Some(PathBuf::from(format!("{}", file!()))),
+                body: "".to_string(),
+            };
+
+            let p = t.relative_path_from(&PathBuf::from("/workdir/hoge"));
+            assert_eq!(
+                p,
+                format!(
+                    "../..{}",
+                    PathBuf::from(file!())
+                        .canonicalize()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                )
+            );
+        }
     }
 }
