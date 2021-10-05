@@ -29,10 +29,10 @@ const config = {
     },
   },
   sidebar: {
-    forcedNavOrder: ['/', '/getting-started', '/learn-shisho', '/roadmap'],
+    forcedNavOrder: ['/', '/getting-started', '/learn-shisho', '/supported-languages', '/roadmap'],
     collapsedNav: [],
     links: [
-      { text: 'Shisho as a Service', link: 'https://shisho.dev' },
+      { text: 'Shisho Cloud', link: 'https://shisho.dev' },
       { text: 'Flatt Security Inc.', link: 'https://flatt.tech/en' },
     ],
     frontline: false,
