@@ -5,7 +5,7 @@ metaTitle: 'Shisho - A lightweight static code analyzer'
 
 # Welcome to Shisho
 
-**Shisho is a lightweight static code analyzer designed for developers**. It is, so to speak, something like pluggable and configurable linter; it gives developers a way to codify your domain knowledge over your code as *rules*. With powerful automation and integration capabilities, the rules will help you find and fix issues semiautomatically.
+**Shisho is a lightweight static code analyzer designed for developers**. It is, so to speak, like a pluggable and configurable linter; it gives developers a way to codify your domain knowledge over your code as *rules*. With powerful automation and integration capabilities, the rules will help you find and fix issues semiautomatically.
 
 ![demo](./images/shisho-demo.gif)
 
@@ -38,7 +38,7 @@ rules:
 
 ## Getting Started
 
-Just pull and run our docker image and you're ready to use 🎉
+Just pull and run our docker image, and you're ready to use 🎉
 
 ```sh
 docker run -i -v $(pwd):/workspace ghcr.io/flatt-security/shisho-cli:latest
@@ -50,11 +50,11 @@ See [Getting Started](/getting-started) to learn Shisho more.
 
 Shisho has mainly two strengths: **it runs everywhere**, and **it runs extremely fast**.
 
-> 📝 We already have `sed` or something like that. There are already several static analysis engines in the world indeed. Now you may wonder why do we need shisho now --- see [this page ("Comparison")](/comparison) page to know that.
+> 📝 We already have `sed` or something like that. There are already several static analysis engines in the world indeed. Now you may wonder why do we need Shisho now --- see [this page ("Comparison")](/comparison) page to know that.
 
 ### 1. Run Extremely Fast
 
-In additition, **Shisho runs everywhere**! You can use this tool offline so that you don't need to transfer your code anywhere. One can use Shisho inside Continuous Integration (CI) systems like GitHub Actions.
+In addition, **Shisho runs everywhere**! You can use this tool offline so that you don't need to transfer your code anywhere. One can use Shisho inside Continuous Integration (CI) systems like GitHub Actions.
 
 ### 2. Run Everywhere
 
@@ -63,7 +63,7 @@ Another key aspect of Shisho is **speed**; it runs so fast with the help of [Rus
 
 ## Language Support
 
-See [the roadmap](/roadmap) for further details. You can request a new language support at [GitHub issues](https://github.com/flatt-security/shisho/issues)!
+See [the roadmap](/roadmap) for further details. You can request new language support at [GitHub issues](https://github.com/flatt-security/shisho/issues)!
 
 ## Feedback
 
