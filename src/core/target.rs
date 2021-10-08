@@ -13,35 +13,122 @@ pub struct Target {
     pub body: String,
 }
 
-impl Target {
-    pub fn from(path: Option<PathBuf>, encoding: Option<&'static Encoding>) -> Result<Self> {
-        if let Some(path) = path {
-            let body_bytes = std::fs::read(&path)?;
-            let mut decoder = DecodeReaderBytesBuilder::new()
-                .encoding(encoding)
-                .build(&body_bytes[..]);
+#[derive(Debug)]
+pub struct TargetLoader {
+    exclude_path_pattern: Vec<glob::Pattern>,
+    encoding: Option<&'static Encoding>,
+}
 
-            let mut body_string = String::new();
-            decoder.read_to_string(&mut body_string)?;
+impl TargetLoader {
+    pub fn new(
+        exclude_path_pattern: Vec<String>,
+        encoding: Option<&'static Encoding>,
+    ) -> Result<Self> {
+        let exclude_path_pattern = exclude_path_pattern
+            .into_iter()
+            .map(|p| {
+                let mut ps = vec![glob::Pattern::new(&p)
+                    .map_err(|e| anyhow::anyhow!("failed to load exclude pattern: {}", e))];
 
-            Ok(Target {
-                path: Some(path),
-                body: body_string,
+                // TODO (y0n3uchy): fix this dirty hack to exclude `./bar/piyo.go` with a pattern `bar` (i.e. without ./)
+                if !p.starts_with("./") && !p.starts_with("/") {
+                    ps.push(
+                        glob::Pattern::new(&format!("./{}", p))
+                            .map_err(|e| anyhow::anyhow!("failed to load exclude pattern: {}", e)),
+                    );
+
+                    ps.push(
+                        glob::Pattern::new(&format!(
+                            "./{}{}",
+                            p,
+                            if p.ends_with("/") { "**" } else { "/**" }
+                        ))
+                        .map_err(|e| anyhow::anyhow!("failed to load exclude pattern: {}", e)),
+                    );
+                };
+
+                // TODO (y0n3uchy): fix this dirty hack to exclude `bar/piyo.go` with a pattern `bar`
+                if !p.ends_with("*") {
+                    ps.push(
+                        glob::Pattern::new(&format!(
+                            "{}{}",
+                            p,
+                            if p.ends_with("/") { "**" } else { "/**" }
+                        ))
+                        .map_err(|e| anyhow::anyhow!("failed to load exclude pattern: {}", e)),
+                    );
+                };
+                ps
             })
+            .flatten()
+            .collect::<Result<Vec<glob::Pattern>>>()?;
+
+        Ok(TargetLoader {
+            exclude_path_pattern,
+            encoding,
+        })
+    }
+
+    pub fn from(&self, p: PathBuf) -> Result<Vec<Target>> {
+        if p.is_dir() {
+            Ok(self.from_dir(p))
         } else {
-            let mut decoder = DecodeReaderBytesBuilder::new()
-                .encoding(encoding)
-                .build(std::io::stdin());
-
-            let mut body_string = String::new();
-            decoder.read_to_string(&mut body_string)?;
-
-            Ok(Target {
-                path,
-                body: body_string,
-            })
+            if self.should_load(&p) {
+                Ok(vec![self.from_file(p)?])
+            } else {
+                Ok(vec![])
+            }
         }
     }
+
+    fn from_dir(&self, p: PathBuf) -> Vec<Target> {
+        WalkDir::new(p)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .map(|e| e.into_path())
+            .filter(|p| p.is_file() && self.should_load(p))
+            .map(move |p| self.from_file(p))
+            .filter_map(|e| e.ok())
+            .collect()
+    }
+
+    fn from_file(&self, p: PathBuf) -> Result<Target> {
+        let body_bytes = std::fs::read(&p)?;
+        let mut decoder = DecodeReaderBytesBuilder::new()
+            .encoding(self.encoding)
+            .build(&body_bytes[..]);
+
+        let mut body_string = String::new();
+        decoder.read_to_string(&mut body_string)?;
+
+        Ok(Target {
+            path: Some(p),
+            body: body_string,
+        })
+    }
+
+    pub fn from_reader<R: std::io::Read>(&self, r: R) -> Result<Target> {
+        let mut decoder = DecodeReaderBytesBuilder::new()
+            .encoding(self.encoding)
+            .build(r);
+
+        let mut body_string = String::new();
+        decoder.read_to_string(&mut body_string)?;
+
+        Ok(Target {
+            path: None,
+            body: body_string,
+        })
+    }
+
+    pub(crate) fn should_load(&self, p: &PathBuf) -> bool {
+        self.exclude_path_pattern
+            .iter()
+            .all(|gpattern| !gpattern.matches(p.as_os_str().to_str().unwrap()))
+    }
+}
+
+impl Target {
     pub fn canonicalized_path(&self) -> String {
         if let Some(ref p) = self.path {
             let p = p.canonicalize().unwrap();
@@ -86,26 +173,31 @@ impl Target {
     }
 }
 
-impl Target {
-    pub fn iter_from(
-        p: PathBuf,
-        encoding: Option<&'static Encoding>,
-    ) -> impl Iterator<Item = Self> {
-        WalkDir::new(p)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .map(|e| e.into_path())
-            .filter(|p| p.is_file())
-            .map(move |p| Target::from(Some(p), encoding))
-            .filter_map(|e| e.ok())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
 
-    use super::Target;
+    use super::{Target, TargetLoader};
+
+    #[test]
+    fn test_loader_exclusion() {
+        let loader = TargetLoader::new(vec!["foo".into(), "bar/*".into()], None).unwrap();
+        assert!(loader.should_load(&PathBuf::from("hoge.go")));
+        assert!(loader.should_load(&PathBuf::from("piyo/hoge.go")));
+        assert!(loader.should_load(&PathBuf::from("./hoge.go")));
+        assert!(loader.should_load(&PathBuf::from("./piyo/hoge.go")));
+
+        assert!(!loader.should_load(&PathBuf::from("foo/hoge.go")));
+        assert!(!loader.should_load(&PathBuf::from("foo/bar/bar.go")));
+        assert!(!loader.should_load(&PathBuf::from("./foo/hoge.go")));
+        assert!(!loader.should_load(&PathBuf::from("./foo/bar/bar.go")));
+
+        assert!(loader.should_load(&PathBuf::from("foobar/bar/bar.go")));
+        assert!(loader.should_load(&PathBuf::from("./foobar/bar/bar.go")));
+
+        assert!(!loader.should_load(&PathBuf::from("bar/aaa.go")));
+        assert!(!loader.should_load(&PathBuf::from("./bar/aaa.go")));
+    }
 
     #[test]
     fn test_relative_path() {

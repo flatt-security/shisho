@@ -30,6 +30,7 @@ macro_rules! ruleset_test {
                     encoding: encoding,
                     target_path: Some(target),
                     exit_zero: false,
+                    exclude: vec![],
                 });
                 match (r, mitem_num) {
                     (Ok(x), Ok(y)) if x == y => (),

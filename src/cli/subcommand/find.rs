@@ -40,6 +40,9 @@ pub struct FindOpts {
 
     #[structopt(flatten)]
     pub report: ReportOpts,
+
+    #[structopt(long)]
+    pub exclude: Vec<String>,
 }
 
 pub fn run(opts: FindOpts) -> i32 {
@@ -81,18 +84,21 @@ fn handle_opts(opts: FindOpts) -> Result<usize> {
         ReporterType::JSON => handle_rulemap(
             JSONReporter::new(&mut stdout),
             opts.target_path,
+            opts.exclude,
             opts.encoding,
             rule_map,
         ),
         ReporterType::Console => handle_rulemap(
             ConsoleReporter::new(&mut stdout),
             opts.target_path,
+            opts.exclude,
             opts.encoding,
             rule_map,
         ),
         ReporterType::SARIF => handle_rulemap(
             SARIFReporter::new(&mut stdout),
             opts.target_path,
+            opts.exclude,
             opts.encoding,
             rule_map,
         ),
