@@ -68,6 +68,7 @@ jobs:
           output-format: "sarif"
           output-path: "shisho.sarif"
           succeed-always: true
+          paths-ignore: "./third_party,./docs"
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@v1
         with:
