@@ -72,10 +72,12 @@ where
 
     fn from_node(&self, node: &Node) -> Result<Segment, anyhow::Error> {
         match node.kind() {
-            NodeType::Ellipsis | NodeType::EllipsisMetavariable(_) => Err(anyhow!(
+            NodeType::Ellipsis => Err(anyhow!(
                 "cannot use ellipsis operator inside the transformation query"
             )),
-            NodeType::Metavariable(mid) => self.from_metavariable(node, &mid.0),
+            NodeType::Metavariable(mid) | NodeType::EllipsisMetavariable(mid) => {
+                self.from_metavariable(node, &mid.0)
+            }
             _ if (node.children.len() == 0 || T::is_leaf_like(node)) => self.from_leaf(node),
             _ => self.from_intermediate_node(node),
         }
