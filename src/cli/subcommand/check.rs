@@ -4,6 +4,7 @@ use crate::cli::encoding::{parse_encoding, LABELS_SORTED};
 use crate::cli::reporter::{ConsoleReporter, JSONReporter, Reporter, ReporterType, SARIFReporter};
 use crate::cli::{CommonOpts, ReportOpts};
 use crate::core::source::NormalizedSource;
+use crate::core::target::TargetLoader;
 use crate::core::tree::TreeView;
 use crate::core::{
     language::{Dockerfile, Go, Queryable, HCL},
@@ -40,6 +41,9 @@ pub struct CheckOpts {
 
     #[structopt(flatten)]
     pub report: ReportOpts,
+
+    #[structopt(long)]
+    pub exclude: Vec<String>,
 }
 
 pub fn run(opts: CheckOpts) -> i32 {
@@ -86,18 +90,21 @@ pub(crate) fn handle_opts(opts: CheckOpts) -> Result<usize> {
         ReporterType::JSON => handle_rulemap(
             JSONReporter::new(&mut stdout),
             opts.target_path,
+            opts.exclude,
             opts.encoding,
             rule_map,
         ),
         ReporterType::Console => handle_rulemap(
             ConsoleReporter::new(&mut stdout),
             opts.target_path,
+            opts.exclude,
             opts.encoding,
             rule_map,
         ),
         ReporterType::SARIF => handle_rulemap(
             SARIFReporter::new(&mut stdout),
             opts.target_path,
+            opts.exclude,
             opts.encoding,
             rule_map,
         ),
@@ -107,13 +114,16 @@ pub(crate) fn handle_opts(opts: CheckOpts) -> Result<usize> {
 pub(crate) fn handle_rulemap<'a>(
     mut reporter: impl Reporter<'a>,
     target_path: Option<PathBuf>,
+
+    exclude_path_pattern: Vec<String>,
     encoding: Option<&'static Encoding>,
     rule_map: HashMap<ruleset::Language, Vec<Rule>>,
 ) -> Result<usize> {
     let mut total_findings = 0;
+    let loader = TargetLoader::new(exclude_path_pattern, encoding)?;
     match target_path {
-        Some(p) if p.is_dir() => {
-            for target in Target::iter_from(p, encoding) {
+        Some(p) => {
+            for target in loader.from(p)? {
                 if let Some(lang) = target.language() {
                     if let Some(rules) = rule_map.get(&lang) {
                         total_findings += handle_rules(&mut reporter, &target, rules, &lang)?;
@@ -121,16 +131,8 @@ pub(crate) fn handle_rulemap<'a>(
                 }
             }
         }
-        Some(p) => {
-            let target = Target::from(Some(p), encoding)?;
-            if let Some(lang) = target.language() {
-                if let Some(rules) = rule_map.get(&lang) {
-                    total_findings += handle_rules(&mut reporter, &target, rules, &lang)?;
-                }
-            }
-        }
         _ => {
-            let target = Target::from(None, encoding)?;
+            let target = loader.from_reader(std::io::stdin())?;
             for (lang, rules) in rule_map {
                 total_findings += handle_rules(&mut reporter, &target, &rules, &lang)?;
             }
