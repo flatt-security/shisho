@@ -35,6 +35,15 @@ mod tests {
             ("match-any-of-regex-pattern.yaml", "unmatch.tf", Result::Ok(0), None),
             ("not-match-any-of-regex-pattern.yaml", "match.tf", Result::Ok(1), None),
             ("not-match-any-of-regex-pattern.yaml", "unmatch.tf", Result::Ok(0), None),
+
+            ("invalid-match-string.yaml", "unmatch.tf", Result::Err(anyhow::anyhow!("")), None),
+            ("invalid-match-strings.yaml", "unmatch.tf", Result::Err(anyhow::anyhow!("")), None),
+
+            ("ambiguous-pattern-use.yaml", "unmatch.tf", Result::Err(anyhow::anyhow!("")), None),
+            ("ambiguous-regex-pattern-use.yaml", "unmatch.tf", Result::Err(anyhow::anyhow!("")), None),
+
+            ("mixed-pattern-like.yaml", "unmatch.tf", Result::Err(anyhow::anyhow!("")), None),
+            ("no-pattern-like.yaml", "unmatch.tf", Result::Err(anyhow::anyhow!("")), None),
         ],
     }
 }

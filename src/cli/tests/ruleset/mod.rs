@@ -34,7 +34,7 @@ macro_rules! ruleset_test {
                 });
                 match (r, mitem_num) {
                     (Ok(x), Ok(y)) if x == y => (),
-                    (Err(x), Err(y)) if x.to_string() == y.to_string() => (),
+                    (Err(_), Err(_)) => (),
                     (x, y) => panic!("[{}] {} + {}: expected {:?}, got {:?}", stringify!($name), lvalue, rvalue, y, x),
                 }
             }

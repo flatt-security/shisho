@@ -137,10 +137,15 @@ where
                     return Err(anyhow::anyhow!("(not-)be-any-of cannot handle pattern(s) and regex-pattern(s). use string(s) instead."));
                 }
 
+                let strings = rc.get_strings()?;
+                if strings.len() == 0 {
+                    return Err(anyhow::anyhow!("(not-)be-any-of requires at least one string specified with `string(s)` attribute"));
+                }
+
                 if rc.should == RawPredicate::BeAnyOf {
-                    Predicate::BeAnyOf(rc.get_strings()?)
+                    Predicate::BeAnyOf(strings)
                 } else if rc.should == RawPredicate::NotBeAnyOf {
-                    Predicate::NotBeAnyOf(rc.get_strings()?)
+                    Predicate::NotBeAnyOf(strings)
                 } else {
                     unreachable!("invalid state")
                 }
