@@ -98,7 +98,7 @@ where
     {
         TreeMatcher::new(self, &qc.query).filter_map(move |x| {
             // TODO (y0n3uchy): is this unwrap_or okay? do we need to emit errors?
-            match x.satisfies_all(&qc.constraints) {
+            match x.satisfies_all(qc.constraints) {
                 Ok(true) => Some(Ok(x)),
                 Ok(false) => None,
                 Err(e) => Some(Err(anyhow::anyhow!(

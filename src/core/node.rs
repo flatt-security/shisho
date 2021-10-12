@@ -239,6 +239,10 @@ impl<'tree> ConsecutiveNodes<'tree> {
         self.as_vec().len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     #[inline]
     pub fn with_extra_newline(&self) -> bool {
         self.as_vec().last().unwrap().with_extra_newline
