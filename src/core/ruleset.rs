@@ -153,20 +153,29 @@ impl Rule {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "kebab-case")]
 pub struct RawConstraint {
     pub target: String,
     pub should: RawPredicate,
 
     pub pattern: Option<String>,
     #[serde(default)]
-    pub constraints: Vec<RawConstraint>,
+    pub patterns: Vec<RawPatternWithConstraints>,
 
     #[serde(default)]
-    pub patterns: Vec<RawPatternWithConstraints>,
+    pub constraints: Vec<RawConstraint>,
+
+    pub string: Option<String>,
+    #[serde(default)]
+    pub strings: Vec<String>,
+
+    pub regex_pattern: Option<String>,
+    #[serde(default)]
+    pub regex_patterns: Vec<String>,
 }
 
 impl RawConstraint {
-    pub fn get_patterns(&self) -> Result<Vec<RawPatternWithConstraints>> {
+    pub fn get_pattern_with_constraints(&self) -> Result<Vec<RawPatternWithConstraints>> {
         match (&self.pattern, &self.patterns) {
             (Some(p), patterns) if patterns.is_empty() => Ok(vec![RawPatternWithConstraints {
                 pattern: p.to_string(),
@@ -178,16 +187,47 @@ impl RawConstraint {
             )),
         }
     }
+
+    pub fn get_strings(&self) -> Result<Vec<String>> {
+        match (&self.string, &self.strings) {
+            (Some(p), patterns) if patterns.is_empty() => Ok(vec![p.to_string()]),
+            (None, patterns) if !patterns.is_empty() => Ok(patterns.clone()),
+            _ => Err(anyhow::anyhow!(
+                "You can use only one of `string` or `strings`."
+            )),
+        }
+    }
+
+    pub fn get_regex_patterns(&self) -> Result<Vec<String>> {
+        match (&self.regex_pattern, &self.regex_patterns) {
+            (Some(p), patterns) if patterns.is_empty() => Ok(vec![p.to_string()]),
+            (None, patterns) if !patterns.is_empty() => Ok(patterns.clone()),
+            _ => Err(anyhow::anyhow!(
+                "You can use only one of `regex-pattern` or `regex-patterns`."
+            )),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub enum RawPredicate {
+    // takes either of a regex or a pattern
     Match,
     NotMatch,
 
+    // takes either of regex-patterns or patterns
+    MatchAnyOf,
+    NotMatchAnyOf,
+
+    // TODO: mark this as deprecated
+    // takes only a regex
     MatchRegex,
     NotMatchRegex,
+
+    // takes only string
+    BeAnyOf,
+    NotBeAnyOf,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Hash, Eq, Clone, Copy)]

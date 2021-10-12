@@ -5,6 +5,7 @@ use crate::core::{
     constraint::{Constraint, Predicate},
     language::Queryable,
     node::{ConsecutiveNodes, Node},
+    pattern::PatternWithConstraints,
     query::MetavariableId,
     tree::RefTreeView,
 };
@@ -22,6 +23,52 @@ impl<'tree> CaptureItem<'tree> {
             CaptureItem::Empty => "",
             CaptureItem::Literal(s) => s.as_str(),
             CaptureItem::Nodes(n) => n.as_str().unwrap(),
+        }
+    }
+
+    pub fn matches<T: Queryable + 'tree>(
+        &self,
+        q: &PatternWithConstraints<T>,
+    ) -> Result<(bool, CaptureMap<'tree>)> {
+        match self {
+            CaptureItem::Empty => Ok((false, CaptureMap::new())),
+            CaptureItem::Literal(_) => Err(anyhow::anyhow!(
+                "match-query predicate for string literals is not supported"
+            )),
+            CaptureItem::Nodes(n) => {
+                let matches = n
+                    .as_vec()
+                    .iter()
+                    .map(|node: &&'tree Node<'tree>| {
+                        let ptree = RefTreeView::<'tree, T>::from(*node);
+                        let matches = ptree
+                            .matches(&q.into())
+                            .collect::<Result<Vec<MatchedItem<'tree>>>>()?;
+                        let is_empty = matches.is_empty();
+                        let captures = matches
+                            .into_iter()
+                            .map(|m: MatchedItem<'tree>| m.captures)
+                            .fold(
+                                CaptureMap::new(),
+                                |mut acc: CaptureMap<'tree>, v: CaptureMap<'tree>| {
+                                    acc.extend(v);
+                                    acc
+                                },
+                            );
+                        Ok((!is_empty, captures))
+                    })
+                    .collect::<Result<Vec<(bool, CaptureMap<'tree>)>>>()?;
+                let matched_at_least_one = matches.iter().any(|m| m.0);
+                let captures =
+                    matches
+                        .into_iter()
+                        .map(|m| m.1)
+                        .fold(CaptureMap::new(), |mut acc, v| {
+                            acc.extend(v);
+                            acc
+                        });
+                Ok((matched_at_least_one, captures))
+            }
         }
     }
 }
@@ -79,73 +126,59 @@ impl<'tree> MatchedItem<'tree> {
         let captured_item: &CaptureItem<'tree> = captured_item.unwrap();
 
         match &constraint.predicate {
-            Predicate::MatchQuery(q) => match captured_item {
-                CaptureItem::Empty => Ok((false, CaptureMap::new())),
-                CaptureItem::Literal(_) => Err(anyhow::anyhow!(
-                    "match-query predicate for string literals is not supported"
-                )),
-                CaptureItem::Nodes(n) => {
-                    let matches = n
-                        .as_vec()
-                        .iter()
-                        .map(|node: &&'tree Node<'tree>| {
-                            let ptree = RefTreeView::<'tree, T>::from(*node);
-                            let matches = ptree
-                                .matches(&q.into())
-                                .collect::<Result<Vec<MatchedItem<'tree>>>>()?;
-                            let is_empty = matches.is_empty();
-                            let captures = matches
-                                .into_iter()
-                                .map(|m: MatchedItem<'tree>| m.captures)
-                                .fold(
-                                    CaptureMap::new(),
-                                    |mut acc: CaptureMap<'tree>, v: CaptureMap<'tree>| {
-                                        acc.extend(v);
-                                        acc
-                                    },
-                                );
-                            Ok((!is_empty, captures))
-                        })
-                        .collect::<Result<Vec<(bool, CaptureMap<'tree>)>>>()?;
-                    let matched_at_least_one = matches.iter().any(|m| m.0);
-                    let captures =
-                        matches
-                            .into_iter()
-                            .map(|m| m.1)
-                            .fold(CaptureMap::new(), |mut acc, v| {
-                                acc.extend(v);
-                                acc
-                            });
-                    Ok((matched_at_least_one, captures))
-                }
-            },
-            Predicate::NotMatchQuery(q) => match captured_item {
-                CaptureItem::Empty => Ok((true, CaptureMap::new())),
-                CaptureItem::Literal(_) => Err(anyhow::anyhow!(
-                    "match-query predicate for string literals is not supported"
-                )),
-                CaptureItem::Nodes(n) => {
-                    let mached = n
-                        .as_vec()
-                        .iter()
-                        .map(|node| {
-                            let ptree = RefTreeView::<T>::from(*node);
-                            Ok(ptree
-                                .matches(&q.into())
-                                .collect::<Result<Vec<MatchedItem>>>()?
-                                .is_empty())
-                        })
-                        .collect::<Result<Vec<bool>>>()?
+            Predicate::MatchQuery(q) => captured_item.matches(q),
+            Predicate::NotMatchQuery(q) => captured_item
+                .matches(q)
+                .map(|(matched, _)| (!matched, HashMap::new())),
+            Predicate::MatchAnyOfQuery(qs) => {
+                let matches = qs
+                    .into_iter()
+                    .map(|q| captured_item.matches(q))
+                    .collect::<Result<Vec<(bool, CaptureMap)>>>()?;
+                let matched_at_least_one = matches.iter().any(|m| m.0);
+                let captures =
+                    matches
                         .into_iter()
-                        .all(|x| x);
-                    Ok((mached, CaptureMap::new()))
-                }
-            },
+                        .map(|m| m.1)
+                        .fold(CaptureMap::new(), |mut acc, v| {
+                            acc.extend(v);
+                            acc
+                        });
+                Ok((matched_at_least_one, captures))
+            }
+            Predicate::NotMatchAnyOfQuery(qs) => {
+                let matches = qs
+                    .into_iter()
+                    .map(|q| captured_item.matches(q))
+                    .collect::<Result<Vec<(bool, CaptureMap)>>>()?;
+                Ok((!matches.iter().any(|m| m.0), CaptureMap::new()))
+            }
 
             Predicate::MatchRegex(r) => Ok((r.is_match(captured_item.as_str()), CaptureMap::new())),
             Predicate::NotMatchRegex(r) => {
                 Ok((!r.is_match(captured_item.as_str()), CaptureMap::new()))
             }
+            Predicate::MatchAnyOfRegex(rs) => Ok((
+                rs.into_iter().any(|r| r.is_match(captured_item.as_str())),
+                CaptureMap::new(),
+            )),
+            Predicate::NotMatchAnyOfRegex(rs) => Ok((
+                !rs.into_iter().any(|r| r.is_match(captured_item.as_str())),
+                CaptureMap::new(),
+            )),
+
+            Predicate::BeAnyOf(candidates) => Ok((
+                candidates
+                    .into_iter()
+                    .any(|r| r.as_str() == captured_item.as_str()),
+                CaptureMap::new(),
+            )),
+            Predicate::NotBeAnyOf(candidates) => Ok((
+                !candidates
+                    .into_iter()
+                    .any(|r| r.as_str() == captured_item.as_str()),
+                CaptureMap::new(),
+            )),
         }
     }
 }

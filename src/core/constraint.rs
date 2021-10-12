@@ -26,9 +26,16 @@ where
 {
     MatchQuery(PatternWithConstraints<T>),
     NotMatchQuery(PatternWithConstraints<T>),
+    MatchAnyOfQuery(Vec<PatternWithConstraints<T>>),
+    NotMatchAnyOfQuery(Vec<PatternWithConstraints<T>>),
 
     MatchRegex(Regex),
     NotMatchRegex(Regex),
+    MatchAnyOfRegex(Vec<Regex>),
+    NotMatchAnyOfRegex(Vec<Regex>),
+
+    BeAnyOf(Vec<String>),
+    NotBeAnyOf(Vec<String>),
 }
 
 impl<T> TryFrom<RawConstraint> for Constraint<T>
@@ -38,28 +45,46 @@ where
     type Error = anyhow::Error;
 
     fn try_from(rc: RawConstraint) -> Result<Self, Self::Error> {
-        let mut rpcs = rc.get_patterns()?;
         let predicate = match rc.should {
-            RawPredicate::Match => {
-                let patterns = rc.get_patterns()?;
-                if patterns.len() == 1 {
-                    let pc = PatternWithConstraints::<T>::try_from(rpcs.pop().unwrap())?;
-                    Predicate::MatchQuery(pc)
-                } else {
-                    return Err(anyhow::anyhow!("match accepts only one pattern once"));
-                }
-            }
-            RawPredicate::NotMatch => {
-                let patterns = rc.get_patterns()?;
-                if patterns.len() == 1 {
-                    let pc = PatternWithConstraints::<T>::try_from(rpcs.pop().unwrap())?;
-                    Predicate::NotMatchQuery(pc)
-                } else {
-                    return Err(anyhow::anyhow!("not-match accepts only one pattern once"));
+            RawPredicate::Match | RawPredicate::NotMatch => {
+                let mut rpwcs = rc.get_pattern_with_constraints()?;
+                let mut rrps = rc.get_regex_patterns()?;
+                match (rpwcs.len(), rrps.len()) {
+                    (1, 0) => {
+                        let pc = PatternWithConstraints::<T>::try_from(rpwcs.pop().unwrap())?;
+                        if rc.should == RawPredicate::Match {
+                            Predicate::MatchQuery(pc)
+                        } else if rc.should == RawPredicate::NotMatch {
+                            Predicate::NotMatchQuery(pc)
+                        } else {
+                            unreachable!("invalid state")
+                        }
+                    }
+                    (0, 1) => {
+                        let rps = Regex::new(rrps.pop().unwrap().as_str())?;
+                        if rc.should == RawPredicate::Match {
+                            Predicate::MatchRegex(rps)
+                        } else if rc.should == RawPredicate::NotMatch {
+                            Predicate::NotMatchRegex(rps)
+                        } else {
+                            unreachable!("invalid state")
+                        }
+                    }
+                    (0, 0) => {
+                        return Err(anyhow::anyhow!(
+                            "(not-)match requires either of a pattern or a regex-pattern"
+                        ))
+                    }
+                    (_, _) => {
+                        return Err(anyhow::anyhow!(
+                            "(not-)match accepts either of a pattern or a regex-pattern"
+                        ))
+                    }
                 }
             }
             RawPredicate::MatchRegex => {
-                let patterns = rc.get_patterns()?;
+                // TODO (y0n3uchy): deprecate match-regex + patterns
+                let patterns = rc.get_pattern_with_constraints()?;
                 if patterns.len() == 1 {
                     let r = Regex::new(patterns.get(0).unwrap().pattern.as_str())?;
                     Predicate::MatchRegex(r)
@@ -68,7 +93,8 @@ where
                 }
             }
             RawPredicate::NotMatchRegex => {
-                let patterns = rc.get_patterns()?;
+                // TODO (y0n3uchy): deprecate match-regex + patterns
+                let patterns = rc.get_pattern_with_constraints()?;
                 if patterns.len() == 1 {
                     let r = Regex::new(patterns.get(0).unwrap().pattern.as_str())?;
                     Predicate::NotMatchRegex(r)
@@ -76,6 +102,69 @@ where
                     return Err(anyhow::anyhow!(
                         "not-match-regex accepts only one pattern once"
                     ));
+                }
+            }
+            RawPredicate::MatchAnyOf | RawPredicate::NotMatchAnyOf => {
+                let rpwcs = rc.get_pattern_with_constraints()?;
+                let rrps = rc.get_regex_patterns()?;
+                match (rpwcs.len(), rrps.len()) {
+                    (l, 0) if l > 0 => {
+                        let pwcs = rpwcs
+                            .into_iter()
+                            .map(|x| PatternWithConstraints::<T>::try_from(x))
+                            .collect::<Result<Vec<PatternWithConstraints<T>>>>()?;
+                        if rc.should == RawPredicate::MatchAnyOf {
+                            Predicate::MatchAnyOfQuery(pwcs)
+                        } else if rc.should == RawPredicate::NotMatchAnyOf {
+                            Predicate::NotMatchAnyOfQuery(pwcs)
+                        } else {
+                            unreachable!("invalid state")
+                        }
+                    }
+                    (0, r) if r > 0 => {
+                        let rps = rrps
+                            .into_iter()
+                            .map(|x| Ok(Regex::new(x.as_str())?))
+                            .collect::<Result<Vec<Regex>>>()?;
+                        if rc.should == RawPredicate::MatchAnyOf {
+                            Predicate::MatchAnyOfRegex(rps)
+                        } else if rc.should == RawPredicate::NotMatchAnyOf {
+                            Predicate::NotMatchAnyOfRegex(rps)
+                        } else {
+                            unreachable!("invalid state")
+                        }
+                    }
+                    (0, 0) => {
+                        return Err(anyhow::anyhow!(
+                            "(not-)match-any-of requires either of pattern(s) or regex-pattern(s)"
+                        ))
+                    }
+                    (_, _) => {
+                        return Err(anyhow::anyhow!(
+                            "(not-)match-any-of accepts either of pattern(s) or regex-pattern(s)"
+                        ))
+                    }
+                }
+            }
+            RawPredicate::BeAnyOf | RawPredicate::NotBeAnyOf => {
+                if rc
+                    .get_pattern_with_constraints()
+                    .map(|x| x.len())
+                    .unwrap_or(1)
+                    > 0
+                {
+                    return Err(anyhow::anyhow!("(not-)be-any-of cannot handle pattern(s) and regex-pattern(s). use string(s) instead."));
+                }
+                if rc.get_regex_patterns().map(|x| x.len()).unwrap_or(1) > 0 {
+                    return Err(anyhow::anyhow!("(not-)be-any-of cannot handle pattern(s) and regex-pattern(s). use string(s) instead."));
+                }
+
+                if rc.should == RawPredicate::BeAnyOf {
+                    Predicate::BeAnyOf(rc.get_strings()?)
+                } else if rc.should == RawPredicate::NotBeAnyOf {
+                    Predicate::NotBeAnyOf(rc.get_strings()?)
+                } else {
+                    unreachable!("invalid state")
                 }
             }
         };
