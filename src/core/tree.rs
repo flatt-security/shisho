@@ -1,7 +1,6 @@
 use crate::core::{
     language::Queryable,
     matcher::{MatchedItem, TreeMatcher},
-    query::Query,
 };
 use anyhow::{anyhow, Result};
 use std::{
@@ -12,6 +11,7 @@ use std::{
 
 use super::{
     node::{Node, RootNode},
+    query::Query,
     source::NormalizedSource,
 };
 
@@ -71,45 +71,35 @@ where
     }
 }
 
-pub struct TreeView<'tree, T> {
+pub struct NormalizedTree<'tree, T> {
     pub view_root: Node<'tree>,
     pub source: &'tree [u8],
     _marker: PhantomData<T>,
 }
 
-impl<'tree, T> TreeView<'tree, T>
+impl<'tree, T> NormalizedTree<'tree, T>
 where
     T: Queryable,
 {
-    pub fn new(view_root: Node<'tree>, source: &'tree [u8]) -> TreeView<'tree, T> {
-        TreeView {
+    pub fn new(view_root: Node<'tree>, source: &'tree [u8]) -> NormalizedTree<'tree, T> {
+        NormalizedTree {
             view_root,
             source,
             _marker: PhantomData,
         }
     }
 
-    pub fn matches<'query>(
-        &'tree self,
-        query: &'query Query<'query, T>,
-    ) -> impl Iterator<Item = MatchedItem<'tree>> + 'query
-    where
-        'tree: 'query,
-    {
-        TreeMatcher::new(self, query)
-    }
-
-    pub fn traverse(&'tree self) -> TreeTreverser<'tree> {
-        TreeTreverser::new(&self.view_root)
+    pub fn as_ref_treeview(&'tree self) -> RefTreeView<'tree, T> {
+        self.into()
     }
 }
 
-impl<'tree, T> From<&'tree Tree<'tree, T>> for TreeView<'tree, T>
+impl<'tree, T> From<&'tree Tree<'tree, T>> for NormalizedTree<'tree, T>
 where
     T: Queryable,
 {
     fn from(t: &'tree Tree<'tree, T>) -> Self {
-        TreeView {
+        NormalizedTree {
             view_root: t.to_root_node().into(),
             source: &t.source,
             _marker: PhantomData,
@@ -117,13 +107,80 @@ where
     }
 }
 
-impl<'tree, T> From<Node<'tree>> for TreeView<'tree, T>
+impl<'tree, T> From<Node<'tree>> for NormalizedTree<'tree, T>
 where
     T: Queryable,
 {
     fn from(t: Node<'tree>) -> Self {
         let source = t.source;
-        TreeView {
+        NormalizedTree {
+            view_root: t,
+            source,
+            _marker: PhantomData,
+        }
+    }
+}
+
+pub struct RefTreeView<'tree, T> {
+    pub view_root: &'tree Node<'tree>,
+    pub source: &'tree [u8],
+    _marker: PhantomData<T>,
+}
+
+impl<'tree, 'view, T> RefTreeView<'tree, T>
+where
+    T: Queryable + 'tree,
+    'tree: 'view,
+{
+    pub fn matches<'query>(
+        &'view self,
+        q: &'query Query<'query, T>,
+    ) -> impl Iterator<Item = Result<MatchedItem<'tree>>> + 'query + 'view
+    where
+        'tree: 'query,
+        'query: 'view,
+    {
+        TreeMatcher::new(self.traverse(), &q.pattern).filter_map(move |mut x| {
+            let captures = match x.satisfies_all(q.constraints) {
+                Ok((true, captures)) => captures,
+                Ok((false, _)) => return None,
+                Err(e) => {
+                    return Some(Err(anyhow::anyhow!(
+                        "failed to validate a match with constraints: {}",
+                        e
+                    )))
+                }
+            };
+            x.captures.extend(captures);
+            Some(Ok(x))
+        })
+    }
+
+    pub fn traverse(&'view self) -> TreeTreverser<'tree> {
+        TreeTreverser::new(self.view_root)
+    }
+}
+
+impl<'tree, T> From<&'tree NormalizedTree<'tree, T>> for RefTreeView<'tree, T>
+where
+    T: Queryable,
+{
+    fn from(t: &'tree NormalizedTree<'tree, T>) -> Self {
+        RefTreeView {
+            view_root: &t.view_root,
+            source: t.source,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<'tree, T> From<&'tree Node<'tree>> for RefTreeView<'tree, T>
+where
+    T: Queryable,
+{
+    fn from(t: &'tree Node<'tree>) -> Self {
+        let source = t.source;
+        RefTreeView {
             view_root: t,
             source,
             _marker: PhantomData,

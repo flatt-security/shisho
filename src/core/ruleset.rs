@@ -7,8 +7,7 @@ use std::{convert::TryFrom, fs::File, path::Path, str::FromStr};
 use walkdir::WalkDir;
 
 use crate::core::{
-    constraint::Constraint, language::Queryable, matcher::MatchedItem, pattern::Pattern,
-    tree::TreeView,
+    language::Queryable, matcher::MatchedItem, pattern::PatternWithConstraints, tree::RefTreeView,
 };
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -76,9 +75,9 @@ impl Rule {
         }
     }
 
-    pub fn find<'tree, 'item, T: 'static>(
+    pub fn find<'tree, 'item, T>(
         &self,
-        tree: &'tree TreeView<'tree, T>,
+        tree: &'tree RefTreeView<'tree, T>,
     ) -> Result<Vec<MatchedItem<'item>>>
     where
         T: Queryable,
@@ -86,17 +85,12 @@ impl Rule {
     {
         let patterns = self.get_patterns()?;
         let mut matches = vec![];
-        for rp in patterns {
-            let p = Pattern::<T>::try_from(rp.pattern.as_str())?;
-            let constraints = rp
-                .constraints
-                .iter()
-                .map(|x| Constraint::try_from(x.clone()))
-                .collect::<Result<Vec<Constraint<T>>>>()?;
-            matches.extend(tree.matches(&p.as_query()).filter(|x| {
-                // TODO (y0n3uchy): is this unwrap_or okay? do we need to emit errors?
-                x.satisfies_all(&constraints).unwrap_or(false)
-            }));
+        for rpc in patterns {
+            let pc = PatternWithConstraints::<T>::try_from(rpc)?;
+            let lmatches = tree
+                .matches(&pc.as_query())
+                .collect::<Result<Vec<MatchedItem>>>()?;
+            matches.extend(lmatches);
         }
         Ok(matches)
     }
@@ -144,7 +138,7 @@ pub enum Severity {
 }
 
 impl Rule {
-    pub fn get_level(&self) -> Severity {
+    pub fn get_severity(&self) -> Severity {
         self.tags
             .iter()
             .find_map(|t| match t.clone().into_inner().to_lowercase().as_str() {
@@ -162,7 +156,28 @@ impl Rule {
 pub struct RawConstraint {
     pub target: String,
     pub should: RawPredicate,
-    pub pattern: String,
+
+    pub pattern: Option<String>,
+    #[serde(default)]
+    pub constraints: Vec<RawConstraint>,
+
+    #[serde(default)]
+    pub patterns: Vec<RawPatternWithConstraints>,
+}
+
+impl RawConstraint {
+    pub fn get_patterns(&self) -> Result<Vec<RawPatternWithConstraints>> {
+        match (&self.pattern, &self.patterns) {
+            (Some(p), patterns) if patterns.is_empty() => Ok(vec![RawPatternWithConstraints {
+                pattern: p.to_string(),
+                constraints: self.constraints.clone(),
+            }]),
+            (None, patterns) if !patterns.is_empty() => Ok(patterns.clone()),
+            _ => Err(anyhow::anyhow!(
+                "You can use only one of `pattern` or `patterns`."
+            )),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]

@@ -220,7 +220,7 @@ impl<'tree> ConsecutiveNodes<'tree> {
         self.as_vec().last().unwrap().end_position()
     }
 
-    pub fn range<T: Queryable + 'static>(&self) -> Range {
+    pub fn range<T: Queryable>(&self) -> Range {
         Range {
             start: T::range(self.as_vec().first().unwrap()).start,
             end: T::range(self.as_vec().last().unwrap()).end,
@@ -237,6 +237,10 @@ impl<'tree> ConsecutiveNodes<'tree> {
 
     pub fn len(&self) -> usize {
         self.as_vec().len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     #[inline]

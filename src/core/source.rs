@@ -1,5 +1,9 @@
+use anyhow::Result;
+
 use crate::core::language::Queryable;
 use std::marker::PhantomData;
+
+use super::{matcher::MatchedItem, rewriter::RewriteOption};
 
 #[derive(Clone)]
 pub struct Code<L>
@@ -16,6 +20,26 @@ where
 {
     pub fn as_str(&self) -> &str {
         self.code.as_str()
+    }
+}
+
+impl<T> Code<T>
+where
+    T: Queryable,
+{
+    pub fn to_rewritten_form(self, item: &MatchedItem, roption: RewriteOption<T>) -> Result<Self> {
+        let current_code = self.as_str().as_bytes();
+
+        let before_snippet = String::from_utf8(current_code[0..item.area.start_byte()].to_vec())?;
+        let snippet = roption.to_rewritten_snippet(item)?;
+        let after_snippet = String::from_utf8(
+            current_code[item.area.end_byte().min(current_code.len())..current_code.len()].to_vec(),
+        )?;
+
+        Ok(Code::from(format!(
+            "{}{}{}",
+            before_snippet, snippet, after_snippet
+        )))
     }
 }
 

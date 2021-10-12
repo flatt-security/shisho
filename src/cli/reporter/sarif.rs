@@ -31,7 +31,7 @@ impl<'a, W: std::io::Write> Reporter<'a> for SARIFReporter<'a, W> {
         }
     }
 
-    fn add_entry<T: Queryable + 'static>(
+    fn add_entry<T: Queryable>(
         &mut self,
         target: &Target,
         items: Vec<(&Rule, MatchedItem)>,
@@ -96,7 +96,7 @@ impl<'a, W: std::io::Write> Reporter<'a> for SARIFReporter<'a, W> {
                     )
                     .build()?])
                 .level(
-                    match rule.get_level() {
+                    match rule.get_severity() {
                         Severity::Unknown => sarif::ResultLevel::None,
                         Severity::Low => sarif::ResultLevel::Note,
                         Severity::Medium => sarif::ResultLevel::Warning,

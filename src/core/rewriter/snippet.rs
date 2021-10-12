@@ -78,7 +78,7 @@ where
             NodeType::Metavariable(mid) | NodeType::EllipsisMetavariable(mid) => {
                 self.from_metavariable(node, &mid.0)
             }
-            _ if (node.children.len() == 0 || T::is_leaf_like(node)) => self.from_leaf(node),
+            _ if (node.children.is_empty() || T::is_leaf_like(node)) => self.from_leaf(node),
             _ => self.from_intermediate_node(node),
         }
     }
@@ -174,7 +174,7 @@ where
                     }
 
                     next_ = children_iter.next();
-                    if let Some((ref n, _)) = next_ {
+                    if let Some((n, _)) = next_ {
                         body += glue.as_str();
                         virtual_end_byte = n.start_byte();
                     } else {

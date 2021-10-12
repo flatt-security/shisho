@@ -17,7 +17,7 @@ pub trait Reporter<'a> {
     where
         Self: Sized;
 
-    fn add_entry<T: Queryable + 'static>(
+    fn add_entry<T: Queryable>(
         &mut self,
         target: &Target,
         items: Vec<(&Rule, MatchedItem)>,

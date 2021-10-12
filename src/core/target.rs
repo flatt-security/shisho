@@ -2,7 +2,11 @@ use anyhow::Result;
 use encoding_rs::Encoding;
 use encoding_rs_io::DecodeReaderBytesBuilder;
 use pathdiff::diff_paths;
-use std::{env, io::Read, path::PathBuf};
+use std::{
+    env,
+    io::Read,
+    path::{Path, PathBuf},
+};
 use walkdir::WalkDir;
 
 use crate::core::ruleset::Language;
@@ -31,7 +35,7 @@ impl TargetLoader {
                     .map_err(|e| anyhow::anyhow!("failed to load exclude pattern: {}", e))];
 
                 // TODO (y0n3uchy): fix this dirty hack to exclude `./bar/piyo.go` with a pattern `bar` (i.e. without ./)
-                if !p.starts_with("./") && !p.starts_with("/") {
+                if !p.starts_with("./") && !p.starts_with('/') {
                     ps.push(
                         glob::Pattern::new(&format!("./{}", p))
                             .map_err(|e| anyhow::anyhow!("failed to load exclude pattern: {}", e)),
@@ -41,19 +45,19 @@ impl TargetLoader {
                         glob::Pattern::new(&format!(
                             "./{}{}",
                             p,
-                            if p.ends_with("/") { "**" } else { "/**" }
+                            if p.ends_with('/') { "**" } else { "/**" }
                         ))
                         .map_err(|e| anyhow::anyhow!("failed to load exclude pattern: {}", e)),
                     );
                 };
 
                 // TODO (y0n3uchy): fix this dirty hack to exclude `bar/piyo.go` with a pattern `bar`
-                if !p.ends_with("*") {
+                if !p.ends_with('*') {
                     ps.push(
                         glob::Pattern::new(&format!(
                             "{}{}",
                             p,
-                            if p.ends_with("/") { "**" } else { "/**" }
+                            if p.ends_with('/') { "**" } else { "/**" }
                         ))
                         .map_err(|e| anyhow::anyhow!("failed to load exclude pattern: {}", e)),
                     );
@@ -72,12 +76,10 @@ impl TargetLoader {
     pub fn from(&self, p: PathBuf) -> Result<Vec<Target>> {
         if p.is_dir() {
             Ok(self.from_dir(p))
+        } else if self.should_load(&p) {
+            Ok(vec![self.from_file(p)?])
         } else {
-            if self.should_load(&p) {
-                Ok(vec![self.from_file(p)?])
-            } else {
-                Ok(vec![])
-            }
+            Ok(vec![])
         }
     }
 
@@ -121,7 +123,7 @@ impl TargetLoader {
         })
     }
 
-    pub(crate) fn should_load(&self, p: &PathBuf) -> bool {
+    pub(crate) fn should_load(&self, p: &Path) -> bool {
         self.exclude_path_pattern
             .iter()
             .all(|gpattern| !gpattern.matches(p.as_os_str().to_str().unwrap()))
@@ -142,7 +144,7 @@ impl Target {
         self.relative_path_from(&env::current_dir().unwrap())
     }
 
-    fn relative_path_from(&self, base: &PathBuf) -> String {
+    fn relative_path_from(&self, base: &Path) -> String {
         if let Some(ref p) = self.path {
             let p = p.canonicalize().unwrap();
             let p = diff_paths(p, base).unwrap();
