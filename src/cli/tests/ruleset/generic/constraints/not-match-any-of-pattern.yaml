@@ -1,0 +1,20 @@
+version: "1"
+rules:
+  - id: "test"
+    language: hcl
+    message: |
+      test
+    pattern: |
+      resource "block" :[NAME] {        
+        :[...X]
+      }
+    constraints:
+      - target: X
+        should: not-match-any-of
+        patterns:
+          - pattern: attr = 32
+          - pattern: attr = 2
+          - pattern: |
+              inner {
+                :[...]
+              }

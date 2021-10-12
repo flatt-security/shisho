@@ -1,0 +1,14 @@
+version: "1"
+rules:
+  - id: "test"
+    language: hcl
+    message: |
+      test
+    pattern: |
+      resource "block" :[NAME] {        
+        attr = :[X]
+      }
+    constraints:
+      - target: X
+        should: not-match
+        regex-pattern: "^2$"

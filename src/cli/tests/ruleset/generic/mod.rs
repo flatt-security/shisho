@@ -10,5 +10,31 @@ mod tests {
             ("ruleset.yaml", "unmatch.with-inner.tf", Result::Ok(0), None),
             ("ruleset.yaml", "unmatch.without-inner.tf", Result::Ok(0), None),
         ],
+        constraints: [
+            ("be-any-of.yaml", "match.tf", Result::Ok(1), None),
+            ("be-any-of.yaml", "unmatch.tf", Result::Ok(0), None),
+            ("not-be-any-of.yaml", "match.tf", Result::Ok(1), None),
+            ("not-be-any-of.yaml", "unmatch.tf", Result::Ok(0), None),
+
+            ("match-pattern.yaml", "match.tf", Result::Ok(1), None),
+            ("match-pattern.yaml", "unmatch.tf", Result::Ok(0), None),
+            ("not-match-pattern.yaml", "match.tf", Result::Ok(1), None),
+            ("not-match-pattern.yaml", "unmatch.tf", Result::Ok(0), None),
+
+            ("match-regex-pattern.yaml", "match.tf", Result::Ok(1), None),
+            ("match-regex-pattern.yaml", "unmatch.tf", Result::Ok(0), None),
+            ("not-match-regex-pattern.yaml", "match.tf", Result::Ok(1), None),
+            ("not-match-regex-pattern.yaml", "unmatch.tf", Result::Ok(0), None),
+
+            ("match-any-of-pattern.yaml", "match.tf", Result::Ok(1), None),
+            ("match-any-of-pattern.yaml", "unmatch.tf", Result::Ok(0), None),
+            ("not-match-any-of-pattern.yaml", "match.tf", Result::Ok(1), None),
+            ("not-match-any-of-pattern.yaml", "unmatch.tf", Result::Ok(0), None),
+
+            ("match-any-of-regex-pattern.yaml", "match.tf", Result::Ok(1), None),
+            ("match-any-of-regex-pattern.yaml", "unmatch.tf", Result::Ok(0), None),
+            ("not-match-any-of-regex-pattern.yaml", "match.tf", Result::Ok(1), None),
+            ("not-match-any-of-regex-pattern.yaml", "unmatch.tf", Result::Ok(0), None),
+        ],
     }
 }

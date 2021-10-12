@@ -82,28 +82,6 @@ where
                     }
                 }
             }
-            RawPredicate::MatchRegex => {
-                // TODO (y0n3uchy): deprecate match-regex + patterns
-                let patterns = rc.get_pattern_with_constraints()?;
-                if patterns.len() == 1 {
-                    let r = Regex::new(patterns.get(0).unwrap().pattern.as_str())?;
-                    Predicate::MatchRegex(r)
-                } else {
-                    return Err(anyhow::anyhow!("match-regex accepts only one pattern once"));
-                }
-            }
-            RawPredicate::NotMatchRegex => {
-                // TODO (y0n3uchy): deprecate match-regex + patterns
-                let patterns = rc.get_pattern_with_constraints()?;
-                if patterns.len() == 1 {
-                    let r = Regex::new(patterns.get(0).unwrap().pattern.as_str())?;
-                    Predicate::NotMatchRegex(r)
-                } else {
-                    return Err(anyhow::anyhow!(
-                        "not-match-regex accepts only one pattern once"
-                    ));
-                }
-            }
             RawPredicate::MatchAnyOf | RawPredicate::NotMatchAnyOf => {
                 let rpwcs = rc.get_pattern_with_constraints()?;
                 let rrps = rc.get_regex_patterns()?;
@@ -150,12 +128,12 @@ where
                 if rc
                     .get_pattern_with_constraints()
                     .map(|x| x.len())
-                    .unwrap_or(1)
+                    .unwrap_or(0)
                     > 0
                 {
                     return Err(anyhow::anyhow!("(not-)be-any-of cannot handle pattern(s) and regex-pattern(s). use string(s) instead."));
                 }
-                if rc.get_regex_patterns().map(|x| x.len()).unwrap_or(1) > 0 {
+                if rc.get_regex_patterns().map(|x| x.len()).unwrap_or(0) > 0 {
                     return Err(anyhow::anyhow!("(not-)be-any-of cannot handle pattern(s) and regex-pattern(s). use string(s) instead."));
                 }
 
@@ -165,6 +143,29 @@ where
                     Predicate::NotBeAnyOf(rc.get_strings()?)
                 } else {
                     unreachable!("invalid state")
+                }
+            }
+
+            RawPredicate::MatchRegex => {
+                // TODO (y0n3uchy): deprecate match-regex + patterns
+                let patterns = rc.get_pattern_with_constraints()?;
+                if patterns.len() == 1 {
+                    let r = Regex::new(patterns.get(0).unwrap().pattern.as_str())?;
+                    Predicate::MatchRegex(r)
+                } else {
+                    return Err(anyhow::anyhow!("match-regex accepts only one pattern once"));
+                }
+            }
+            RawPredicate::NotMatchRegex => {
+                // TODO (y0n3uchy): deprecate match-regex + patterns
+                let patterns = rc.get_pattern_with_constraints()?;
+                if patterns.len() == 1 {
+                    let r = Regex::new(patterns.get(0).unwrap().pattern.as_str())?;
+                    Predicate::NotMatchRegex(r)
+                } else {
+                    return Err(anyhow::anyhow!(
+                        "not-match-regex accepts only one pattern once"
+                    ));
                 }
             }
         };

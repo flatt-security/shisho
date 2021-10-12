@@ -182,6 +182,7 @@ impl RawConstraint {
                 constraints: self.constraints.clone(),
             }]),
             (None, patterns) if !patterns.is_empty() => Ok(patterns.clone()),
+            (None, patterns) if patterns.is_empty() => Ok(vec![]),
             _ => Err(anyhow::anyhow!(
                 "You can use only one of `pattern` or `patterns`."
             )),
@@ -192,6 +193,7 @@ impl RawConstraint {
         match (&self.string, &self.strings) {
             (Some(p), patterns) if patterns.is_empty() => Ok(vec![p.to_string()]),
             (None, patterns) if !patterns.is_empty() => Ok(patterns.clone()),
+            (None, patterns) if patterns.is_empty() => Ok(vec![]),
             _ => Err(anyhow::anyhow!(
                 "You can use only one of `string` or `strings`."
             )),
@@ -202,6 +204,7 @@ impl RawConstraint {
         match (&self.regex_pattern, &self.regex_patterns) {
             (Some(p), patterns) if patterns.is_empty() => Ok(vec![p.to_string()]),
             (None, patterns) if !patterns.is_empty() => Ok(patterns.clone()),
+            (None, patterns) if patterns.is_empty() => Ok(vec![]),
             _ => Err(anyhow::anyhow!(
                 "You can use only one of `regex-pattern` or `regex-patterns`."
             )),

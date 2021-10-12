@@ -1,0 +1,17 @@
+version: "1"
+rules:
+  - id: "test"
+    language: hcl
+    message: |
+      test
+    pattern: |
+      resource "block" :[NAME] {        
+        attr = :[X]
+      }
+    constraints:
+      - target: X
+        should: not-be-any-of
+        strings:
+          - "27"
+          - "32"
+          - "2"
