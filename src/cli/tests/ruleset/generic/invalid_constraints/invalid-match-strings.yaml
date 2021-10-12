@@ -1,0 +1,17 @@
+version: "1"
+rules:
+  - id: "test"
+    language: hcl
+    message: |
+      test
+    pattern: |
+      resource "block" :[NAME] {        
+        attr = :[X]
+      }
+    # should cause error(s)
+    constraints:
+      - target: X
+        should: match
+        strings:
+          - "27"
+          - "1"
