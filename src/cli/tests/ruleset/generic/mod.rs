@@ -35,7 +35,8 @@ mod tests {
             ("match-any-of-regex-pattern.yaml", "unmatch.tf", Result::Ok(0), None),
             ("not-match-any-of-regex-pattern.yaml", "match.tf", Result::Ok(1), None),
             ("not-match-any-of-regex-pattern.yaml", "unmatch.tf", Result::Ok(0), None),
-
+        ],
+        invalid_constraints: [
             ("invalid-match-string.yaml", "unmatch.tf", Result::Err(anyhow::anyhow!("")), None),
             ("invalid-match-strings.yaml", "unmatch.tf", Result::Err(anyhow::anyhow!("")), None),
 

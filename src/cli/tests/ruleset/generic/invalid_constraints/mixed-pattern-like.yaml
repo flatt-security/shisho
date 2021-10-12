@@ -8,9 +8,10 @@ rules:
       resource "block" :[NAME] {        
         attr = :[X]
       }
+    # should cause error(s)
     constraints:
       - target: X
         should: match
-        strings:
-          - "27"
-          - "1"
+        regex-pattern: "a"
+        patterns:
+          - pattern: "a"

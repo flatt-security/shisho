@@ -8,6 +8,7 @@ rules:
       resource "block" :[NAME] {        
         attr = :[X]
       }
+    # should cause error(s)
     constraints:
       - target: X
         should: match
