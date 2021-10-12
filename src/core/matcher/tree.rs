@@ -6,7 +6,7 @@ use crate::core::{
     node::ConsecutiveNodes,
     node::{Node, NodeType, RootNode},
     query::QueryPattern,
-    tree::{TreeTreverser, TreeView},
+    tree::TreeTreverser,
 };
 
 use std::{convert::TryFrom, marker::PhantomData};
@@ -27,10 +27,10 @@ pub struct TreeMatcher<'tree, 'query, T: Queryable> {
 }
 
 impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
-    pub fn new(view: &'tree TreeView<'tree, T>, query: &'query QueryPattern<T>) -> Self {
+    pub fn new(traverser: TreeTreverser<'tree>, query: &'query QueryPattern<T>) -> Self {
         TreeMatcher {
             query: &query.root_node,
-            traverser: view.traverse(),
+            traverser,
             items: vec![],
 
             _marker: PhantomData,

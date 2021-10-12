@@ -25,7 +25,7 @@ where
 }
 
 pub struct Query<'a, T: Queryable> {
-    pub query: QueryPattern<'a, T>,
+    pub pattern: QueryPattern<'a, T>,
     pub constraints: &'a Vec<Constraint<T>>,
 }
 
@@ -35,7 +35,7 @@ where
 {
     fn from(pc: &'a PatternWithConstraints<T>) -> Self {
         Self {
-            query: (&pc.pattern).into(),
+            pattern: (&pc.pattern).into(),
             constraints: &pc.constraints,
         }
     }

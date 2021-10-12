@@ -19,4 +19,9 @@ rules:
           - target: Z
             should: match
             pattern: |
-              test = 1
+              test = :[HOO]
+    rewrite_options:
+      - |
+        resource "block" :[NAME] {        
+          test = :[HOO]
+        }
