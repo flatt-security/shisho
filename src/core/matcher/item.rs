@@ -47,10 +47,7 @@ impl<'tree> MatchedItem<'tree> {
         self.captures.get(id)
     }
 
-    pub fn satisfies_all<T: Queryable + 'static>(
-        &self,
-        constraints: &[Constraint<T>],
-    ) -> Result<bool> {
+    pub fn satisfies_all<T: Queryable>(&self, constraints: &[Constraint<T>]) -> Result<bool> {
         for c in constraints {
             if !self.satisfies(c)? {
                 return Ok(false);
@@ -59,7 +56,7 @@ impl<'tree> MatchedItem<'tree> {
         Ok(true)
     }
 
-    pub fn satisfies<T: Queryable + 'static>(&self, constraint: &Constraint<T>) -> Result<bool> {
+    pub fn satisfies<T: Queryable>(&self, constraint: &Constraint<T>) -> Result<bool> {
         let captured_item = self.capture_of(&constraint.target);
         if captured_item.is_none() {
             return Err(anyhow::anyhow!(

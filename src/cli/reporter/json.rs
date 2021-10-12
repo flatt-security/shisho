@@ -2,8 +2,8 @@ use std::convert::TryFrom;
 
 use super::Reporter;
 use crate::core::{
-    language::Queryable, matcher::MatchedItem, node::Range, pattern::Pattern, rewriter::Rewritable,
-    ruleset::Rule, source::Code, target::Target,
+    language::Queryable, matcher::MatchedItem, node::Range, pattern::Pattern, ruleset::Rule,
+    source::Code, target::Target,
 };
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -41,7 +41,7 @@ impl<'a, W: std::io::Write> Reporter<'a> for JSONReporter<'a, W> {
         }
     }
 
-    fn add_entry<T: Queryable + 'static>(
+    fn add_entry<T: Queryable>(
         &mut self,
         target: &Target,
         items: Vec<(&Rule, MatchedItem)>,
@@ -59,7 +59,7 @@ impl<'a, W: std::io::Write> Reporter<'a> for JSONReporter<'a, W> {
             for rewrite in rule.get_rewrite_options()? {
                 let old_code: Code<T> = target.body.clone().into();
                 let pattern = Pattern::try_from(rewrite.as_str())?;
-                let new_code = old_code.to_rewritten_form(&mitem, &pattern)?;
+                let new_code = old_code.to_rewritten_form(&mitem, pattern.as_rewrite_option())?;
 
                 let diff = TextDiff::from_lines(target.body.as_str(), new_code.as_str())
                     .unified_diff()

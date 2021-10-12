@@ -1,7 +1,6 @@
 use crate::core::{
     language::Queryable,
     matcher::{MatchedItem, TreeMatcher},
-    query::Query,
 };
 use anyhow::{anyhow, Result};
 use std::{
@@ -12,6 +11,7 @@ use std::{
 
 use super::{
     node::{Node, RootNode},
+    query::Query,
     source::NormalizedSource,
 };
 
@@ -91,12 +91,22 @@ where
 
     pub fn matches<'query>(
         &'tree self,
-        query: &'query Query<'query, T>,
-    ) -> impl Iterator<Item = MatchedItem<'tree>> + 'query
+        qc: &'query Query<'query, T>,
+    ) -> impl Iterator<Item = Result<MatchedItem<'tree>>> + 'query
     where
         'tree: 'query,
     {
-        TreeMatcher::new(self, query)
+        TreeMatcher::new(self, &qc.query).filter_map(move |x| {
+            // TODO (y0n3uchy): is this unwrap_or okay? do we need to emit errors?
+            match x.satisfies_all(&qc.constraints) {
+                Ok(true) => Some(Ok(x)),
+                Ok(false) => None,
+                Err(e) => Some(Err(anyhow::anyhow!(
+                    "failed to validate a match with constraints: {}",
+                    e
+                ))),
+            }
+        })
     }
 
     pub fn traverse(&'tree self) -> TreeTreverser<'tree> {

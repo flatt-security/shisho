@@ -158,7 +158,7 @@ fn handle_rules<'a, E: Reporter<'a>>(
     }
 }
 
-fn handle_typed_rules<'a, E: Reporter<'a>, Lang: Queryable + 'static>(
+fn handle_typed_rules<'a, E: Reporter<'a>, Lang: Queryable>(
     reporter: &mut E,
     target: &Target,
     rules: &[Rule],
