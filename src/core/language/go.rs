@@ -40,8 +40,7 @@ mod tests {
 
     use crate::core::matcher::MatchedItem;
     use crate::core::pattern::Pattern;
-    use crate::core::tree::TreeView;
-    use crate::core::{query::MetavariableId, source::Code, tree::Tree};
+    use crate::core::{query::MetavariableId, source::Code};
     use crate::match_pt;
     use std::convert::TryFrom;
 

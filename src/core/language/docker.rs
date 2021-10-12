@@ -48,18 +48,12 @@ impl Queryable for Dockerfile {
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Result;
-
     use super::*;
     use crate::{
-        core::{
-            matcher::MatchedItem,
-            pattern::Pattern,
-            query::MetavariableId,
-            tree::{Tree, TreeView},
-        },
+        core::{matcher::MatchedItem, query::MetavariableId},
         match_pt,
     };
+    use anyhow::Result;
     use std::convert::TryFrom;
 
     #[test]

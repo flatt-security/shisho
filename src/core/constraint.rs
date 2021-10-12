@@ -8,7 +8,7 @@ use crate::core::{
     ruleset::{RawConstraint, RawPredicate},
 };
 
-use super::ruleset::PatternWithConstraints;
+use super::pattern::PatternWithConstraints;
 
 #[derive(Debug)]
 pub struct Constraint<T>

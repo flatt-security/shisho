@@ -7,8 +7,7 @@ use std::{convert::TryFrom, fs::File, path::Path, str::FromStr};
 use walkdir::WalkDir;
 
 use crate::core::{
-    constraint::Constraint, language::Queryable, matcher::MatchedItem, pattern::Pattern,
-    tree::TreeView,
+    language::Queryable, matcher::MatchedItem, pattern::PatternWithConstraints, tree::TreeView,
 };
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -47,38 +46,6 @@ pub struct RawPatternWithConstraints {
 
     #[serde(default)]
     pub constraints: Vec<RawConstraint>,
-}
-
-#[derive(Debug)]
-pub struct PatternWithConstraints<T: Queryable> {
-    pub pattern: Pattern<T>,
-    pub constraints: Vec<Constraint<T>>,
-}
-
-impl<T: Queryable> PatternWithConstraints<T> {
-    pub fn new(pattern: Pattern<T>, constraints: Vec<Constraint<T>>) -> Self {
-        Self {
-            pattern,
-            constraints,
-        }
-    }
-}
-
-impl<T: Queryable> TryFrom<RawPatternWithConstraints> for PatternWithConstraints<T> {
-    type Error = anyhow::Error;
-
-    fn try_from(rpc: RawPatternWithConstraints) -> Result<Self> {
-        let pattern = Pattern::<T>::try_from(rpc.pattern.as_str())?;
-        let constraints = rpc
-            .constraints
-            .iter()
-            .map(|x| Constraint::try_from(x.clone()))
-            .collect::<Result<Vec<Constraint<T>>>>()?;
-        Ok(Self {
-            pattern,
-            constraints,
-        })
-    }
 }
 
 impl Rule {

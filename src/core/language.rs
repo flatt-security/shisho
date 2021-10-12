@@ -68,15 +68,14 @@ pub trait Queryable {
 #[macro_export]
 macro_rules! match_pt {
     ($lang:ident, $p:tt, $t:tt, $callback:expr) => {{
-        use crate::core::ruleset::PatternWithConstraints;
-        let pattern = Pattern::<$lang>::try_from($p).unwrap();
-        let pc = PatternWithConstraints::new(pattern, vec![]);
+        let pattern = crate::core::pattern::Pattern::<$lang>::try_from($p).unwrap();
+        let pc = crate::core::pattern::PatternWithConstraints::new(pattern, vec![]);
 
         let query = pc.as_query();
-        let tree = Tree::<$lang>::try_from($t).unwrap();
-        let ptree = TreeView::from(&tree);
+        let tree = crate::core::tree::Tree::<$lang>::try_from($t).unwrap();
+        let ptree = crate::core::tree::TreeView::from(&tree);
         let session = ptree.matches(&query);
 
-        $callback(session.collect::<Result<Vec<MatchedItem>>>());
+        $callback(session.collect::<anyhow::Result<Vec<crate::core::matcher::MatchedItem>>>());
     }};
 }
