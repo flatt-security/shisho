@@ -72,20 +72,38 @@ impl<'tree> MatchedItem<'tree> {
                 CaptureItem::Literal(_) => Err(anyhow::anyhow!(
                     "match-query predicate for string literals is not supported"
                 )),
-                CaptureItem::Nodes(n) => Ok(n.as_vec().iter().any(|node| {
-                    let ptree = TreeView::<T>::from((*node).clone());
-                    !ptree.matches(&q.into()).count() == 0
-                })),
+                CaptureItem::Nodes(n) => Ok(n
+                    .as_vec()
+                    .iter()
+                    .map(|node| {
+                        let ptree = TreeView::<T>::from((*node).clone());
+                        let p = ptree
+                            .matches(&q.into())
+                            .collect::<Result<Vec<MatchedItem>>>()?;
+                        Ok(!p.is_empty())
+                    })
+                    .collect::<Result<Vec<bool>>>()?
+                    .into_iter()
+                    .any(|x| x)),
             },
             Predicate::NotMatchQuery(q) => match captured_item {
                 CaptureItem::Empty => Ok(true),
                 CaptureItem::Literal(_) => Err(anyhow::anyhow!(
                     "match-query predicate for string literals is not supported"
                 )),
-                CaptureItem::Nodes(n) => Ok(n.as_vec().iter().all(|node| {
-                    let ptree = TreeView::<T>::from((*node).clone());
-                    ptree.matches(&q.into()).count() == 0
-                })),
+                CaptureItem::Nodes(n) => Ok(n
+                    .as_vec()
+                    .iter()
+                    .map(|node| {
+                        let ptree = TreeView::<T>::from((*node).clone());
+                        let p = ptree
+                            .matches(&q.into())
+                            .collect::<Result<Vec<MatchedItem>>>()?;
+                        Ok(p.is_empty())
+                    })
+                    .collect::<Result<Vec<bool>>>()?
+                    .into_iter()
+                    .all(|x| x)),
             },
 
             Predicate::MatchRegex(r) => Ok(r.is_match(captured_item.as_str())),
