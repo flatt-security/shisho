@@ -1,6 +1,7 @@
 use anyhow::Result;
 use encoding_rs::Encoding;
 use encoding_rs_io::DecodeReaderBytesBuilder;
+use itertools::Itertools;
 use pathdiff::diff_paths;
 use std::{
     env,
@@ -167,11 +168,21 @@ impl Target {
         }?;
 
         match ext.to_str() {
-            Some("go") => Some(Language::Go),
-            Some("tf") => Some(Language::HCL),
-            Some("Dockerfile") => Some(Language::Dockerfile),
-            _ => None,
+            Some("go") => return Some(Language::Go),
+            Some("tf") => return Some(Language::HCL),
+            _ => (),
+        };
+
+        if p.file_name()?
+            .to_ascii_lowercase()
+            .to_str()?
+            .split('.')
+            .contains(&"dockerfile")
+        {
+            return Some(Language::Dockerfile);
         }
+
+        return None;
     }
 }
 

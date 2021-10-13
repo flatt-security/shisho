@@ -65,12 +65,12 @@ impl Rule {
             title: None,
 
             patterns,
+            constraints: vec![],
             rewrite_options,
             tags,
 
             // these params are just for YAMLs
             pattern: None,
-            constraints: vec![],
             rewrite: None,
         }
     }
@@ -101,7 +101,13 @@ impl Rule {
                 pattern: p.to_string(),
                 constraints: self.constraints.clone(),
             }]),
-            (None, patterns) if !patterns.is_empty() => Ok(patterns.clone()),
+            (None, patterns) if !patterns.is_empty() => Ok(patterns
+                .into_iter()
+                .map(|p| RawPatternWithConstraints {
+                    pattern: p.pattern.to_string(),
+                    constraints: [p.constraints.clone(), self.constraints.clone()].concat(),
+                })
+                .collect()),
             _ => Err(anyhow::anyhow!(
                 "You can use only one of `pattern` or `patterns`."
             )),
@@ -181,7 +187,13 @@ impl RawConstraint {
                 pattern: p.to_string(),
                 constraints: self.constraints.clone(),
             }]),
-            (None, patterns) if !patterns.is_empty() => Ok(patterns.clone()),
+            (None, patterns) if !patterns.is_empty() => Ok(patterns
+                .into_iter()
+                .map(|p| RawPatternWithConstraints {
+                    pattern: p.pattern.to_string(),
+                    constraints: [p.constraints.clone(), self.constraints.clone()].concat(),
+                })
+                .collect()),
             (None, patterns) if patterns.is_empty() => Ok(vec![]),
             _ => Err(anyhow::anyhow!(
                 "You can use only one of `pattern` or `patterns`."
