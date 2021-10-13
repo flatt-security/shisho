@@ -32,7 +32,7 @@ where
 }
 
 #[derive(Debug)]
-struct Segment {
+pub(crate) struct Segment {
     pub body: String,
     pub start_byte: usize,
     pub end_byte: usize,
@@ -83,7 +83,7 @@ where
         }
     }
 
-    fn from_metavariable(
+    pub(crate) fn from_metavariable(
         &self,
         node: &Node,
         variable_name: &str,
@@ -110,11 +110,15 @@ where
     }
 
     fn from_leaf(&self, node: &Node) -> Result<Segment, anyhow::Error> {
-        Ok(Segment {
-            body: node.as_str().into(),
-            start_byte: node.start_byte(),
-            end_byte: node.end_byte(),
-        })
+        if T::is_string_literal(node) {
+            self.from_string_leaf(node)
+        } else {
+            Ok(Segment {
+                body: node.as_str().into(),
+                start_byte: node.start_byte(),
+                end_byte: node.end_byte(),
+            })
+        }
     }
 
     fn from_intermediate_node(&self, node: &Node) -> Result<Segment, anyhow::Error> {
