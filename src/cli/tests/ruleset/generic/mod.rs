@@ -46,5 +46,10 @@ mod tests {
             ("mixed-pattern-like.yaml", "unmatch.tf", Result::Err(anyhow::anyhow!("")), None),
             ("no-pattern-like.yaml", "unmatch.tf", Result::Err(anyhow::anyhow!("")), None),
         ],
+        shared_constraints: [
+            ("ruleset.yaml", "test.Dockerfile", Result::Ok(8), None),
+            ("ruleset.yaml", "dockerfile", Result::Ok(8), None),
+            ("ruleset.yaml", "Dockerfile.test", Result::Ok(8), None),
+        ],
     }
 }

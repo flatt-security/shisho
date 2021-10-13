@@ -1,0 +1,20 @@
+version: "1"
+rules:
+  - id: "use-trusted-base-images"
+    language: dockerfile
+    message: |
+      Use trusted base images if possible.
+    patterns:
+      - pattern: FROM :[NAME]
+      - pattern: FROM :[NAME] AS :[ALIAS]
+      - pattern: FROM :[NAME]@:[HASH]
+      - pattern: FROM :[NAME]@:[HASH] AS :[ALIAS]
+      - pattern: FROM :[NAME]::[TAG]
+      - pattern: FROM :[NAME]::[TAG] AS :[ALIAS]
+      - pattern: FROM :[NAME]::[TAG]@:[HASH]
+      - pattern: FROM :[NAME]::[TAG]@:[HASH] AS :[ALIAS]
+    constraints:
+      - target: NAME
+        should: be-any-of
+        strings:
+          - test
