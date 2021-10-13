@@ -45,8 +45,8 @@ impl<'a, W: std::io::Write> Reporter<'a> for SARIFReporter<'a, W> {
                         .id(rule.id.clone())
                         .short_description::<sarif::MultiformatMessageString>(
                             sarif::MultiformatMessageStringBuilder::default()
-                                .markdown(rule.message.clone())
-                                .text(rule.message.clone())
+                                .markdown(rule.title.clone().unwrap_or(rule.message.clone()))
+                                .text(rule.title.clone().unwrap_or(rule.message.clone()))
                                 .build()?,
                         )
                         .full_description::<sarif::MultiformatMessageString>(
