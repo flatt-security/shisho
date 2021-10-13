@@ -32,23 +32,24 @@ pub fn match_string_pattern<'tree, 'query>(
 }
 
 fn find_metavariables(q: &str) -> Vec<&str> {
-    let p = regex::Regex::new(r":\[([A-Z_][A-Z_0-9]*)\]").unwrap();
+    let p = regex::Regex::new(r":\[(\.\.\.)?(?P<name>[A-Z_][A-Z_0-9]*)\]").unwrap();
     p.captures_iter(q)
-        .map(|x| x.get(1).unwrap().as_str())
+        .map(|x| x.name("name").unwrap().as_str())
         .collect()
 }
 
 fn to_regex(q: &str) -> String {
     // TODO: handle backslash
     let escaped_qvalue = regex::escape(q);
-    let p = regex::Regex::new(r":\\\[([A-Z_][A-Z_0-9]*)\\\]").unwrap();
+    let p = regex::Regex::new(r":\\\[(\\.\\.\\.)?(?P<name>[A-Z_][A-Z_0-9]*)\\\]").unwrap();
     format!(
         "(?s-m)\\A{}\\z",
         p.replace_all(escaped_qvalue.as_str(), |caps: &Captures| {
-            if &caps[1] == "_" {
+            let name = caps.name("name").unwrap().as_str();
+            if name == "_" {
                 "(.*)".to_string()
             } else {
-                format!("(?P<{}>.*)", &caps[1])
+                format!("(?P<{}>.*)", name)
             }
         })
     )
@@ -61,9 +62,16 @@ mod tests {
     #[test]
     fn test_to_regex() {
         assert_eq!(to_regex("test"), "(?s-m)\\Atest\\z");
+
         assert_eq!(to_regex("te:[X]st"), "(?s-m)\\Ate(?P<X>.*)st\\z");
         assert_eq!(
             to_regex("te:[X]s:[Y]t"),
+            "(?s-m)\\Ate(?P<X>.*)s(?P<Y>.*)t\\z"
+        );
+
+        assert_eq!(to_regex("te:[...X]st"), "(?s-m)\\Ate(?P<X>.*)st\\z");
+        assert_eq!(
+            to_regex("te:[...X]s:[...Y]t"),
             "(?s-m)\\Ate(?P<X>.*)s(?P<Y>.*)t\\z"
         );
     }
@@ -71,8 +79,12 @@ mod tests {
     #[test]
     fn test_find_metavariables() {
         assert_eq!(find_metavariables("test").len(), 0);
+
         assert_eq!(find_metavariables("te:[X]st"), vec!["X"]);
         assert_eq!(find_metavariables("te:[X]s:[Y]t"), vec!["X", "Y"]);
+
+        assert_eq!(find_metavariables("te:[...X]st"), vec!["X"]);
+        assert_eq!(find_metavariables("te:[...X]s:[...Y]t"), vec!["X", "Y"]);
     }
 
     #[test]

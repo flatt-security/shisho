@@ -1,9 +1,10 @@
-mod snippet;
+mod builder;
+mod literal;
 
 use crate::core::{language::Queryable, matcher::MatchedItem, node::RootNode, pattern::Pattern};
 use anyhow::Result;
 
-use self::snippet::SnippetBuilder;
+use self::builder::SnippetBuilder;
 
 pub struct RewriteOption<'a, T>
 where
