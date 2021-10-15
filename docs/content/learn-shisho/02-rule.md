@@ -9,11 +9,11 @@ metaDescription: 'This page describes details of rules for pattern matching.'
 _A rule_ describes how matched parts for a pattern should be treated. It mainly consists of:
 
 - an ID
-- [a pattern](/learn-shisho/01-pattern.md)
+- [a pattern](/learn-shisho/01-pattern)
 - a target language name of the pattern
 - a message related to the pattern
-- [rule constraints](/learn-shisho/03-constraint.md) (optional)
-- [a rewrite pattern](/learn-shisho/04-rewrite-pattern.md) (optional)
+- [rule constraints](/learn-shisho/03-constraint) (optional)
+- [a rewrite pattern](/learn-shisho/04-rewrite-pattern) (optional)
 
 _A rule set_ is a set of rules with Shisho's version information. Here's an example ruleset:
 
@@ -28,3 +28,73 @@ rules:
       here comes your own message
     rewrite: size = 20
 ```
+
+## Patterns
+
+_A pattern_ describes what parts are searched and you can select single pattern **OR** multiple patterns.
+
+### Single Pattern
+
+A below example is a fundamental usage. This searches the part, `auto_recovery = false` in `resource "hoge"`. 
+
+```yaml
+pattern: |
+  resource "hoge" :[NAME] {
+    :[...X]
+    auto_recovery = false
+    :[...Y]
+  }
+```
+
+> 📝 Tips: what is `:[...X]` and `:[...Y]`?  
+> This is _metavariables_. Please review the section, _Metavariable_ on the page, [Pattern](/learn-shisho/01-pattern). 
+
+### Multiple Patterns
+
+Multiple patterns are available for complex searches. For instance, the below patterns search the parts to meet **either** case, `risk_level` is `1` **OR** `2`. 
+
+```yaml
+patterns:
+  - pattern: |
+      resource "hoge" :[NAME] {
+        :[...X]
+        risk_level = 1
+        :[...Y]
+      }
+  - pattern: |
+      resource "hoge" :[NAME] {
+        :[...X]
+        risk_level = 2
+        :[...Y]
+      }
+```
+
+### Invalid Pattern Expression
+
+You can select **either** single or multiple patterns. Your code cannot have both expressions.
+
+```yaml
+
+// This is an invalid example because the code has both `pattern` and `patterns`.
+// You need explicitly select either one. 
+pattern: | 
+  resource "hoge" :[NAME] {
+    :[...X]
+    risk_level = 1
+    :[...Y]
+  }
+patterns:
+  - pattern: | 
+      resource "hoge" :[NAME] {
+        :[...X]
+        risk_level = 2
+        :[...Y]
+      }
+  - pattern: |
+      resource "hoge" :[NAME] {
+        :[...X]
+        risk_level = 3
+        :[...Y]
+      }
+```
+
