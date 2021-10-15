@@ -29,7 +29,7 @@ echo "func test(v []string) int { return len(v) + 1; }" | docker run -i ghcr.io/
 
 ```sh
 echo "func test(v []string) int { return len(v) + 1; }" > file.go
-docker run -i -v $(PWD):/workspace ghcr.io/flatt-security/shisho-cli:latest find "len(:[...])" --lang=go /workspace/file.go
+docker run -i -v $(pwd):/workspace ghcr.io/flatt-security/shisho-cli:latest find "len(:[...])" --lang=go /workspace/file.go
 ```
 
 ## Install with pre-built binaries
@@ -69,7 +69,7 @@ If you're using [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/w
 
 [release]: https://github.com/flatt-security/shisho/releases/latest
 [release-img]: https://img.shields.io/github/release/flatt-security/shisho.svg?logo=github
-[marketplace]: https://github.com/marketplace/actions/flatt-security-shisho
+[marketplace]: https://github.com/marketplace/actions/shisho-action
 [marketplace-img]: https://img.shields.io/badge/marketplace-shisho--action-blue?logo=github
 [license]: https://github.com/flatt-security/shisho/blob/main/LICENSE
 [license-img]: https://img.shields.io/github/license/flatt-security/shisho

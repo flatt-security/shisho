@@ -9,7 +9,7 @@ metaDescription: 'TBD'
 Shisho enables you to analyze and transform your code. All you need to do is just two steps:
 
 1. Set up your environment
-2. Write a rule / ruleset
+2. Write a rule / rule set
 
 # Set up your environment
 
