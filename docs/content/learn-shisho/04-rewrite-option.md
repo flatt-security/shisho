@@ -210,7 +210,7 @@ Suggested changes:
 
 ## Refer to Metavariables with Constraints 
 
-Moreover, you can refer to the metavariables captured by constraints. The feature allows referring existing values.
+Moreover, you can refer to the metavariables captured by constraints. The feature allows referring to existing values.
 
 ```yaml
 version: '1'
