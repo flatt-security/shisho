@@ -35,11 +35,11 @@ _A pattern_ describes what parts are searched and you can select single pattern 
 
 ### Single Pattern
 
-A below example is a fundamental usage. This searches the part, `auto_recovery = false` in `resource "hoge"`. 
+A below example is a fundamental usage. This searches the part, `auto_recovery = false` in `resource "foobar"`. 
 
 ```yaml
 pattern: |
-  resource "hoge" :[NAME] {
+  resource "foobar" :[NAME] {
     :[...X]
     auto_recovery = false
     :[...Y]
@@ -56,13 +56,13 @@ Multiple patterns are available for complex searches. For instance, the below pa
 ```yaml
 patterns:
   - pattern: |
-      resource "hoge" :[NAME] {
+      resource "foobar" :[NAME] {
         :[...X]
         risk_level = 1
         :[...Y]
       }
   - pattern: |
-      resource "hoge" :[NAME] {
+      resource "foobar" :[NAME] {
         :[...X]
         risk_level = 2
         :[...Y]
@@ -78,20 +78,20 @@ You can select **either** single or multiple patterns. Your code cannot have bot
 // This is an invalid example because the code has both `pattern` and `patterns`.
 // You need explicitly select either one. 
 pattern: | 
-  resource "hoge" :[NAME] {
+  resource "foobar" :[NAME] {
     :[...X]
     risk_level = 1
     :[...Y]
   }
 patterns:
   - pattern: | 
-      resource "hoge" :[NAME] {
+      resource "foobar" :[NAME] {
         :[...X]
         risk_level = 2
         :[...Y]
       }
   - pattern: |
-      resource "hoge" :[NAME] {
+      resource "foobar" :[NAME] {
         :[...X]
         risk_level = 3
         :[...Y]
