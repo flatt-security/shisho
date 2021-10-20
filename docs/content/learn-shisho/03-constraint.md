@@ -191,6 +191,7 @@ rules:
 ```
 
 ```
+$ cat example.tf | shisho check policy.yaml
 [sample-policy-match-any-of]: It includes either 'attr1 = 1' or 'attr3 = 3'
 In /dev/stdin:
          |
@@ -243,6 +244,7 @@ rules:
 ```
 
 ```
+$ cat example.tf | shisho check policy.yaml
 [sample-policy-not-match-any-of]: It does not include either 'attr1 = 1' or 'attr3 = 3'
 In /dev/stdin:
          |
@@ -274,6 +276,7 @@ rules:
 ```
 
 ```
+$ cat example.tf | shisho check policy.yaml
 [sample-policy-be-any-of]: It includes either 'attr1 = 1' or 'attr3 = 3'
 In /dev/stdin:
          |
@@ -305,6 +308,7 @@ rules:
 ```
 
 ```
+$ cat example.tf | shisho check policy.yaml
 [sample-policy-not-be-any-of]: It does not include either 'attr1 = 1' or 'attr3 = 3'
 In /dev/stdin:
          |
