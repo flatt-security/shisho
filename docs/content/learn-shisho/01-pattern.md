@@ -62,7 +62,7 @@ The above sections explain the base parameters and their principles so far. Let'
 
 ### Pattern in HCL
 
-Let's check the case of HashiCorp Terraform code. Please execute `shisho find 'auto_repair = :[X]' --lang=hcl sample-1.tf` after creating a sample target file, `sample-1.tf` in your current directory. This searches whether `sample-1.tf` includes the configuraton paramatter `auto_repair =` with any values.
+Let's check the case of HCL code (e.g. Terraform code). Please execute `shisho find 'auto_repair = :[X]' --lang=hcl sample-1.tf` after creating a sample target file, `sample-1.tf` in your current directory. This searches whether `sample-1.tf` includes the `auto_repair` attribute with any values.
 
 ```shell
 $ shisho find 'auto_repair = :[X]' --lang=hcl sample-1.tf
