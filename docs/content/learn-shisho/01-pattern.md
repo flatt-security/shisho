@@ -120,7 +120,7 @@ In Dockerfile.sample:
          |
 ```
 
-This is a sample target Docker file, `Dockerfile.sample`.
+This is a sample target Dockerfile (`Dockerfile.sample`).
 
 ```
 FROM node:10-alpine 
