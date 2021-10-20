@@ -9,11 +9,11 @@ metaDescription: 'This page describes details of rules for pattern matching.'
 _A rule_ describes how matched parts for a pattern should be treated. It mainly consists of:
 
 - an ID
-- [a pattern](/learn-shisho/01-pattern)
+- [one or more patterns](/learn-shisho/01-pattern)
 - a target language name of the pattern
 - a message related to the pattern
 - [rule constraints](/learn-shisho/03-constraint) (optional)
-- [a rewrite pattern](/learn-shisho/04-rewrite-pattern) (optional)
+- [one or more rewrite patterns](/learn-shisho/04-rewrite-pattern) (optional)
 
 _A rule set_ is a set of rules with Shisho's version information. Here's an example ruleset:
 
@@ -71,7 +71,7 @@ patterns:
 
 ### Invalid Pattern Expression
 
-You can select **either** single or multiple patterns. Your code cannot have both expressions.
+You can select **either** single or multiple patterns. Your rule cannot have both expressions.
 
 ```yaml
 
