@@ -60,7 +60,7 @@ resource "hoge" "foo" {
 
 The above sections explain the base parameters and their principles so far. Let's begin with more specific cases depends on your target language!
 
-### Pattern for HCL
+### Pattern in HCL
 
 Let's check the case of HashiCorp Terraform code. Please execute `shisho find 'auto_repair = :[X]' --lang=hcl sample-1.tf` after creating a sample target file, `sample-1.tf` in your current directory. This searches whether `sample-1.tf` includes the configuraton paramatter `auto_repair =` with any values.
 
@@ -85,7 +85,7 @@ resource "google_container_node_pool" "bad_example" {
 }
 ```
 
-### Pattern for Go
+### Pattern in Go
 
 Please execute a simple pattern `shisho find 'len(:[...])' --lang=go sample-1.go`. This searches whether `sample-1.go` includes the code `len()` with any inside values.
 
@@ -107,7 +107,7 @@ func test(v []string) int {
 ```
 
 
-### Pattern for Docker
+### Pattern in Dockerfile
 
 Let's execute a pattern `shisho find 'USER :[X]' --lang=dockerfile Dockerfile.sample`. This searches whether `Dockerfile.sample` includes the configuraton paramatter `USER :[X]` with any values.
 
