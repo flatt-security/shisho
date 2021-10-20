@@ -47,7 +47,7 @@ pattern: |
 ```
 
 > 📝 Tips: what is `:[...X]` and `:[...Y]`?  
-> This is _metavariables_. Please review the section, _Metavariable_ on the page, [Pattern](/learn-shisho/01-pattern). 
+> These are _metavariables_. Please review the section, _Metavariable_ on the page, [Pattern](/learn-shisho/01-pattern). 
 
 ### Multiple Patterns
 
