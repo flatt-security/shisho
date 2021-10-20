@@ -71,7 +71,7 @@ patterns:
 
 ### Invalid Pattern Expression
 
-You can select **either** single or multiple patterns. Your code cannot have both expressions.
+You can select **either** single or multiple patterns. Your rule cannot have both expressions.
 
 ```yaml
 
