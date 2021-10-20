@@ -73,7 +73,7 @@ In sample-1.tf:
          |
 ```
 
-This is a sample target Terraform file. `sample-1.tf`.
+This is a sample target Terraform file, `sample-1.tf`.
 
 ```
 resource "google_container_node_pool" "bad_example" {
@@ -98,7 +98,7 @@ In sample-1.go:
          |
 ```
 
-This is a sample target Go file. `sample-1.go`.
+This is a sample target Go file, `sample-1.go`.
 
 ```go
 func test(v []string) int { 
@@ -120,7 +120,7 @@ In Dockerfile.sample:
          |
 ```
 
-This is a sample target Docker file. `Dockerfile.sample`.
+This is a sample target Docker file, `Dockerfile.sample`.
 
 ```
 FROM node:10-alpine 
