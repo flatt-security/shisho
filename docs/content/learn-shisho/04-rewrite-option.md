@@ -6,7 +6,7 @@ metaDescription: 'This page describes details of rewrite options for pattern mat
 
 ## Overview
 
-_A rewrite option(s)_ defines how the matched parts of code should be transformed. You can utilize a single rewrite option with `rewrite` **OR** multiple rewrite options with `rewrite_options`. For example, if you need to show some options to transform the parts depending on external factors such as the user's environment or preference etc., `rewrite_options` is useful. 
+_A rewrite option(s)_ defines how the matched parts of code should be transformed. You can utilize a single rewrite option with `rewrite` block in a rule **OR** multiple rewrite options with `rewrite_options` block. For example, if you need to show some options to transform the parts depending on external factors such as the user's environment or preference etc., `rewrite_options` is useful. 
 
 > 📝 Tips: You can't use both `rewrite` and `rewrite_options`. You need to choose either one. 
 
