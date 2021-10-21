@@ -59,7 +59,7 @@ _A pattern_ describes what parts are searched and you can select single pattern 
 
 #### Single Pattern
 
-A below example is a fundamental usage. This searches the part, `auto_recovery = false` in `resource "foobar"`. 
+A below example is a fundamental usage. This searches the part `auto_recovery = false` in `resource "foobar"`. 
 
 ```yaml
 pattern: |
@@ -71,7 +71,7 @@ pattern: |
 ```
 
 > 📝 Tips: what is `:[...X]` and `:[...Y]`?  
-> These are _metavariables_. Please review the section, _Metavariable_ on the page, [Pattern](/learn-shisho/01-pattern). 
+> These are _metavariables_. Please review the section, _Metavariable_ on the page [Pattern](/learn-shisho/01-pattern). 
 
 #### Multiple Patterns
 
@@ -124,4 +124,4 @@ patterns:
 
 ### rewrite and rewrite_options
 
-If the parts match `pattern` block, it is transformed by `rewrite` block. You can utilize a single rewrite option with `rewrite` block in a rule **OR** multiple rewrite options with `rewrite_options` block. Please check the further details on the page, [one or more rewrite patterns](/learn-shisho/04-rewrite-option). 
+If the parts match `pattern` block, it is transformed by `rewrite` block. You can utilize a single rewrite option with `rewrite` block in a rule **OR** multiple rewrite options with `rewrite_options` block. Please check the further details on the page [one or more rewrite patterns](/learn-shisho/04-rewrite-option). 
