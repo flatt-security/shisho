@@ -15,17 +15,17 @@ The remaining section describes what they are and how they behave with the follo
 
 ```
 // (R1)
-resource "hoge" "foo" {
+resource "foobar" "foo" {
   attr1 = 1
 }
 
 // (R2)
-resource "hoge" "foo" {
+resource "foobar" "foo" {
   attr2 = 2
 }
 
 // (R3)
-resource "hoge" "foo" {
+resource "foobar" "foo" {
   size = 1
 }
 ```
@@ -116,7 +116,7 @@ rules:
 
 ## Predicates
 
-Predicates equals to available `should` options. The current available ones are:
+Predicates equal to available `should` options. The currently available ones are:
 
 1. match
 2. no-match
@@ -133,24 +133,24 @@ A target Terraform file is below and each part shows you example rules and the e
 
 ```
 // (R1)
-resource "hoge" "foo" {
+resource "foobar" "foo" {
   attr1 = 1
 }
 
 // (R2)
-resource "hoge" "foo" {
+resource "foobar" "foo" {
   attr2 = 2
 }
 
 // (R3)
-resource "hoge" "foo" {
+resource "foobar" "foo" {
   size = 1
 }
 ```
 
 ### match-any-of
 
-The predicate, `match-any-of` supports both _pattern-based_ and _regex-based_.
+The predicate `match-any-of` supports both _pattern-based_ and _regex-based_.
 
 ```yaml
 version: '1'
@@ -158,7 +158,7 @@ rules:
   - id: sample-policy-match-any-of
     language: hcl
     pattern: |
-      resource "hoge" :[Y] {
+      resource "foobar" :[Y] {
         :[...Z]
       }
     constraints:
@@ -177,7 +177,7 @@ rules:
   - id: sample-policy-match-any-of
     language: hcl
     pattern: |
-      resource "hoge" :[Y] {
+      resource "foobar" :[Y] {
         :[...Z]
       }
     constraints:
@@ -195,7 +195,7 @@ $ cat example.tf | shisho check policy.yaml
 [sample-policy-match-any-of]: It includes either 'attr1 = 1' or 'attr3 = 3'
 In /dev/stdin:
          |
-       2 | resource "hoge" "foo" {
+       2 | resource "foobar" "foo" {
        3 |   attr1 = 1
        4 | }
          |
@@ -203,7 +203,7 @@ In /dev/stdin:
 
 ### not-match-any-of
 
-The predicate, `not-match-any-of` supports both _pattern-based_ and _regex-based_.
+The predicate `not-match-any-of` supports both _pattern-based_ and _regex-based_.
 
 ```yaml
 version: '1'
@@ -211,7 +211,7 @@ rules:
   - id: sample-policy-not-match-any-of
     language: hcl
     pattern: |
-      resource "hoge" :[Y] {
+      resource "foobar" :[Y] {
         :[...Z]
       }
     constraints:
@@ -230,7 +230,7 @@ rules:
   - id: sample-policy-not-match-any-of
     language: hcl
     pattern: |
-      resource "hoge" :[Y] {
+      resource "foobar" :[Y] {
         :[...Z]
       }
     constraints:
@@ -248,7 +248,7 @@ $ cat example.tf | shisho check policy.yaml
 [sample-policy-not-match-any-of]: It does not include either 'attr1 = 1' or 'attr3 = 3'
 In /dev/stdin:
          |
-       7 | resource "hoge" "foo" {
+       7 | resource "foobar" "foo" {
        8 |   attr2 = 2
        9 | }
          |
@@ -256,13 +256,15 @@ In /dev/stdin:
 
 ### be-any-of
 
+A sub-parameter `strings` is available and this can have multiple values.
+
 ```yaml
 version: '1'
 rules:
   - id: sample-policy-be-any-of
     language: hcl
     pattern: |
-      resource "hoge" :[Y] {
+      resource "foobar" :[Y] {
         :[...Z]
       }
     constraints:
@@ -280,7 +282,7 @@ $ cat example.tf | shisho check policy.yaml
 [sample-policy-be-any-of]: It includes either 'attr1 = 1' or 'attr3 = 3'
 In /dev/stdin:
          |
-       2 | resource "hoge" "foo" {
+       2 | resource "foobar" "foo" {
        3 |   attr1 = 1
        4 | }
          |
@@ -288,13 +290,15 @@ In /dev/stdin:
 
 ### not-be-any-of 
 
+A sub-parameter `strings` is available and this is can have multiple values.
+
 ```yaml
 version: '1'
 rules:
   - id: sample-policy-not-be-any-of 
     language: hcl
     pattern: |
-      resource "hoge" :[Y] {
+      resource "foobar" :[Y] {
         :[...Z]
       }
     constraints:
@@ -312,7 +316,7 @@ $ cat example.tf | shisho check policy.yaml
 [sample-policy-not-be-any-of]: It does not include either 'attr1 = 1' or 'attr3 = 3'
 In /dev/stdin:
          |
-      12 | resource "hoge" "foo" {
+      12 | resource "foobar" "foo" {
       13 |   size = 1
       14 | }
          |
@@ -320,18 +324,11 @@ In /dev/stdin:
 [sample-policy-not-be-any-of]: It does not include either 'attr1 = 1' or 'attr3 = 3'
 In /dev/stdin:
          |
-       7 | resource "hoge" "foo" {
+       7 | resource "foobar" "foo" {
        8 |   attr2 = 2
        9 | }
          |
 ```
-
-The predicates support a variety of expressions for the utilization of constraints. However, you might be confused about the treatment of each parameter.  
-
-The points you might need to care about are:
-- Sub-parameters, `patterns` and `regex-patterns` are available for `match-any-of` and `not-match-any-of`
-- A sub-parameter, `strings` is available for only `be-any-of` and `not-be-any-of`
-- Both sub-parameters are able to have multiple values
 
 ## Advanced Usage
 
@@ -390,7 +387,7 @@ In /dev/stdin:
 
 Nested constraints can take a pattern from the parent constraint and for rewrite options, you can use metavariables from the inside constraint pattern. 
 
-What the below example rule, `policy.yaml` does is:
+What the below example rule `policy.yaml` does is:
 
 1. Search a `block` resource  while capturing the body of the block as metavariable `X`
 2. Search an `inner` block in the value of metavariable `X` while capturing the body of the block as metavariable `Z`
@@ -427,10 +424,10 @@ rules:
         }
 ```
 
-This is a target file, `example.tf`.
+This is a target file `example.tf`.
 
 ```
-resource "hoge" "foo" {
+resource "block" "foo" {
   inner {
     test = true
   }
