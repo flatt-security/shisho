@@ -444,7 +444,7 @@ $ cat example.tf | shisho check policy.yaml
 [test]: test.
 In /dev/stdin:
          |
-       1 | resource "hoge" "foo" {
+       1 | resource "block" "foo" {
        2 |   inner {
        3 |     test = true
        4 |   }
