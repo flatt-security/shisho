@@ -62,7 +62,7 @@ The above sections explain the base parameters and their principles so far. Let'
 
 ### Pattern in HCL
 
-Let's check the case of HCL code (e.g. Terraform code). Please execute below, `shisho find 'auto_repair = :[X]' ...`. This searches whether the target, `resource "google_container_node_pool" ...` includes the `auto_repair` attribute with any values.
+Let's check the case of HCL code (e.g. Terraform code). Please execute below `shisho find 'auto_repair = :[X]' ...`. This searches whether the target `resource "google_container_node_pool" ...` includes the `auto_repair` attribute with any values.
 
 ```shell
 $ shisho find 'auto_repair = :[X]' --lang=hcl << EOF
@@ -88,7 +88,7 @@ In /dev/stdin:
 
 ### Pattern in Go
 
-Please execute a simple below pattern `shisho find 'len(:[...])' ...`. This searches whether the target, `func test(...` includes the code `len()` with any inside values.
+Please execute a simple below pattern `shisho find 'len(:[...])' ...`. This searches whether the target `func test(...` includes the code `len()` with any inside values.
 
 ```shell
 $ shisho find 'len(:[...])' --lang=go << EOF
@@ -110,7 +110,7 @@ In /dev/stdin:
 
 ### Pattern in Dockerfile
 
-Let's execute a below pattern `shisho find 'USER :[X]' --lang ...`. It searches whether the target, `FROM node:10-alpine ...` includes the instruction `USER :[X]` with any values.
+Let's execute a below pattern `shisho find 'USER :[X]' --lang ...`. It searches whether the target　`FROM node:10-alpine ...` includes the instruction `USER :[X]` with any values.
 
 ```shell
 $ shisho find 'USER :[X]' --lang=dockerfile << EOF
