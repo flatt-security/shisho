@@ -394,7 +394,7 @@ What the below example rule, `policy.yaml` does is:
 
 1. Search a resource `hoge` by a `pattern`
 2. Search an `inner` component in the `hoge` by `parent constraint`
-3. Search a configuration parameter, `test =` with a metavariable `:[HOO]` in the `inner` by `nested constraint`
+3. Search `test` attribute in the value of metavariable `Z` while capturing the value of the attribute as `:[HOO]`
 4. If it matches, extract the value `test = :[HOO]` and set it in the parent component, `hoge`
 
 ```
