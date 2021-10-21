@@ -451,7 +451,7 @@ In /dev/stdin:
        5 | }
          |
 Suggested changes (1):
-1    1    |   resource "hoge" "foo" {
+1    1    |   resource "block" "foo" {
 2         | -   inner {
 3         | -     test = true
 4         | -   }
