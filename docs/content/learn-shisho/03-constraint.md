@@ -328,7 +328,7 @@ In /dev/stdin:
 
 The predicates support a variety of expressions for the utilization of constraints. However, you might be confused about the treatment of each parameter.  
 
-The points your might need to care about are:
+The points you might need to care about are:
 - Sub-parameters, `patterns` and `regex-patterns` are available for `match-any-of` and `not-match-any-of`
 - A sub-parameter, `strings` is available for only `be-any-of` and `not-be-any-of`
 - Both sub-parameters are able to have multiple values
