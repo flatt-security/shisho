@@ -55,3 +55,81 @@ resource "hoge" "foo" {
 > ```
 >
 > Similarly, `:[...]` is called _anonymous ellipsis metavariable_, whose matched parts won't be tested for equivalence.
+
+## Pattern Usage
+
+The above sections explain the base parameters and their principles so far. Let's begin with more specific cases depends on your target language!
+
+### Pattern in HCL
+
+Let's check the case of HCL code (e.g. Terraform code). Please execute below `shisho find 'auto_repair = :[X]' ...`. This searches whether the target `resource "google_container_node_pool" ...` includes the `auto_repair` attribute with any values.
+
+```shell
+$ shisho find 'auto_repair = :[X]' --lang=hcl << EOF
+resource "google_container_node_pool" "bad_example" {
+  name       = "example-node-pool"
+  cluster    = google_container_cluster.primary.id
+  management {
+    auto_repair = false
+  }
+}
+EOF
+```
+
+The expected result is below.
+
+```
+[inline]: matched with the given rule
+In /dev/stdin:
+         |
+       5 |     auto_repair = false
+         |
+```
+
+### Pattern in Go
+
+Please execute a simple below pattern `shisho find 'len(:[...])' ...`. This searches whether the target `func test(...` includes the code `len()` with any inside values.
+
+```shell
+$ shisho find 'len(:[...])' --lang=go << EOF
+func test(v []string) int { 
+  return len(v) + 1; 
+}
+EOF
+```
+
+The expected result is below.
+
+```
+[inline]: matched with the given rule
+In /dev/stdin:
+         |
+      2  |     return len(v) + 1; 
+         |
+```
+
+### Pattern in Dockerfile
+
+Let's execute a below pattern `shisho find 'USER :[X]' --lang ...`. It searches whether the target　`FROM node:10-alpine ...` includes the instruction `USER :[X]` with any values.
+
+```shell
+$ shisho find 'USER :[X]' --lang=dockerfile << EOF
+FROM node:10-alpine 
+RUN mkdir /app
+COPY . /app
+RUN chown -R node:node /app
+USER node
+CMD ["node", "index.js"]
+EOF
+```
+
+The expected result is below.
+
+```
+[inline]: matched with the given rule
+In /dev/stdin:
+         |
+      5  |     USER node
+         |
+```
+
