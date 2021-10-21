@@ -392,7 +392,7 @@ Nested constraints can take a pattern from the parent constraint and for rewrite
 
 What the below example rule, `policy.yaml` does is:
 
-1. Search a resource `hoge` by a `pattern`
+1. Search a `block` resource  while capturing the body of the block as metavariable `X`
 2. Search an `inner` block in the value of metavariable `X` while capturing the body of the block as metavariable `Z`
 3. Search `test` attribute in the value of metavariable `Z` while capturing the value of the attribute as `:[HOO]`
 4. If it matches, extract the value `test = :[HOO]` and set it in the parent component, `hoge`
