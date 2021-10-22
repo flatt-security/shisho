@@ -1,4 +1,4 @@
-use std::convert::TryFrom;
+use std::{collections::HashMap, convert::TryFrom};
 
 use crate::core::language::Queryable;
 use serde::{Deserialize, Serialize};
@@ -9,6 +9,7 @@ const SHISHO_NODE_METAVARIABLE_NAME: &str = "shisho_metavariable_name";
 const SHISHO_NODE_METAVARIABLE: &str = "shisho_metavariable";
 const SHISHO_NODE_ELLIPSIS_METAVARIABLE: &str = "shisho_ellipsis_metavariable";
 const SHISHO_NODE_ELLIPSIS: &str = "shisho_ellipsis";
+
 /// `Range` describes a range over a source code in a same manner as [Language Server Protocol](https://microsoft.github.io/language-server-protocol/specifications/specification-current/#range).
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Range {
@@ -257,4 +258,35 @@ impl<'tree> ConsecutiveNodes<'tree> {
         };
         core::str::from_utf8(&self.source[self.start_byte()..last])
     }
+}
+
+pub struct Path {
+    components: Vec<PathComponent>,
+}
+
+pub enum PathComponent {
+    Index(usize),
+    KeyName(String),
+}
+
+pub struct BlockId(usize);
+
+pub type BlockMap = HashMap<BlockId, Block>;
+
+pub struct Block {
+    id: BlockId,
+
+    /// type of this block
+    kind: BlockKind,
+
+    /// unique identifier
+    path: Path,
+
+    /// block depth starting from 0
+    depth: usize,
+}
+
+pub enum BlockKind {
+    Normal,
+    ArrayLike,
 }
