@@ -1,9 +1,5 @@
 use crate::core::{
-    language::Queryable,
-    matcher::CaptureItem,
-    matcher::MatchedItem,
-    node::NodeType,
-    node::{Node, RootNode},
+    language::Queryable, matcher::CaptureItem, matcher::MatchedItem, node::Node, node::NodeType,
     query::MetavariableId,
 };
 use anyhow::{anyhow, Result};
@@ -15,7 +11,7 @@ pub struct SnippetBuilder<'pattern, T>
 where
     T: Queryable,
 {
-    autofix: &'pattern RewriteOption<'pattern, T>,
+    autofix: RewriteOption<'pattern, T>,
     item: &'pattern MatchedItem<'pattern>,
 }
 
@@ -23,10 +19,7 @@ impl<'pattern, T> SnippetBuilder<'pattern, T>
 where
     T: Queryable,
 {
-    pub fn new(
-        autofix: &'pattern RewriteOption<'pattern, T>,
-        item: &'pattern MatchedItem<'pattern>,
-    ) -> Self {
+    pub fn new(autofix: RewriteOption<'pattern, T>, item: &'pattern MatchedItem<'pattern>) -> Self {
         Self { autofix, item }
     }
 }
@@ -57,14 +50,14 @@ impl<'tree, T> SnippetBuilder<'tree, T>
 where
     T: Queryable,
 {
-    pub fn from_root(&self, rnode: &RootNode) -> Result<Snippet, anyhow::Error> {
-        let pitems = T::unwrap_root(rnode)
+    pub fn build(&self) -> Result<Snippet, anyhow::Error> {
+        let pitems = T::unwrap_root(&self.autofix.root_node)
             .iter()
             .map(|node| (node, self.from_node(node)))
             .collect::<Vec<(&Node, Result<Segment>)>>();
 
         let body = self
-            .from_sub_segments(0, rnode.as_node().end_byte(), pitems)?
+            .from_sub_segments(0, self.autofix.root_node.as_node().end_byte(), pitems)?
             .body;
 
         Ok(Snippet { body })

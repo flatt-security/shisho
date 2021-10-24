@@ -18,10 +18,9 @@ impl<'a, T> RewriteOption<'a, T>
 where
     T: Queryable,
 {
-    pub fn to_rewritten_snippet<'tree>(&self, item: &'tree MatchedItem) -> Result<String> {
-        Ok(SnippetBuilder::new(self, item)
-            .from_root(&self.root_node)?
-            .body)
+    pub fn into_rewritten_snippet<'tree>(self, item: &'tree MatchedItem) -> Result<String> {
+        let builder = SnippetBuilder::new(self, item).build()?;
+        Ok(builder.body)
     }
 }
 

@@ -31,7 +31,7 @@ where
         let current_code = self.as_str().as_bytes();
 
         let before_snippet = String::from_utf8(current_code[0..item.area.start_byte()].to_vec())?;
-        let snippet = roption.to_rewritten_snippet(item)?;
+        let snippet = roption.into_rewritten_snippet(item)?;
         let after_snippet = String::from_utf8(
             current_code[item.area.end_byte().min(current_code.len())..current_code.len()].to_vec(),
         )?;
