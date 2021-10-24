@@ -13,7 +13,7 @@ pub struct Pattern<T>
 where
     T: Queryable,
 {
-    pub source: Vec<u8>,
+    pub(crate) source: Vec<u8>,
     pub(crate) with_extra_newline: bool,
 
     tstree: tree_sitter::Tree,

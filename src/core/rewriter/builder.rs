@@ -9,6 +9,7 @@ use crate::core::{
     query::MetavariableId,
 };
 use anyhow::{anyhow, Result};
+use regex::Captures;
 use thiserror::Error;
 
 use super::{node::RewritableNode, RewriteOption};
@@ -72,6 +73,10 @@ enum SnippetBuilderError {
     },
 }
 
+/// Tree Editor
+impl<'tree, T> SnippetBuilder<'tree, T> where T: Queryable {}
+
+/// Snippet Constructor
 impl<'tree, T> SnippetBuilder<'tree, T>
 where
     T: Queryable,
@@ -100,7 +105,7 @@ where
         }
     }
 
-    pub(crate) fn from_metavariable(
+    fn from_metavariable(
         &self,
         node: &RewritableNode,
         variable_name: &str,
@@ -230,6 +235,22 @@ where
             body,
             start_byte,
             end_byte,
+        })
+    }
+
+    fn from_string_leaf(&self, node: &RewritableNode) -> Result<Segment> {
+        let body = node.as_cow().to_string();
+        let r = regex::Regex::new(r":\[(\.\.\.)?(?P<name>[A-Z_][A-Z_0-9]*)\]").unwrap();
+        let body = r.replace_all(body.as_str(), |caps: &Captures| {
+            let name = caps.name("name").unwrap().as_str();
+            self.from_metavariable(node, name)
+                .map(|x| x.body)
+                .unwrap_or_default()
+        });
+        Ok(Segment {
+            body: body.into(),
+            start_byte: node.start_byte(),
+            end_byte: node.end_byte(),
         })
     }
 

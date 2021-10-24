@@ -16,8 +16,8 @@ use super::{
 };
 
 pub struct Tree<'tree, T> {
-    pub source: Vec<u8>,
-    with_extra_newline: bool,
+    pub(crate) source: Vec<u8>,
+    pub(crate) with_extra_newline: bool,
 
     tstree: tree_sitter::Tree,
     _marker: PhantomData<&'tree T>,
