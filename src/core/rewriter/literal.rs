@@ -7,8 +7,8 @@ use regex::Captures;
 use super::node::RewritableNode;
 
 impl<'tree, T: Queryable> SnippetBuilder<'tree, T> {
-    pub(crate) fn from_string_leaf(&self, node: &RewritableNode<'tree>) -> Result<Segment> {
-        let body = node.as_str().to_string();
+    pub(crate) fn from_string_leaf(&self, node: &RewritableNode) -> Result<Segment> {
+        let body = node.as_cow().to_string();
         let r = regex::Regex::new(r":\[(\.\.\.)?(?P<name>[A-Z_][A-Z_0-9]*)\]").unwrap();
         let body = r.replace_all(body.as_str(), |caps: &Captures| {
             let name = caps.name("name").unwrap().as_str();

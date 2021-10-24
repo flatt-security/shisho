@@ -18,15 +18,15 @@ impl Queryable for Go {
         &root.as_node().children
     }
 
-    fn is_skippable<'a, N: NodeLike<'a>>(node: &N) -> bool {
+    fn is_skippable<N: NodeLike>(node: &N) -> bool {
         node.kind() == NodeType::Normal("\n")
     }
 
-    fn is_leaf_like<'a, N: NodeLike<'a>>(node: &N) -> bool {
+    fn is_leaf_like<N: NodeLike>(node: &N) -> bool {
         Self::is_string_literal(node)
     }
 
-    fn is_string_literal<'a, N: NodeLike<'a>>(node: &N) -> bool {
+    fn is_string_literal<N: NodeLike>(node: &N) -> bool {
         matches!(
             node.kind(),
             NodeType::Normal("interpreted_string_literal") | NodeType::Normal("raw_string_literal")
@@ -52,7 +52,7 @@ mod tests {
             Go,
             r#"for _, x := range iter { fmt.Printf("%s", x) }"#,
             r#"for _, x := range iter { fmt.Printf("%s", x) }"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
             }
@@ -62,7 +62,7 @@ mod tests {
             Go,
             r#"for _, x := range iter { fmt.Printf("%s", :[VAR]) }"#,
             r#"for _, x := range iter { fmt.Printf("%s", x) }"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
             }
@@ -87,7 +87,7 @@ mod tests {
                     fmt.Printf("%s", x)
                 }
                 "#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
             }
@@ -105,7 +105,7 @@ mod tests {
                 def = abc
                 abc = x
             "#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
             }
@@ -118,13 +118,13 @@ mod tests {
             Go,
             r#"fmt.Printf("%s%d", :[X], 2)"#,
             r#"fmt.Printf("%s%d", "test", 2)"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("\"test\"")
+                        .map(|x| x.to_string()),
+                    Some("\"test\"".to_string())
                 );
             }
         );
@@ -133,13 +133,13 @@ mod tests {
             Go,
             r#"f("%s%d", :[...X])"#,
             r#"f("%s%d", 1, 2)"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("1, 2")
+                        .map(|x| x.to_string()),
+                    Some("1, 2".to_string())
                 );
             }
         );
@@ -148,13 +148,13 @@ mod tests {
             Go,
             r#"f("%s%d", :[...X], 3)"#,
             r#"f("%s%d", 1, 2, 3)"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("1, 2")
+                        .map(|x| x.to_string()),
+                    Some("1, 2".to_string())
                 );
             }
         );
@@ -166,13 +166,13 @@ mod tests {
             Go,
             r#":[X].Printf("%s%d", :[...])"#,
             r#"fmt.Printf("%s%d", "test", 2)"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("fmt")
+                        .map(|x| x.to_string()),
+                    Some("fmt".to_string())
                 );
             }
         );
@@ -181,13 +181,13 @@ mod tests {
             Go,
             r#":[X]("%s%d", :[...])"#,
             r#"fmt.Printf("%s%d", "test", 2)"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("fmt.Printf")
+                        .map(|x| x.to_string()),
+                    Some("fmt.Printf".to_string())
                 );
             }
         );
@@ -199,13 +199,13 @@ mod tests {
             Go,
             r#"func (:[X] *Receiver) f(a int, b string, c int) int { return 1 }"#,
             r#"func (r *Receiver) f(a int, b string, c int) int { return 1 }"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("r")
+                        .map(|x| x.to_string()),
+                    Some("r".to_string())
                 );
             }
         );
@@ -214,13 +214,13 @@ mod tests {
             Go,
             r#"func (r *Receiver) f(:[...X]) int { return 1 }"#,
             r#"func (r *Receiver) f(a int, b string, c int) int { return 1 }"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("a int, b string, c int")
+                        .map(|x| x.to_string()),
+                    Some("a int, b string, c int".to_string())
                 );
             }
         );
@@ -229,13 +229,13 @@ mod tests {
             Go,
             r#"func (r *Receiver) f(a int, :[...X], c int) int { return 1 }"#,
             r#"func (r *Receiver) f(a int, b string, c int) int { return 1 }"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("b string")
+                        .map(|x| x.to_string()),
+                    Some("b string".to_string())
                 );
             }
         );
@@ -247,18 +247,18 @@ mod tests {
             Go,
             r#"[] :[X] {1, 2, :[Y], 4, 5}"#,
             r#"[]int {1, 2, 3, 4, 5}"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("int")
+                        .map(|x| x.to_string()),
+                    Some("int".to_string())
                 );
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("Y".into()))
-                        .map(|x| x.as_str()),
-                    Some("3")
+                        .map(|x| x.to_string()),
+                    Some("3".to_string())
                 );
             }
         );
@@ -267,13 +267,13 @@ mod tests {
             Go,
             r#"[] int {1, 2, :[...Y], 5}"#,
             r#"[]int {1, 2, 3, 4, 5}"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("Y".into()))
-                        .map(|x| x.as_str()),
-                    Some("3, 4")
+                        .map(|x| x.to_string()),
+                    Some("3, 4".to_string())
                 );
             }
         );
@@ -282,26 +282,26 @@ mod tests {
     #[test]
     fn test_string() {
         match_pt!(Go, r#""xoxp-:[X]""#, r#"a := "xoxp-test""#, |c: Result<
-            Vec<MatchedItem>,
+            Vec<MatchedItem<Node<'_>>>,
         >| {
             let c = c.unwrap();
             assert_eq!(c.len(), 1);
             assert_eq!(
                 c[0].capture_of(&MetavariableId("X".into()))
-                    .map(|x| x.as_str()),
-                Some("test")
+                    .map(|x| x.to_string()),
+                Some("test".to_string())
             );
         });
 
         match_pt!(Go, r#"`xoxp-:[X]`"#, r#"a := `xoxp-test`"#, |c: Result<
-            Vec<MatchedItem>,
+            Vec<MatchedItem<Node<'_>>>,
         >| {
             let c = c.unwrap();
             assert_eq!(c.len(), 1);
             assert_eq!(
                 c[0].capture_of(&MetavariableId("X".into()))
-                    .map(|x| x.as_str()),
-                Some("test")
+                    .map(|x| x.to_string()),
+                Some("test".to_string())
             );
         });
     }
@@ -312,7 +312,7 @@ mod tests {
             Go,
             r#"if :[X] { :[...Y] }"#,
             r#"if true == false { a := 2; b := 3 }"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
             }
@@ -322,7 +322,7 @@ mod tests {
             Go,
             r#"if :[X]; :[Y] { :[...Z] }"#,
             r#"if err := nil; true == false { a := 2; b := 3 }"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
             }
@@ -332,7 +332,7 @@ mod tests {
             Go,
             r#"if :[X] { :[...] }"#,
             r#"if err := nil; true == false { a := 2; b := 3 } else { c := 4 }"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 0);
             }
@@ -345,7 +345,7 @@ mod tests {
             Go,
             r#":[X] || :[X]"#,
             r#"func a() { b := 1 || 1 }"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let mut c = c.unwrap();
 
                 assert_eq!(c.len(), 1);

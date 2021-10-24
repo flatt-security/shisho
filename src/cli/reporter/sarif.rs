@@ -2,6 +2,7 @@ use super::Reporter;
 use crate::core::{
     language::Queryable,
     matcher::MatchedItem,
+    node::Node,
     ruleset::{Rule, Severity},
     target::Target,
 };
@@ -34,7 +35,7 @@ impl<'a, W: std::io::Write> Reporter<'a> for SARIFReporter<'a, W> {
     fn add_entry<T: Queryable>(
         &mut self,
         target: &Target,
-        items: Vec<(&Rule, MatchedItem)>,
+        items: Vec<(&Rule, MatchedItem<'_, Node<'_>>)>,
     ) -> Result<()> {
         for (rule, mitem) in items {
             let descriptor_idx = {

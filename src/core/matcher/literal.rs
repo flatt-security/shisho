@@ -1,13 +1,14 @@
 use crate::core::{
     matcher::{CaptureItem, UnverifiedMetavariable},
+    node::NodeLike,
     query::MetavariableId,
 };
 use regex::Captures;
 
-pub fn match_string_pattern<'tree, 'query>(
+pub fn match_string_pattern<'tree, 'query, 'captured, N: NodeLike>(
     tvalue: &'tree str,
     qvalue: &'query str,
-) -> Vec<Vec<UnverifiedMetavariable<'tree>>> {
+) -> Vec<Vec<UnverifiedMetavariable<'captured, N>>> {
     // TODO (enhancement): this should have better implementation :/
     let qpattern = to_regex(qvalue);
     let metavariables = find_metavariables(qvalue);
@@ -26,7 +27,7 @@ pub fn match_string_pattern<'tree, 'query>(
                         )
                     })
                 })
-                .collect::<Vec<UnverifiedMetavariable>>()
+                .collect::<Vec<UnverifiedMetavariable<N>>>()
         })
         .collect()
 }
@@ -57,6 +58,8 @@ fn to_regex(q: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use crate::core::node::Node;
+
     use super::*;
 
     #[test]
@@ -89,9 +92,9 @@ mod tests {
 
     #[test]
     fn test_match_string_pattern() {
-        assert_eq!(match_string_pattern("test", "test").len(), 1);
+        assert_eq!(match_string_pattern::<Node<'_>>("test", "test").len(), 1);
         assert_eq!(
-            match_string_pattern("hellotestgoodbye", "hello:[X]goodbye"),
+            match_string_pattern::<Node<'_>>("hellotestgoodbye", "hello:[X]goodbye"),
             vec![vec![(
                 MetavariableId("X".into()),
                 CaptureItem::Literal("test".into())
@@ -99,7 +102,7 @@ mod tests {
         );
 
         assert_eq!(
-            match_string_pattern("hello\ntestgoodbye", "hello:[X]goodbye"),
+            match_string_pattern::<Node<'_>>("hello\ntestgoodbye", "hello:[X]goodbye"),
             vec![vec![(
                 MetavariableId("X".into()),
                 CaptureItem::Literal("\ntest".into())
@@ -108,7 +111,7 @@ mod tests {
 
         // longest match
         assert_eq!(
-            match_string_pattern("hellotestgoodbye", "hello:[X]:[Y]goodbye"),
+            match_string_pattern::<Node<'_>>("hellotestgoodbye", "hello:[X]:[Y]goodbye"),
             vec![vec![
                 (
                     MetavariableId("X".into()),

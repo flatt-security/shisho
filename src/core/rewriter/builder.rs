@@ -1,8 +1,12 @@
-use std::marker::PhantomData;
+use std::{cell::RefCell, marker::PhantomData, rc::Rc};
 
 use crate::core::{
-    language::Queryable, matcher::CaptureItem, matcher::MatchedItem, node::NodeLike,
-    node::NodeType, query::MetavariableId,
+    language::Queryable,
+    matcher::CaptureItem,
+    matcher::MatchedItem,
+    node::NodeType,
+    node::{Node, NodeLike},
+    query::MetavariableId,
 };
 use anyhow::{anyhow, Result};
 use thiserror::Error;
@@ -13,11 +17,12 @@ pub struct SnippetBuilder<'pattern, T>
 where
     T: Queryable,
 {
-    root_node: RewritableNode<'pattern>,
-    source: Vec<u8>,
+    root_node: RewritableNode,
+    source: Rc<RefCell<Vec<u8>>>,
     with_extra_newline: bool,
 
-    item: &'pattern MatchedItem<'pattern>,
+    item: &'pattern MatchedItem<'pattern, Node<'pattern>>,
+
     _marker: PhantomData<T>,
 }
 
@@ -25,10 +30,17 @@ impl<'pattern, T> SnippetBuilder<'pattern, T>
 where
     T: Queryable,
 {
-    pub fn new(autofix: RewriteOption<'pattern, T>, item: &'pattern MatchedItem<'pattern>) -> Self {
+    pub fn new(
+        autofix: RewriteOption<'pattern, T>,
+        item: &'pattern MatchedItem<'pattern, Node<'pattern>>,
+    ) -> Self {
+        let source = autofix.pattern.source.clone();
+        let source = Rc::new(RefCell::new(source));
+
+        let rnode: Node = autofix.root_node.into();
         Self {
-            root_node: autofix.root_node.into(),
-            source: autofix.pattern.source.clone(),
+            root_node: RewritableNode::from_node(rnode, source.clone()),
+            source,
             with_extra_newline: autofix.pattern.with_extra_newline,
 
             item,
@@ -99,7 +111,7 @@ where
             .capture_of(&id)
             .and_then(|x| match x {
                 CaptureItem::Empty => None,
-                _ => Some(x.as_str()),
+                _ => Some(x.to_string()),
             })
             .ok_or(SnippetBuilderError::MetavariableUnavailable {
                 id: id.0,
@@ -119,7 +131,7 @@ where
             self.from_string_leaf(node)
         } else {
             Ok(Segment {
-                body: node.as_str().into(),
+                body: node.as_cow().into(),
                 start_byte: node.start_byte(),
                 end_byte: node.end_byte(),
             })
@@ -223,16 +235,18 @@ where
 
     #[inline]
     pub fn string_between(&self, start: usize, end: usize) -> Result<String> {
-        let start = if self.source.len() == start && self.with_extra_newline {
+        let source = self.source.borrow();
+
+        let start = if source.len() == start && self.with_extra_newline {
             start - 1
         } else {
             start
         };
-        let end = if self.source.len() == end && self.with_extra_newline {
+        let end = if source.len() == end && self.with_extra_newline {
             end - 1
         } else {
             end
         };
-        Ok(String::from_utf8(self.source[start..end].to_vec())?)
+        Ok(String::from_utf8(source[start..end].to_vec())?)
     }
 }

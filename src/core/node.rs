@@ -1,7 +1,5 @@
-use std::convert::TryFrom;
-
-use crate::core::language::Queryable;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 
 use super::query::MetavariableId;
 
@@ -26,10 +24,10 @@ pub struct Position {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Node<'tree> {
     inner: tree_sitter::Node<'tree>,
-    pub children: Vec<Node<'tree>>,
+    with_extra_newline: bool,
 
+    pub children: Vec<Node<'tree>>,
     pub(crate) source: &'tree [u8],
-    pub(crate) with_extra_newline: bool,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -40,11 +38,11 @@ pub enum NodeType {
     Normal(&'static str),
 }
 
-fn get_metavariable_id<'a>(node: &'a Node<'_>) -> &'a str {
+fn get_metavariable_id<'a>(node: &'a Node<'_>) -> Cow<'a, str> {
     node.children
         .iter()
         .find(|child| child.kind() == NodeType::Normal(SHISHO_NODE_METAVARIABLE_NAME))
-        .map(|child| child.as_str())
+        .map(|child| child.as_cow())
         .expect(
             format!(
                 "{} did not have {}",
@@ -54,18 +52,27 @@ fn get_metavariable_id<'a>(node: &'a Node<'_>) -> &'a str {
         )
 }
 
-pub trait NodeLike<'tree> {
+pub trait NodeLike
+where
+    Self: Sized + Clone,
+{
     fn kind(&self) -> NodeType;
+    fn with_extra_newline(&self) -> bool;
+    fn children<'a>(&'a self) -> Vec<&'a Self>;
 
     fn start_byte(&self) -> usize;
     fn end_byte(&self) -> usize;
     fn start_position(&self) -> tree_sitter::Point;
     fn end_position(&self) -> tree_sitter::Point;
 
-    fn as_str(&self) -> &'tree str;
+    fn as_cow(&self) -> Cow<'_, str>;
+    fn with_source<'a, F, Output>(&'a self, callback: F) -> Output
+    where
+        F: Fn(&[u8]) -> Output,
+        Output: 'a;
 }
 
-impl<'tree> NodeLike<'tree> for Node<'tree> {
+impl<'tree> NodeLike for Node<'tree> {
     fn kind(&self) -> NodeType {
         match self.inner.kind() {
             s if s == SHISHO_NODE_METAVARIABLE => {
@@ -77,6 +84,10 @@ impl<'tree> NodeLike<'tree> for Node<'tree> {
             ),
             s => NodeType::Normal(s),
         }
+    }
+
+    fn with_extra_newline(&self) -> bool {
+        self.with_extra_newline
     }
 
     fn start_byte(&self) -> usize {
@@ -95,13 +106,27 @@ impl<'tree> NodeLike<'tree> for Node<'tree> {
         self.inner.end_position()
     }
 
-    fn as_str(&self) -> &'tree str {
+    fn as_cow(&self) -> Cow<'_, str> {
         let last = if self.with_extra_newline {
             self.end_byte() - 1
         } else {
             self.end_byte()
         };
-        core::str::from_utf8(&self.source[self.start_byte()..last]).unwrap()
+        std::borrow::Cow::Borrowed(
+            core::str::from_utf8(&self.source[self.start_byte()..last]).unwrap(),
+        )
+    }
+
+    fn children<'a>(&'a self) -> Vec<&'a Self> {
+        self.children.iter().collect()
+    }
+
+    fn with_source<'a, F, Output>(&'a self, callback: F) -> Output
+    where
+        F: Fn(&[u8]) -> Output,
+        Output: 'a,
+    {
+        callback(self.source)
     }
 }
 
@@ -170,101 +195,5 @@ impl<'tree> RootNode<'tree> {
 impl<'tree> From<RootNode<'tree>> for Node<'tree> {
     fn from(r: RootNode<'tree>) -> Self {
         r.0
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ConsecutiveNodes<'tree> {
-    inner: Vec<&'tree Node<'tree>>,
-    source: &'tree [u8],
-}
-
-impl<'tree> TryFrom<Vec<&'tree Node<'tree>>> for ConsecutiveNodes<'tree> {
-    type Error = anyhow::Error;
-    fn try_from(inner: Vec<&'tree Node<'tree>>) -> Result<Self, Self::Error> {
-        // TODO (y0n3uchy): check all capture items are consecutive
-        if inner.is_empty() {
-            Err(anyhow::anyhow!(
-                "internal error; ConsecutiveNodes was generated from empty vec."
-            ))
-        } else {
-            let source = inner.get(0).unwrap().source;
-            Ok(ConsecutiveNodes { inner, source })
-        }
-    }
-}
-
-impl<'tree> TryFrom<Vec<ConsecutiveNodes<'tree>>> for ConsecutiveNodes<'tree> {
-    type Error = anyhow::Error;
-
-    fn try_from(cns: Vec<ConsecutiveNodes<'tree>>) -> Result<Self, Self::Error> {
-        // TODO (y0n3uchy): check all capture items are consecutive
-        if cns.is_empty() {
-            Err(anyhow::anyhow!(
-                "internal error; ConsecutiveNodes was generated from empty vec."
-            ))
-        } else {
-            let source = cns.get(0).unwrap().source;
-            Ok(ConsecutiveNodes {
-                inner: cns.into_iter().map(|cn| cn.inner).flatten().collect(),
-                source,
-            })
-        }
-    }
-}
-
-impl<'tree> ConsecutiveNodes<'tree> {
-    pub fn as_vec(&self) -> &Vec<&'tree Node<'tree>> {
-        &self.inner
-    }
-
-    pub fn push(&mut self, n: &'tree Node<'tree>) {
-        self.inner.push(n)
-    }
-
-    pub fn start_position(&self) -> tree_sitter::Point {
-        self.as_vec().first().unwrap().start_position()
-    }
-
-    pub fn end_position(&self) -> tree_sitter::Point {
-        self.as_vec().last().unwrap().end_position()
-    }
-
-    pub fn range<T: Queryable>(&self) -> Range {
-        Range {
-            start: T::range(*self.as_vec().first().unwrap()).start,
-            end: T::range(*self.as_vec().last().unwrap()).end,
-        }
-    }
-
-    pub fn start_byte(&self) -> usize {
-        self.as_vec().first().unwrap().start_byte()
-    }
-
-    pub fn end_byte(&self) -> usize {
-        self.as_vec().last().unwrap().end_byte()
-    }
-
-    pub fn len(&self) -> usize {
-        self.as_vec().len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    #[inline]
-    pub fn with_extra_newline(&self) -> bool {
-        self.as_vec().last().unwrap().with_extra_newline
-    }
-
-    #[inline]
-    pub fn as_str(&self) -> Result<&str, core::str::Utf8Error> {
-        let last = if self.with_extra_newline() {
-            self.end_byte() - 1
-        } else {
-            self.end_byte()
-        };
-        core::str::from_utf8(&self.source[self.start_byte()..last])
     }
 }

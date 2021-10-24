@@ -10,7 +10,7 @@ use std::{
 };
 
 use super::{
-    node::{Node, RootNode},
+    node::{Node, NodeLike, RootNode},
     query::Query,
     source::NormalizedSource,
 };
@@ -89,7 +89,7 @@ where
         }
     }
 
-    pub fn as_ref_treeview(&'tree self) -> RefTreeView<'tree, T> {
+    pub fn as_ref_treeview(&'tree self) -> RefTreeView<'tree, T, Node<'tree>> {
         self.into()
     }
 }
@@ -121,13 +121,12 @@ where
     }
 }
 
-pub struct RefTreeView<'tree, T> {
-    pub view_root: &'tree Node<'tree>,
-    pub source: &'tree [u8],
+pub struct RefTreeView<'tree, T, N: NodeLike> {
+    pub view_root: &'tree N,
     _marker: PhantomData<T>,
 }
 
-impl<'tree, 'view, T> RefTreeView<'tree, T>
+impl<'tree, 'view, T, N: NodeLike> RefTreeView<'tree, T, N>
 where
     T: Queryable + 'tree,
     'tree: 'view,
@@ -135,7 +134,7 @@ where
     pub fn matches<'query>(
         &'view self,
         q: &'query Query<'query, T>,
-    ) -> impl Iterator<Item = Result<MatchedItem<'tree>>> + 'query + 'view
+    ) -> impl Iterator<Item = Result<MatchedItem<'tree, N>>> + 'query + 'view
     where
         'tree: 'query,
         'query: 'view,
@@ -156,58 +155,55 @@ where
         })
     }
 
-    pub fn traverse(&'view self) -> TreeTreverser<'tree> {
+    pub fn traverse(&'view self) -> TreeTreverser<'tree, N> {
         TreeTreverser::new(self.view_root)
     }
 }
 
-impl<'tree, T> From<&'tree NormalizedTree<'tree, T>> for RefTreeView<'tree, T>
+impl<'tree, T> From<&'tree NormalizedTree<'tree, T>> for RefTreeView<'tree, T, Node<'tree>>
 where
     T: Queryable,
 {
     fn from(t: &'tree NormalizedTree<'tree, T>) -> Self {
         RefTreeView {
             view_root: &t.view_root,
-            source: t.source,
             _marker: PhantomData,
         }
     }
 }
 
-impl<'tree, T> From<&'tree Node<'tree>> for RefTreeView<'tree, T>
+impl<'tree, T, N: NodeLike> From<&'tree N> for RefTreeView<'tree, T, N>
 where
     T: Queryable,
 {
-    fn from(t: &'tree Node<'tree>) -> Self {
-        let source = t.source;
+    fn from(t: &'tree N) -> Self {
         RefTreeView {
             view_root: t,
-            source,
             _marker: PhantomData,
         }
     }
 }
 
-pub struct TreeTreverser<'a> {
-    queue: VecDeque<(usize, &'a Node<'a>)>,
+pub struct TreeTreverser<'a, N: NodeLike> {
+    queue: VecDeque<(usize, &'a N)>,
 }
 
-impl<'a> TreeTreverser<'a> {
+impl<'a, N: NodeLike> TreeTreverser<'a, N> {
     #[inline]
-    pub fn new(root: &'a Node<'a>) -> Self {
+    pub fn new(root: &'a N) -> Self {
         Self {
             queue: VecDeque::from(vec![(0, root)]),
         }
     }
 }
 
-impl<'a> Iterator for TreeTreverser<'a> {
-    type Item = (usize, &'a Node<'a>);
+impl<'a, N: NodeLike> Iterator for TreeTreverser<'a, N> {
+    type Item = (usize, &'a N);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((depth, node)) = self.queue.pop_front() {
-            let children = node.children.iter();
+            let children = node.children().into_iter();
             self.queue.extend(children.map(|child| (depth + 1, child)));
 
             Some((depth, node))

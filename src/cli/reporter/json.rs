@@ -2,8 +2,13 @@ use std::convert::TryFrom;
 
 use super::Reporter;
 use crate::core::{
-    language::Queryable, matcher::MatchedItem, node::Range, pattern::Pattern, ruleset::Rule,
-    source::Code, target::Target,
+    language::Queryable,
+    matcher::MatchedItem,
+    node::{Node, Range},
+    pattern::Pattern,
+    ruleset::Rule,
+    source::Code,
+    target::Target,
 };
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -44,7 +49,7 @@ impl<'a, W: std::io::Write> Reporter<'a> for JSONReporter<'a, W> {
     fn add_entry<T: Queryable>(
         &mut self,
         target: &Target,
-        items: Vec<(&Rule, MatchedItem)>,
+        items: Vec<(&Rule, MatchedItem<'_, Node<'_>>)>,
     ) -> Result<()> {
         for (rule, mitem) in items {
             let mut r = Entry {

@@ -7,7 +7,8 @@ use std::{convert::TryFrom, fs::File, path::Path, str::FromStr};
 use walkdir::WalkDir;
 
 use crate::core::{
-    language::Queryable, matcher::MatchedItem, pattern::PatternWithConstraints, tree::RefTreeView,
+    language::Queryable, matcher::MatchedItem, node::Node, pattern::PatternWithConstraints,
+    tree::RefTreeView,
 };
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -77,8 +78,8 @@ impl Rule {
 
     pub fn find<'tree, 'item, T>(
         &self,
-        tree: &'tree RefTreeView<'tree, T>,
-    ) -> Result<Vec<MatchedItem<'item>>>
+        tree: &'tree RefTreeView<'tree, T, Node<'tree>>,
+    ) -> Result<Vec<MatchedItem<'item, Node<'tree>>>>
     where
         T: Queryable,
         'tree: 'item,
@@ -89,7 +90,7 @@ impl Rule {
             let pc = PatternWithConstraints::<T>::try_from(rpc)?;
             let lmatches = tree
                 .matches(&pc.as_query())
-                .collect::<Result<Vec<MatchedItem>>>()?;
+                .collect::<Result<Vec<MatchedItem<Node>>>>()?;
             matches.extend(lmatches);
         }
         Ok(matches)

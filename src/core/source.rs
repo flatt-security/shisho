@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::core::language::Queryable;
+use crate::core::{language::Queryable, node::Node};
 use std::marker::PhantomData;
 
 use super::{matcher::MatchedItem, rewriter::RewriteOption};
@@ -27,7 +27,11 @@ impl<T> Code<T>
 where
     T: Queryable,
 {
-    pub fn to_rewritten_form(self, item: &MatchedItem, roption: RewriteOption<T>) -> Result<Self> {
+    pub fn to_rewritten_form(
+        self,
+        item: &MatchedItem<'_, Node<'_>>,
+        roption: RewriteOption<T>,
+    ) -> Result<Self> {
         let current_code = self.as_str().as_bytes();
 
         let before_snippet = String::from_utf8(current_code[0..item.area.start_byte()].to_vec())?;

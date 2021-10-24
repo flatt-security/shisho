@@ -24,18 +24,18 @@ impl Queryable for HCL {
             .children
     }
 
-    fn is_leaf_like<'a, N: NodeLike<'a>>(node: &N) -> bool {
+    fn is_leaf_like< N: NodeLike>(node: &N) -> bool {
         Self::is_string_literal(node)
     }
 
-    fn is_string_literal<'a, N: NodeLike<'a>>(node: &N) -> bool {
+    fn is_string_literal<N: NodeLike>(node: &N) -> bool {
         matches!(
             node.kind(),
             NodeType::Normal("string_lit") | NodeType::Normal("quoted_template")
         )
     }
 
-    fn is_skippable<'a, N: NodeLike<'a>>(node: &N) -> bool {
+    fn is_skippable<N: NodeLike>(node: &N) -> bool {
         node.kind() == NodeType::Normal("\n")
     }
 }
@@ -57,7 +57,7 @@ mod tests {
             HCL,
             r#"encrypted = true"#,
             r#"encrypted = true"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
             }
@@ -67,7 +67,7 @@ mod tests {
             HCL,
             r#"resource "rtype" "rname" { attr = "value" }"#,
             r#"resource "rtype" "rname" { attr = "value" }"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
             }
@@ -77,7 +77,7 @@ mod tests {
             HCL,
             r#"resource "rtype" "rname" { attr = :[X] }"#,
             r#"resource "rtype" "rname" { attr = "value" }"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
             }
@@ -94,7 +94,7 @@ mod tests {
                 hoge = "foobar"
                 foo = "test"
             }"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
             }
@@ -115,7 +115,7 @@ mod tests {
             resource "rtype" "rname3" {
                 attr = "value"
             }"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 2);
             }
@@ -154,7 +154,7 @@ mod tests {
                     another_attr = 3
                 }
             "#,            
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 2);
             }
@@ -173,7 +173,7 @@ mod tests {
                    xx = 1
                }
            "#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
             }
@@ -213,7 +213,7 @@ mod tests {
                     another_attr = 3
                 }
             "#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 3);
             }
@@ -255,7 +255,7 @@ mod tests {
                 yetanother_attr = :[X]
             "#,
             cmd,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
             }
@@ -269,7 +269,7 @@ mod tests {
                 yetanother_attr = :[_]
             "#,
             cmd,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 2);
             }
@@ -288,13 +288,13 @@ mod tests {
                     one_attr = max(1, 2, 5)
                 }
             "#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("2")
+                        .map(|x| x.to_string()),
+                    Some("2".to_string())
                 );
             }
         );
@@ -309,13 +309,13 @@ mod tests {
                     one_attr = max(1, 2, 3, 4, 5)
                 }
             "#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("2, 3, 4")
+                        .map(|x| x.to_string()),
+                    Some("2, 3, 4".to_string())
                 );
             }
         );
@@ -336,18 +336,18 @@ mod tests {
                     attr = "hello2"
                 }
             "#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 2);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("\"hello1\"")
+                        .map(|x| x.to_string()),
+                    Some("\"hello1\"".to_string())
                 );
                 assert_eq!(
                     c[1].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("\"hello2\"")
+                        .map(|x| x.to_string()),
+                    Some("\"hello2\"".to_string())
                 );
             }
         );
@@ -365,13 +365,13 @@ mod tests {
                     attr = [1, 2, 3, 4, 5]
                 }
             "#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("2, 3, 4, 5")
+                        .map(|x| x.to_string()),
+                    Some("2, 3, 4, 5".to_string())
                 );
             }
         );
@@ -386,18 +386,18 @@ mod tests {
                     attr = [1, 2, 3, 4, 5]
                 }
             "#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("2")
+                        .map(|x| x.to_string()),
+                    Some("2".to_string())
                 );
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("Y".into()))
-                        .map(|x| x.as_str()),
-                    Some("4")
+                        .map(|x| x.to_string()),
+                    Some("4".to_string())
                 );
             }
         );
@@ -424,26 +424,26 @@ mod tests {
                     }
                 }
             "#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("key1 = value1")
+                        .map(|x| x.to_string()),
+                    Some("key1 = value1".to_string())
                 );
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("Y".into()))
-                        .map(|x| x.as_str()),
-                    Some("value2")
+                        .map(|x| x.to_string()),
+                    Some("value2".to_string())
                 );
 
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("Z".into()))
-                        .map(|x| x.as_str()),
+                        .map(|x| x.to_string()),
                     Some(
                         r#"key3 = value3
-                        key4 = value4"#
+                        key4 = value4"#.to_string()
                     )
                 );
             }
@@ -464,13 +464,13 @@ mod tests {
                 attr = "sample-:[X]-foo"
             "#,
             cmd,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("0012")
+                        .map(|x| x.to_string()),
+                    Some("0012".to_string())
                 );
             }
         );
@@ -481,18 +481,18 @@ mod tests {
                 attr = "sample-:[X]:[Y]-foo"
             "#,
             cmd,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("0012")
+                        .map(|x| x.to_string()),
+                    Some("0012".to_string())
                 );
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("Y".into()))
-                        .map(|x| x.as_str()),
-                    Some("")
+                        .map(|x| x.to_string()),
+                    Some("".to_string())
                 );
             }
         );
@@ -518,18 +518,18 @@ mod tests {
                 attr = [for :[Y] in :[X] : upper(:[Y]) if :[Y] != ""]
             "#,
             cmd,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("var.list")
+                        .map(|x| x.to_string()),
+                    Some("var.list".to_string())
                 );
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("Y".into()))
-                        .map(|x| x.as_str()),
-                    Some("s")
+                        .map(|x| x.to_string()),
+                    Some("s".to_string())
                 );
             }
         );
@@ -540,18 +540,18 @@ mod tests {
                 attr = [for :[...Y] in :[X] : upper(:[_]) if :[_] != ""]
             "#,
             cmd,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 2);
                 assert_eq!(
                     c[1].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("var.list")
+                        .map(|x| x.to_string()),
+                    Some("var.list".to_string())
                 );
                 assert_eq!(
                     c[1].capture_of(&MetavariableId("Y".into()))
-                        .map(|x| x.as_str()),
-                    Some("s, ss")
+                        .map(|x| x.to_string()),
+                    Some("s, ss".to_string())
                 );
             }
         );
@@ -562,18 +562,18 @@ mod tests {
                 attr = {for :[...Y] in :[X] : :[_] => upper(:[_]) if :[_] != ""}
             "#,
             cmd,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("var.list")
+                        .map(|x| x.to_string()),
+                    Some("var.list".to_string())
                 );
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("Y".into()))
-                        .map(|x| x.as_str()),
-                    Some("s")
+                        .map(|x| x.to_string()),
+                    Some("s".to_string())
                 );
             }
         );
@@ -588,7 +588,7 @@ mod tests {
                 resource "rtype" "rname" { attr = :[_] }
             "#,
             cmd,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let mut c = c.unwrap();
                 assert_eq!(c.len(), 1);
 
@@ -616,7 +616,7 @@ mod tests {
             HCL,
             "resource \"rtype\" \"rname\" { attr = :[X] }\nresource \"rtype\" \"another\" { attr = :[Y] }",
             cmd,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let mut c = c.unwrap();
                 assert_eq!(c.len(), 1);
 

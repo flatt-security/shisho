@@ -16,24 +16,24 @@ pub trait Queryable {
     fn unwrap_root<'tree, 'a>(root: &'a RootNode<'tree>) -> &'a Vec<Node<'tree>>;
 
     /// `is_skippable` returns whether the given node could be ignored on matching.
-    fn is_skippable<'a, N: NodeLike<'a>>(_node: &N) -> bool {
+    fn is_skippable<N: NodeLike>(_node: &N) -> bool {
         false
     }
 
-    fn is_leaf_like<'a, N: NodeLike<'a>>(_node: &N) -> bool {
+    fn is_leaf_like<N: NodeLike>(_node: &N) -> bool {
         false
     }
 
-    fn is_string_literal<'a, N: NodeLike<'a>>(_node: &N) -> bool {
+    fn is_string_literal<N: NodeLike>(_node: &N) -> bool {
         false
     }
 
-    fn range<'a, N: NodeLike<'a>>(node: &N) -> Range {
+    fn range<N: NodeLike>(node: &N) -> Range {
         Self::default_range(node)
     }
 
-    fn default_range<'a, N: NodeLike<'a>>(node: &N) -> Range {
-        if node.as_str().ends_with('\n') {
+    fn default_range<N: NodeLike>(node: &N) -> Range {
+        if node.as_cow().ends_with('\n') {
             Range {
                 start: Position {
                     row: node.start_position().row + 1,
@@ -58,8 +58,8 @@ pub trait Queryable {
         }
     }
 
-    fn node_value_eq<'a, 'b, NL: NodeLike<'a>, NR: NodeLike<'b>>(l: &NL, r: &NR) -> bool {
-        *l.as_str() == *r.as_str()
+    fn node_value_eq<NL: NodeLike, NR: NodeLike>(l: &NL, r: &NR) -> bool {
+        *l.as_cow() == *r.as_cow()
     }
 }
 
@@ -75,6 +75,8 @@ macro_rules! match_pt {
         let ptree = ptree.as_ref_treeview();
         let session = ptree.matches(&query);
 
-        $callback(session.collect::<anyhow::Result<Vec<crate::core::matcher::MatchedItem>>>());
+        $callback(
+            session.collect::<anyhow::Result<Vec<crate::core::matcher::MatchedItem<crate::core::node::Node>>>>(),
+        );
     }};
 }

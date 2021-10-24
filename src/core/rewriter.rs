@@ -2,7 +2,9 @@ mod builder;
 mod literal;
 mod node;
 
-use crate::core::{language::Queryable, matcher::MatchedItem, node::RootNode, pattern::Pattern};
+use crate::core::{
+    language::Queryable, matcher::MatchedItem, node::Node, node::RootNode, pattern::Pattern,
+};
 use anyhow::Result;
 
 use self::builder::SnippetBuilder;
@@ -19,7 +21,10 @@ impl<'a, T> RewriteOption<'a, T>
 where
     T: Queryable,
 {
-    pub fn into_rewritten_snippet<'tree>(self, item: &'tree MatchedItem) -> Result<String> {
+    pub fn into_rewritten_snippet<'tree>(
+        self,
+        item: &'tree MatchedItem<'tree, Node<'tree>>,
+    ) -> Result<String> {
         let builder = SnippetBuilder::new(self, item).build()?;
         Ok(builder.body)
     }

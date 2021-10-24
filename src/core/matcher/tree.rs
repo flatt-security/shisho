@@ -1,9 +1,9 @@
 use crate::core::{
     language::Queryable,
     matcher::{
-        match_string_pattern, CaptureItem, MatchedItem, MatcherState, UnverifiedMetavariable,
+        match_string_pattern, CaptureItem, ConsecutiveNodes, MatchedItem, MatcherState,
+        UnverifiedMetavariable,
     },
-    node::ConsecutiveNodes,
     node::{Node, NodeLike, NodeType, RootNode},
     query::QueryPattern,
     tree::TreeTreverser,
@@ -12,22 +12,22 @@ use crate::core::{
 use std::{convert::TryFrom, marker::PhantomData};
 
 /// `TreeMatcher` iterates possible matches between query and tree to traverse.
-pub struct TreeMatcher<'tree, 'query, T: Queryable> {
+pub struct TreeMatcher<'tree, 'query, T: Queryable, N: NodeLike> {
     /// Tree to traverse
-    traverser: TreeTreverser<'tree>,
+    traverser: TreeTreverser<'tree, N>,
 
     /// Query
     query: &'query RootNode<'query>,
 
     /// local state for implementing `Iterator`/    
-    items: Vec<MatchedItem<'tree>>,
+    items: Vec<MatchedItem<'tree, N>>,
 
     /// just a marker
     _marker: PhantomData<T>,
 }
 
-impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
-    pub fn new(traverser: TreeTreverser<'tree>, query: &'query QueryPattern<T>) -> Self {
+impl<'tree, 'query, T: Queryable, N: NodeLike> TreeMatcher<'tree, 'query, T, N> {
+    pub fn new(traverser: TreeTreverser<'tree, N>, query: &'query QueryPattern<T>) -> Self {
         TreeMatcher {
             query: &query.root_node,
             traverser,
@@ -38,7 +38,7 @@ impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
     }
 }
 
-impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
+impl<'tree, 'query, T: Queryable, N: NodeLike> TreeMatcher<'tree, 'query, T, N> {
     /// `match_sibilings` takes two sibiling nodes (one for the code tree to search, one for the query tree) and returns zero or more matches.    
     /// Each element of return value accompanies with a value with `Option<&Node>`.
     ///
@@ -68,11 +68,11 @@ impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
     ///     - (MatcherState {subtree: ABCDEF, .. }, None)    
     fn match_sibilings(
         &self,
-        tsibilings: Vec<&'tree Node<'tree>>,
+        tsibilings: Vec<&'tree N>,
         qsibilings: Vec<&'query Node<'query>>,
-    ) -> Vec<(MatcherState<'tree>, Option<&Node<'tree>>)> {
-        let mut queue: Vec<(usize, usize, Vec<UnverifiedMetavariable>)> = vec![(0, 0, vec![])];
-        let mut result: Vec<(MatcherState, Option<&Node<'tree>>)> = vec![];
+    ) -> Vec<(MatcherState<'tree, N>, Option<&N>)> {
+        let mut queue: Vec<(usize, usize, Vec<UnverifiedMetavariable<N>>)> = vec![(0, 0, vec![])];
+        let mut result: Vec<(MatcherState<N>, Option<&N>)> = vec![];
 
         while let Some((tidx, qidx, captures)) = queue.pop() {
             match (tsibilings.get(tidx), qsibilings.get(qidx)) {
@@ -122,7 +122,7 @@ impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
                         }
                     }
                     NodeType::EllipsisMetavariable(mid) => {
-                        let mut captured_nodes = vec![];
+                        let mut captured_nodes: Vec<&N> = vec![];
                         // NOTE: this loop must end with `tsibilings.len()`
                         for tcidx in tidx..=tsibilings.len() {
                             queue.push((
@@ -134,13 +134,13 @@ impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
                                 ]
                                 .concat(),
                             ));
-                            if let Some(tchild) = tsibilings.get(tcidx) {
+                            if let Some(&tchild) = tsibilings.get(tcidx) {
                                 captured_nodes.push(tchild);
                             }
                         }
                     }
                     _ => {
-                        for submatch in self.match_intermediate_node(Some(tchild), Some(qchild)) {
+                        for submatch in self.match_intermediate_node(Some(*tchild), Some(*qchild)) {
                             queue.push((
                                 tidx + 1,
                                 qidx + 1,
@@ -156,14 +156,17 @@ impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
 
     fn match_intermediate_node(
         &self,
-        tnode: Option<&'tree Node<'tree>>,
+        tnode: Option<&'tree N>,
         qnode: Option<&'query Node<'query>>,
-    ) -> Vec<MatcherState<'tree>> {
+    ) -> Vec<MatcherState<'tree, N>> {
         match (tnode, qnode) {
             (None, None) =>
             // treat as a match
             {
-                vec![Default::default()]
+                vec![MatcherState {
+                    subtree: None,
+                    captures: vec![],
+                }]
             }
             (Some(tnode), Some(qnode)) =>
             // check the equality of two nodes and get possible matches
@@ -202,8 +205,8 @@ impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
                         // (2): get matches of children
                         self.match_sibilings(
                             tnode
-                                .children
-                                .iter()
+                                .children()
+                                .into_iter()
                                 .filter(|n| !T::is_skippable(*n))
                                 .collect(),
                             qnode
@@ -240,15 +243,15 @@ impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
     /// `match_leaf` validates the equality of two leaf nodes with `NodeType::Normal`.
     fn match_leaf(
         &self,
-        tnode: &'tree Node<'tree>,
+        tnode: &'tree N,
         qnode: &'query Node<'query>,
-    ) -> Vec<MatcherState<'tree>> {
+    ) -> Vec<MatcherState<'tree, N>> {
         assert!(matches!(tnode.kind(), NodeType::Normal(_)));
         assert!(matches!(qnode.kind(), NodeType::Normal(_)));
 
         if T::is_string_literal(tnode) && T::is_string_literal(qnode) {
             // when both of tnode and qnode is string literal, use string matcher to check the equality of them
-            match_string_pattern(tnode.as_str(), qnode.as_str())
+            match_string_pattern(&tnode.as_cow(), &qnode.as_cow())
                 .into_iter()
                 .map(|captures| MatcherState {
                     subtree: ConsecutiveNodes::try_from(vec![tnode]).ok(),
@@ -271,11 +274,11 @@ impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
     }
 }
 
-impl<'tree, 'query, T> Iterator for TreeMatcher<'tree, 'query, T>
+impl<'tree, 'query, T, N: NodeLike> Iterator for TreeMatcher<'tree, 'query, T, N>
 where
     T: Queryable,
 {
-    type Item = MatchedItem<'tree>;
+    type Item = MatchedItem<'tree, N>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let qnodes: Vec<&Node<'query>> = T::unwrap_root(self.query)
@@ -289,9 +292,9 @@ where
             }
 
             if let Some((depth, tnode)) = self.traverser.next() {
-                let tnodes: Vec<&Node<'tree>> = tnode
-                    .children
-                    .iter()
+                let tnodes: Vec<&N> = tnode
+                    .children()
+                    .into_iter()
                     .filter(|n| !T::is_skippable(*n))
                     .collect();
                 let tcandidates =
@@ -306,8 +309,8 @@ where
                     let items = self
                         .match_sibilings(tsibilings, qnodes.clone())
                         .into_iter()
-                        .filter_map(|(mitem, _)| Option::<MatchedItem>::from(mitem))
-                        .collect::<Vec<MatchedItem>>();
+                        .filter_map(|(mitem, _)| Option::<MatchedItem<N>>::from(mitem))
+                        .collect::<Vec<MatchedItem<N>>>();
                     self.items.extend(items);
                 }
             } else {
