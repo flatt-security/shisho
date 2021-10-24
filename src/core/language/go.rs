@@ -1,5 +1,5 @@
 use super::Queryable;
-use crate::core::node::{Node, NodeType, RootNode};
+use crate::core::node::{Node, NodeLike, NodeType, RootNode};
 
 #[derive(Debug, Clone)]
 pub struct Go;
@@ -18,15 +18,15 @@ impl Queryable for Go {
         &root.as_node().children
     }
 
-    fn is_skippable(node: &Node) -> bool {
+    fn is_skippable<'a, N: NodeLike<'a>>(node: &N) -> bool {
         node.kind() == NodeType::Normal("\n")
     }
 
-    fn is_leaf_like(node: &Node) -> bool {
+    fn is_leaf_like<'a, N: NodeLike<'a>>(node: &N) -> bool {
         Self::is_string_literal(node)
     }
 
-    fn is_string_literal(node: &Node) -> bool {
+    fn is_string_literal<'a, N: NodeLike<'a>>(node: &N) -> bool {
         matches!(
             node.kind(),
             NodeType::Normal("interpreted_string_literal") | NodeType::Normal("raw_string_literal")

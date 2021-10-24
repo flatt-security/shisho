@@ -4,7 +4,7 @@ use crate::core::{
         match_string_pattern, CaptureItem, MatchedItem, MatcherState, UnverifiedMetavariable,
     },
     node::ConsecutiveNodes,
-    node::{Node, NodeType, RootNode},
+    node::{Node, NodeLike, NodeType, RootNode},
     query::QueryPattern,
     tree::TreeTreverser,
 };
@@ -204,12 +204,12 @@ impl<'tree, 'query, T: Queryable> TreeMatcher<'tree, 'query, T> {
                             tnode
                                 .children
                                 .iter()
-                                .filter(|n| !T::is_skippable(n))
+                                .filter(|n| !T::is_skippable(*n))
                                 .collect(),
                             qnode
                                 .children
                                 .iter()
-                                .filter(|n| !T::is_skippable(n))
+                                .filter(|n| !T::is_skippable(*n))
                                 .collect(),
                         )
                         .into_iter()
@@ -280,7 +280,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let qnodes: Vec<&Node<'query>> = T::unwrap_root(self.query)
             .iter()
-            .filter(|n| !T::is_skippable(n))
+            .filter(|n| !T::is_skippable(*n))
             .collect();
 
         loop {
@@ -292,7 +292,7 @@ where
                 let tnodes: Vec<&Node<'tree>> = tnode
                     .children
                     .iter()
-                    .filter(|n| !T::is_skippable(n))
+                    .filter(|n| !T::is_skippable(*n))
                     .collect();
                 let tcandidates =
                     (0..tnodes.len())

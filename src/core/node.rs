@@ -9,6 +9,7 @@ const SHISHO_NODE_METAVARIABLE_NAME: &str = "shisho_metavariable_name";
 const SHISHO_NODE_METAVARIABLE: &str = "shisho_metavariable";
 const SHISHO_NODE_ELLIPSIS_METAVARIABLE: &str = "shisho_ellipsis_metavariable";
 const SHISHO_NODE_ELLIPSIS: &str = "shisho_ellipsis";
+
 /// `Range` describes a range over a source code in a same manner as [Language Server Protocol](https://microsoft.github.io/language-server-protocol/specifications/specification-current/#range).
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Range {
@@ -25,13 +26,13 @@ pub struct Position {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Node<'tree> {
     inner: tree_sitter::Node<'tree>,
-    with_extra_newline: bool,
+    pub children: Vec<Node<'tree>>,
 
     pub(crate) source: &'tree [u8],
-    pub children: Vec<Node<'tree>>,
+    pub(crate) with_extra_newline: bool,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum NodeType {
     Metavariable(MetavariableId),
     EllipsisMetavariable(MetavariableId),
@@ -53,8 +54,19 @@ fn get_metavariable_id<'a>(node: &'a Node<'_>) -> &'a str {
         )
 }
 
-impl<'tree> Node<'tree> {
-    pub fn kind(&self) -> NodeType {
+pub trait NodeLike<'tree> {
+    fn kind(&self) -> NodeType;
+
+    fn start_byte(&self) -> usize;
+    fn end_byte(&self) -> usize;
+    fn start_position(&self) -> tree_sitter::Point;
+    fn end_position(&self) -> tree_sitter::Point;
+
+    fn as_str(&self) -> &'tree str;
+}
+
+impl<'tree> NodeLike<'tree> for Node<'tree> {
+    fn kind(&self) -> NodeType {
         match self.inner.kind() {
             s if s == SHISHO_NODE_METAVARIABLE => {
                 NodeType::Metavariable(MetavariableId(get_metavariable_id(self).to_string()))
@@ -67,23 +79,23 @@ impl<'tree> Node<'tree> {
         }
     }
 
-    pub fn start_byte(&self) -> usize {
+    fn start_byte(&self) -> usize {
         self.inner.start_byte()
     }
 
-    pub fn end_byte(&self) -> usize {
+    fn end_byte(&self) -> usize {
         self.inner.end_byte()
     }
 
-    pub fn start_position(&self) -> tree_sitter::Point {
+    fn start_position(&self) -> tree_sitter::Point {
         self.inner.start_position()
     }
 
-    pub fn end_position(&self) -> tree_sitter::Point {
+    fn end_position(&self) -> tree_sitter::Point {
         self.inner.end_position()
     }
 
-    pub fn as_str(&self) -> &'tree str {
+    fn as_str(&self) -> &'tree str {
         let last = if self.with_extra_newline {
             self.end_byte() - 1
         } else {
@@ -91,11 +103,9 @@ impl<'tree> Node<'tree> {
         };
         core::str::from_utf8(&self.source[self.start_byte()..last]).unwrap()
     }
+}
 
-    pub fn is_named(&self) -> bool {
-        self.inner.is_named()
-    }
-
+impl<'tree> Node<'tree> {
     pub fn from_tsnode(
         tsnode: tree_sitter::Node<'tree>,
         source: &'tree [u8],
@@ -222,8 +232,8 @@ impl<'tree> ConsecutiveNodes<'tree> {
 
     pub fn range<T: Queryable>(&self) -> Range {
         Range {
-            start: T::range(self.as_vec().first().unwrap()).start,
-            end: T::range(self.as_vec().last().unwrap()).end,
+            start: T::range(*self.as_vec().first().unwrap()).start,
+            end: T::range(*self.as_vec().last().unwrap()).end,
         }
     }
 

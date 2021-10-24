@@ -1,18 +1,24 @@
+use std::marker::PhantomData;
+
 use crate::core::{
-    language::Queryable, matcher::CaptureItem, matcher::MatchedItem, node::Node, node::NodeType,
-    query::MetavariableId,
+    language::Queryable, matcher::CaptureItem, matcher::MatchedItem, node::NodeLike,
+    node::NodeType, query::MetavariableId,
 };
 use anyhow::{anyhow, Result};
 use thiserror::Error;
 
-use super::RewriteOption;
+use super::{node::RewritableNode, RewriteOption};
 
 pub struct SnippetBuilder<'pattern, T>
 where
     T: Queryable,
 {
-    autofix: RewriteOption<'pattern, T>,
+    root_node: RewritableNode<'pattern>,
+    source: Vec<u8>,
+    with_extra_newline: bool,
+
     item: &'pattern MatchedItem<'pattern>,
+    _marker: PhantomData<T>,
 }
 
 impl<'pattern, T> SnippetBuilder<'pattern, T>
@@ -20,7 +26,15 @@ where
     T: Queryable,
 {
     pub fn new(autofix: RewriteOption<'pattern, T>, item: &'pattern MatchedItem<'pattern>) -> Self {
-        Self { autofix, item }
+        Self {
+            root_node: autofix.root_node.into(),
+            source: autofix.pattern.source.clone(),
+            with_extra_newline: autofix.pattern.with_extra_newline,
+
+            item,
+
+            _marker: PhantomData,
+        }
     }
 }
 
@@ -51,19 +65,17 @@ where
     T: Queryable,
 {
     pub fn build(&self) -> Result<Snippet, anyhow::Error> {
-        let pitems = T::unwrap_root(&self.autofix.root_node)
-            .iter()
-            .map(|node| (node, self.from_node(node)))
-            .collect::<Vec<(&Node, Result<Segment>)>>();
+        let pitems: Vec<(&RewritableNode, Result<Segment>)> =
+            vec![(&self.root_node, self.from_node(&self.root_node))];
 
         let body = self
-            .from_sub_segments(0, self.autofix.root_node.as_node().end_byte(), pitems)?
+            .from_sub_segments(0, self.root_node.end_byte(), pitems)?
             .body;
 
         Ok(Snippet { body })
     }
 
-    fn from_node(&self, node: &Node) -> Result<Segment, anyhow::Error> {
+    fn from_node(&self, node: &RewritableNode) -> Result<Segment, anyhow::Error> {
         match node.kind() {
             NodeType::Ellipsis => Err(anyhow!(
                 "cannot use ellipsis operator inside the transformation query"
@@ -78,7 +90,7 @@ where
 
     pub(crate) fn from_metavariable(
         &self,
-        node: &Node,
+        node: &RewritableNode,
         variable_name: &str,
     ) -> Result<Segment, anyhow::Error> {
         let id = MetavariableId(variable_name.into());
@@ -102,7 +114,7 @@ where
         })
     }
 
-    fn from_leaf(&self, node: &Node) -> Result<Segment, anyhow::Error> {
+    fn from_leaf(&self, node: &RewritableNode) -> Result<Segment, anyhow::Error> {
         if T::is_string_literal(node) {
             self.from_string_leaf(node)
         } else {
@@ -114,12 +126,12 @@ where
         }
     }
 
-    fn from_intermediate_node(&self, node: &Node) -> Result<Segment, anyhow::Error> {
+    fn from_intermediate_node(&self, node: &RewritableNode) -> Result<Segment, anyhow::Error> {
         let children = node
             .children
             .iter()
             .map(|child| (child, self.from_node(child)))
-            .collect::<Vec<(&Node, Result<Segment>)>>();
+            .collect::<Vec<(&RewritableNode, Result<Segment>)>>();
 
         self.from_sub_segments(node.start_byte(), node.end_byte(), children)
     }
@@ -129,7 +141,7 @@ where
         &self,
         start_byte: usize,
         end_byte: usize,
-        subitems: Vec<(&Node, Result<Segment>)>,
+        subitems: Vec<(&RewritableNode, Result<Segment>)>,
     ) -> Result<Segment, anyhow::Error> {
         let mut body: String = "".into();
 
@@ -166,7 +178,7 @@ where
                     // ```
                     let mut glue = "".to_string();
                     if let Some(e) = end_byte_for_last_real_node {
-                        glue = self.autofix.pattern.string_between(e, n.start_byte())?;
+                        glue = self.string_between(e, n.start_byte())?;
                         end_byte_for_last_real_node = None;
                     }
 
@@ -186,10 +198,7 @@ where
                     // `child` is a normal TransformedSegment.
 
                     // (1) handle between the previous TransformedSegment and `child`.
-                    let pre_glue = self
-                        .autofix
-                        .pattern
-                        .string_between(virtual_end_byte, child.start_byte)?;
+                    let pre_glue = self.string_between(virtual_end_byte, child.start_byte)?;
                     body += pre_glue.as_str();
 
                     // (2) handle `child` itself
@@ -202,10 +211,7 @@ where
             }
         }
 
-        let post_glue = self
-            .autofix
-            .pattern
-            .string_between(virtual_end_byte, end_byte)?;
+        let post_glue = self.string_between(virtual_end_byte, end_byte)?;
         body += post_glue.as_str();
 
         Ok(Segment {
@@ -213,5 +219,20 @@ where
             start_byte,
             end_byte,
         })
+    }
+
+    #[inline]
+    pub fn string_between(&self, start: usize, end: usize) -> Result<String> {
+        let start = if self.source.len() == start && self.with_extra_newline {
+            start - 1
+        } else {
+            start
+        };
+        let end = if self.source.len() == end && self.with_extra_newline {
+            end - 1
+        } else {
+            end
+        };
+        Ok(String::from_utf8(self.source[start..end].to_vec())?)
     }
 }

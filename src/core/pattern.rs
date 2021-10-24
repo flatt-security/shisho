@@ -14,7 +14,7 @@ where
     T: Queryable,
 {
     pub source: Vec<u8>,
-    with_extra_newline: bool,
+    pub(crate) with_extra_newline: bool,
 
     tstree: tree_sitter::Tree,
     _marker: PhantomData<T>,

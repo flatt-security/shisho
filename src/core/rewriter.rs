@@ -1,5 +1,6 @@
 mod builder;
 mod literal;
+mod node;
 
 use crate::core::{language::Queryable, matcher::MatchedItem, node::RootNode, pattern::Pattern};
 use anyhow::Result;
@@ -11,7 +12,7 @@ where
     T: Queryable,
 {
     pub root_node: RootNode<'a>,
-    pattern: &'a Pattern<T>,
+    pub(crate) pattern: &'a Pattern<T>,
 }
 
 impl<'a, T> RewriteOption<'a, T>

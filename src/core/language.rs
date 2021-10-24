@@ -2,13 +2,11 @@ mod docker;
 mod go;
 mod hcl;
 
-use crate::core::node::Position;
+use crate::core::node::{Node, NodeLike, Position, Range, RootNode};
 
 pub use self::docker::Dockerfile;
 pub use self::go::Go;
 pub use self::hcl::HCL;
-
-use super::node::{Node, Range, RootNode};
 
 pub trait Queryable {
     fn target_language() -> tree_sitter::Language;
@@ -18,23 +16,23 @@ pub trait Queryable {
     fn unwrap_root<'tree, 'a>(root: &'a RootNode<'tree>) -> &'a Vec<Node<'tree>>;
 
     /// `is_skippable` returns whether the given node could be ignored on matching.
-    fn is_skippable(_node: &Node) -> bool {
+    fn is_skippable<'a, N: NodeLike<'a>>(_node: &N) -> bool {
         false
     }
 
-    fn is_leaf_like(_node: &Node) -> bool {
+    fn is_leaf_like<'a, N: NodeLike<'a>>(_node: &N) -> bool {
         false
     }
 
-    fn is_string_literal(_node: &Node) -> bool {
+    fn is_string_literal<'a, N: NodeLike<'a>>(_node: &N) -> bool {
         false
     }
 
-    fn range(node: &Node) -> Range {
+    fn range<'a, N: NodeLike<'a>>(node: &N) -> Range {
         Self::default_range(node)
     }
 
-    fn default_range(node: &Node) -> Range {
+    fn default_range<'a, N: NodeLike<'a>>(node: &N) -> Range {
         if node.as_str().ends_with('\n') {
             Range {
                 start: Position {
@@ -60,7 +58,7 @@ pub trait Queryable {
         }
     }
 
-    fn node_value_eq<'a, 'b>(l: &Node<'a>, r: &Node<'b>) -> bool {
+    fn node_value_eq<'a, 'b, NL: NodeLike<'a>, NR: NodeLike<'b>>(l: &NL, r: &NR) -> bool {
         *l.as_str() == *r.as_str()
     }
 }
