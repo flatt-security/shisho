@@ -80,13 +80,15 @@ where
         pwc: &PatternWithConstraints<T>,
         with_pattern: &Pattern<T>,
     ) -> Result<()> {
-        let rtv = RefTreeView::from(&self.replace_with.root);
+        // let rtv = RefTreeView::from(from capture);
 
-        let matches = rtv
-            .matches(&pwc.as_query())
-            .collect::<Result<Vec<MatchedItem<RewritableNode>>>>()?;
+        // let matches = rtv
+        //     .matches(&pwc.as_query())
+        //     .collect::<Result<Vec<MatchedItem<RewritableNode>>>>()?;
 
-        todo!("not implemented yet")
+        // todo!("not implemented yet")
+
+        Ok(())
     }
 
     pub fn apply_filter(&mut self, filter: &RewriteFilter<T>) -> Result<&mut Self> {
@@ -94,9 +96,10 @@ where
             RewriteFilterPredicate::ReplaceWithQuery((pwcs, to)) => {
                 for pwc in pwcs {
                     self.replace(&filter.target, pwc, to)?;
-                }            
+                }
             }
         }
+
         Ok(self)
     }
 
@@ -145,11 +148,6 @@ where
         node: &RewritableNode,
         variable_name: &str,
     ) -> Result<Segment, anyhow::Error> {
-        assert!(matches!(
-            node.kind(),
-            NodeType::Metavariable(_) | NodeType::EllipsisMetavariable(_)
-        ));
-
         let id = MetavariableId(variable_name.into());
         let value = self
             .replace_target

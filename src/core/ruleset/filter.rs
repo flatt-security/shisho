@@ -1,8 +1,10 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
+use std::{convert::TryFrom, str::FromStr};
 
-use crate::core::{language::Queryable, pattern::Pattern, query::MetavariableId};
+use crate::core::{
+    language::Queryable, pattern::Pattern, query::MetavariableId, ruleset::util::string_or_struct,
+};
 
 use super::constraint::{PatternWithConstraints, RawConstraint, RawPatternWithConstraints};
 
@@ -41,6 +43,22 @@ pub struct RawPatternWithFilters {
 
     #[serde(default)]
     pub filters: Vec<RawRewriteFilter>,
+}
+
+#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
+pub struct RawPatternWithFiltersWrapper(
+    #[serde(deserialize_with = "string_or_struct")] pub RawPatternWithFilters,
+);
+
+impl FromStr for RawPatternWithFilters {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self {
+            pattern: s.to_string(),
+            filters: vec![],
+        })
+    }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]

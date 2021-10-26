@@ -4,6 +4,7 @@ use crate::cli::encoding::{parse_encoding, LABELS_SORTED};
 use crate::cli::reporter::{ConsoleReporter, JSONReporter, Reporter, ReporterType, SARIFReporter};
 use crate::cli::{subcommand::check::handle_rulemap, CommonOpts, ReportOpts};
 use crate::core::ruleset::constraint::RawPatternWithConstraints;
+use crate::core::ruleset::filter::RawPatternWithFilters;
 use crate::core::ruleset::{self, Rule};
 use ansi_term::Color;
 use anyhow::Result;
@@ -72,7 +73,10 @@ fn handle_opts(opts: FindOpts) -> Result<usize> {
             pattern: opts.pattern,
             constraints: vec![],
         }],
-        opts.rewrite.map_or(vec![], |x| vec![x]),
+        opts.rewrite.map_or(vec![], |x| vec![RawPatternWithFilters {
+            pattern: x,
+            filters: vec![],
+        }]),
         vec![],
     );
 

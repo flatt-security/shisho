@@ -3,6 +3,7 @@ mod test;
 
 pub mod constraint;
 pub mod filter;
+mod util;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -17,7 +18,10 @@ use crate::core::{
     tree::RefTreeView,
 };
 
-use self::constraint::{RawConstraint, RawPatternWithConstraints};
+use self::{
+    constraint::{RawConstraint, RawPatternWithConstraints},
+    filter::{RawPatternWithFiltersWrapper, RawRewriteFilter},
+};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct RuleSet {
@@ -45,8 +49,11 @@ pub struct Rule {
     constraints: Vec<RawConstraint>,
 
     #[serde(default)]
-    rewrite_options: Vec<String>,
+    rewrite_options: Vec<RawPatternWithFiltersWrapper>,
+
     rewrite: Option<String>,
+    #[serde(default)]
+    filters: Vec<RawRewriteFilter>,
 }
 
 impl Rule {
@@ -55,7 +62,7 @@ impl Rule {
         language: Language,
         message: String,
         patterns: Vec<RawPatternWithConstraints>,
-        rewrite_options: Vec<String>,
+        rewrite_options: Vec<RawPatternWithFilters>,
         tags: Vec<Tag>,
     ) -> Self {
         Rule {
@@ -66,13 +73,19 @@ impl Rule {
             title: None,
 
             patterns,
-            constraints: vec![],
-            rewrite_options,
+            rewrite_options: rewrite_options
+                .into_iter()
+                .map(|x| RawPatternWithFiltersWrapper(x))
+                .collect(),
+
             tags,
 
             // these params are just for YAMLs
             pattern: None,
+            constraints: vec![],
+
             rewrite: None,
+            filters: vec![],
         }
     }
 
@@ -116,17 +129,16 @@ impl Rule {
     }
 
     pub fn get_rewrite_options(&self) -> Result<Vec<RawPatternWithFilters>> {
-        todo!("load filters");
         match (&self.rewrite, &self.rewrite_options) {
             (Some(p), patterns) if patterns.is_empty() => Ok(vec![RawPatternWithFilters {
                 pattern: p.to_string(),
-                filters: vec![],
+                filters: self.filters.clone(),
             }]),
             (None, patterns) => Ok(patterns
                 .into_iter()
                 .map(|p| RawPatternWithFilters {
-                    pattern: p.clone(),
-                    filters: vec![],
+                    pattern: p.0.pattern.clone(),
+                    filters: p.0.filters.clone(),
                 })
                 .collect()),
             _ => Err(anyhow::anyhow!(
