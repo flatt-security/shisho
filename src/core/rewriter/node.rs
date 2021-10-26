@@ -73,7 +73,7 @@ impl NodeLike for RewritableNode {
 }
 
 impl<'tree> RewritableNode {
-    pub fn from_node(n: Node<'tree>, source: Rc<RefCell<Vec<u8>>>) -> Self {
+    pub fn from_node(n: &Node<'tree>, source: Rc<RefCell<Vec<u8>>>) -> Self {
         RewritableNode {
             kind: n.kind(),
             start_byte: n.start_byte(),
@@ -84,7 +84,7 @@ impl<'tree> RewritableNode {
             source: source.clone(),
             children: n
                 .children
-                .into_iter()
+                .iter()
                 .map(|x| Self::from_node(x, source.clone()))
                 .collect(),
         }

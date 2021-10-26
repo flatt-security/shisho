@@ -106,6 +106,12 @@ impl<'tree> From<RootNode<'tree>> for Node<'tree> {
     }
 }
 
+impl<'tree> From<&'tree RootNode<'tree>> for &'tree Node<'tree> {
+    fn from(r: &'tree RootNode<'tree>) -> Self {
+        &r.0
+    }
+}
+
 pub trait NodeLike
 where
     Self: Sized + Clone,

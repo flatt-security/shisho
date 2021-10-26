@@ -29,21 +29,31 @@ where
 {
     pub fn rewrite(
         self,
-        roption: RewriteOption<T>,
         item: &MatchedItem<'_, Node<'_>>,
+        roption: RewriteOption<T>,
     ) -> Result<Self> {
         let current_code = self.as_str().as_bytes();
 
-        let before_snippet = String::from_utf8(current_code[0..item.area.start_byte()].to_vec())?;
-        let snippet = roption.into_builder(item).build()?.body;
-        let after_snippet = String::from_utf8(
-            current_code[item.area.end_byte().min(current_code.len())..current_code.len()].to_vec(),
+        let before = self.string_between(0, item.area.start_byte())?;
+
+        let snippet = roption
+            .to_builder(item)
+            .apply_filters(&roption.filters)?
+            .build()?
+            .body;
+
+        let after = self.string_between(
+            item.area.end_byte().min(current_code.len()),
+            current_code.len(),
         )?;
 
-        Ok(Code::from(format!(
-            "{}{}{}",
-            before_snippet, snippet, after_snippet
-        )))
+        Ok(Code::from(format!("{}{}{}", before, snippet, after)))
+    }
+
+    #[inline]
+    pub fn string_between(&self, start: usize, end: usize) -> Result<String> {
+        let source = self.as_str().as_bytes();
+        Ok(String::from_utf8(source[start..end].to_vec())?)
     }
 }
 

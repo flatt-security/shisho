@@ -352,7 +352,7 @@ mod tests {
 
                 let code: Code<Go> = "func a() { b := 1 || 1 }".into();
                 let autofix = Pattern::<Go>::try_from(":[X]").unwrap();
-                let from_code = code.rewrite(autofix.as_rewrite_option(), &c.pop().unwrap());
+                let from_code = code.rewrite(&c.pop().unwrap(), autofix.as_roption());
                 assert!(from_code.is_ok());
 
                 assert_eq!(from_code.unwrap().as_str(), "func a() { b := 1 }",);

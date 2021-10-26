@@ -598,7 +598,7 @@ mod tests {
 
                 let code: Code<HCL> = cmd.into();
                 let from_code =
-                    code.rewrite(autofix.as_rewrite_option(), &c.pop().unwrap());
+                    code.rewrite( &c.pop().unwrap(), autofix.as_roption());
                 assert!(from_code.is_ok());
 
                 assert_eq!(
@@ -622,7 +622,7 @@ mod tests {
 
                 let code: Code<HCL> = cmd.into();
                 let autofix = Pattern::<HCL>::try_from("resource \"rtype\" \"rname\" { attr = :[Y] }\nresource \"rtype\" \"another\" { attr = :[X] }").unwrap();
-                let from_code = code.rewrite(autofix.as_rewrite_option(), &c.pop().unwrap());
+                let from_code = code.rewrite(&c.pop().unwrap(), autofix.as_roption());
                 assert!(from_code.is_ok());
 
                 assert_eq!(

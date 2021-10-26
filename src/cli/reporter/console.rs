@@ -105,7 +105,7 @@ impl<'a, W: std::io::Write> Reporter<'a> for ConsoleReporter<'a, W> {
                 writeln!(self.writer, "Suggested changes ({}):", idx + 1)?;
                 let old_code: Code<T> = target.body.clone().into();
                 let pattern = Pattern::try_from(rewrite.as_str())?;
-                let new_code = old_code.rewrite(pattern.as_rewrite_option(), &mitem)?;
+                let new_code = old_code.rewrite(&mitem, pattern.as_roption())?;
 
                 let diff = TextDiff::from_lines(target.body.as_str(), new_code.as_str());
                 for (group_idx, group) in diff.grouped_ops(1).iter().enumerate() {

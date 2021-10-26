@@ -8,12 +8,13 @@ use crate::core::{
     node::{Node, NodeLike},
     pattern::PatternWithConstraints,
     query::MetavariableId,
+    tree::RefTreeView,
 };
 use anyhow::{anyhow, Result};
 use regex::Captures;
 use thiserror::Error;
 
-use super::{node::RewritableNode, RewriteOption};
+use super::{node::RewritableNode, option::RewriteFilter, RewriteOption};
 
 pub struct SnippetBuilder<'tree, T>
 where
@@ -27,23 +28,20 @@ where
     _marker: PhantomData<T>,
 }
 
-impl<'tree, 'pattern, T> SnippetBuilder<'tree, T>
+impl<'tree, T> SnippetBuilder<'tree, T>
 where
     T: Queryable,
 {
     pub fn new(
-        autofix: RewriteOption<'pattern, T>,
+        root_node: RewritableNode,
+        source: Rc<RefCell<Vec<u8>>>,
+        with_extra_newline: bool,
         item: &'tree MatchedItem<'tree, Node<'tree>>,
     ) -> Self {
-        let source = autofix.pattern.source.clone();
-        let source = Rc::new(RefCell::new(source));
-
-        let rnode: Node = autofix.root_node.into();
         Self {
-            root_node: RewritableNode::from_node(rnode, source.clone()),
+            root_node,
             source,
-            with_extra_newline: autofix.pattern.with_extra_newline,
-
+            with_extra_newline,
             item,
             _marker: PhantomData,
         }
@@ -77,8 +75,26 @@ impl<'tree, T> SnippetBuilder<'tree, T>
 where
     T: Queryable,
 {
-    pub fn replace(&self, _pwc: &PatternWithConstraints<T>, _ro: RewriteOption<T>) -> Result<()> {
+    pub fn replace(
+        &mut self,
+        pwc: &PatternWithConstraints<T>,
+        _ro: RewriteOption<T>,
+    ) -> Result<()> {
+        let rtv = RefTreeView::from(&self.root_node);
+
+        let matches = rtv
+            .matches(&pwc.as_query())
+            .collect::<Result<Vec<MatchedItem<RewritableNode>>>>()?;
+
         todo!("not implemented yet")
+    }
+
+    pub fn apply_filters(&mut self, filters: &Vec<RewriteFilter<T>>) -> Result<&Self> {
+        for filter in filters {
+            // TODO
+        }
+
+        todo!("not implemented yet");
     }
 }
 
@@ -89,33 +105,38 @@ where
 {
     pub fn build(&self) -> Result<Snippet, anyhow::Error> {
         let pitems: Vec<(&RewritableNode, Result<Segment>)> =
-            vec![(&self.root_node, self.from_node(&self.root_node))];
+            vec![(&self.root_node, self.build_from_node(&self.root_node))];
 
         let body = self
-            .from_sub_segments(0, self.root_node.end_byte(), pitems)?
+            .build_segment_from_segments(0, self.root_node.end_byte(), pitems)?
             .body;
 
         Ok(Snippet { body })
     }
 
-    fn from_node(&self, node: &RewritableNode) -> Result<Segment, anyhow::Error> {
+    fn build_from_node(&self, node: &RewritableNode) -> Result<Segment, anyhow::Error> {
         match node.kind() {
             NodeType::Ellipsis => Err(anyhow!(
                 "cannot use ellipsis operator inside the transformation query"
             )),
             NodeType::Metavariable(mid) | NodeType::EllipsisMetavariable(mid) => {
-                self.from_metavariable(node, &mid.0)
+                self.build_from_metavariable(node, &mid.0)
             }
-            _ if (node.children.is_empty() || T::is_leaf_like(node)) => self.from_leaf(node),
-            _ => self.from_intermediate_node(node),
+            _ if (node.children.is_empty() || T::is_leaf_like(node)) => self.build_from_leaf(node),
+            _ => self.build_from_intermediate_node(node),
         }
     }
 
-    fn from_metavariable(
+    fn build_from_metavariable(
         &self,
         node: &RewritableNode,
         variable_name: &str,
     ) -> Result<Segment, anyhow::Error> {
+        assert!(matches!(
+            node.kind(),
+            NodeType::Metavariable(_) | NodeType::EllipsisMetavariable(_)
+        ));
+
         let id = MetavariableId(variable_name.into());
         let value = self
             .item
@@ -137,9 +158,11 @@ where
         })
     }
 
-    fn from_leaf(&self, node: &RewritableNode) -> Result<Segment, anyhow::Error> {
+    fn build_from_leaf(&self, node: &RewritableNode) -> Result<Segment, anyhow::Error> {
+        assert!(node.children.is_empty() || T::is_leaf_like(node));
+
         if T::is_string_literal(node) {
-            self.from_string_leaf(node)
+            self.build_from_string_leaf(node)
         } else {
             Ok(Segment {
                 body: node.as_cow().into(),
@@ -149,18 +172,21 @@ where
         }
     }
 
-    fn from_intermediate_node(&self, node: &RewritableNode) -> Result<Segment, anyhow::Error> {
+    fn build_from_intermediate_node(
+        &self,
+        node: &RewritableNode,
+    ) -> Result<Segment, anyhow::Error> {
         let children = node
             .children
             .iter()
-            .map(|child| (child, self.from_node(child)))
+            .map(|child| (child, self.build_from_node(child)))
             .collect::<Vec<(&RewritableNode, Result<Segment>)>>();
 
-        self.from_sub_segments(node.start_byte(), node.end_byte(), children)
+        self.build_segment_from_segments(node.start_byte(), node.end_byte(), children)
     }
 
     /// `from_patched_items` generates TransformedSegment for the range [start_byte, end_byte) by combining multiple and ordered TransformedSegments in the same range.
-    fn from_sub_segments(
+    fn build_segment_from_segments(
         &self,
         start_byte: usize,
         end_byte: usize,
@@ -244,12 +270,14 @@ where
         })
     }
 
-    fn from_string_leaf(&self, node: &RewritableNode) -> Result<Segment> {
+    fn build_from_string_leaf(&self, node: &RewritableNode) -> Result<Segment> {
+        assert!((node.children.is_empty() || T::is_leaf_like(node)) && T::is_string_literal(node));
+
         let body = node.as_cow().to_string();
         let r = regex::Regex::new(r":\[(\.\.\.)?(?P<name>[A-Z_][A-Z_0-9]*)\]").unwrap();
         let body = r.replace_all(body.as_str(), |caps: &Captures| {
             let name = caps.name("name").unwrap().as_str();
-            self.from_metavariable(node, name)
+            self.build_from_metavariable(node, name)
                 .map(|x| x.body)
                 .unwrap_or_default()
         });
@@ -261,7 +289,7 @@ where
     }
 
     #[inline]
-    pub fn string_between(&self, start: usize, end: usize) -> Result<String> {
+    fn string_between(&self, start: usize, end: usize) -> Result<String> {
         let source = self.source.borrow();
 
         let start = if source.len() == start && self.with_extra_newline {
