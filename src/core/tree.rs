@@ -44,7 +44,7 @@ where
             .expect("Error loading hcl grammar");
 
         let tstree = parser
-            .parse(nsource.as_ref(), None)
+            .parse(nsource.as_normalized(), None)
             .ok_or(anyhow!("failed to load the code"))?;
 
         Ok(Tree {

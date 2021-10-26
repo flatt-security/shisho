@@ -89,6 +89,11 @@ impl NormalizedSource {
     pub fn as_str_between(&self, start: usize, end: usize) -> Result<&str> {
         Ok(core::str::from_utf8(&self[start..end])?)
     }
+
+    #[inline]
+    pub fn as_normalized(&self) -> &[u8] {
+        &self.source
+    }
 }
 
 impl Index<Range<usize>> for NormalizedSource {

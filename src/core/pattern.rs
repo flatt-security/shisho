@@ -41,7 +41,7 @@ where
         parser.set_language(T::query_language())?;
 
         let tstree = parser
-            .parse(source.as_ref(), None)
+            .parse(source.as_normalized(), None)
             .ok_or(anyhow!("failed to load the code"))?;
 
         Ok(Pattern {

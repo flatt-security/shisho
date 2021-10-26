@@ -93,7 +93,7 @@ impl<'tree> From<&'tree RootNode<'tree>> for &'tree Node<'tree> {
 
 pub trait NodeLike
 where
-    Self: Sized + Clone,
+    Self: Sized + Clone + std::fmt::Debug,
 {
     fn kind(&self) -> NodeType;
     fn children<'a>(&'a self) -> Vec<&'a Self>;
