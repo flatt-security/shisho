@@ -3,7 +3,8 @@
 use crate::cli::encoding::{parse_encoding, LABELS_SORTED};
 use crate::cli::reporter::{ConsoleReporter, JSONReporter, Reporter, ReporterType, SARIFReporter};
 use crate::cli::{subcommand::check::handle_rulemap, CommonOpts, ReportOpts};
-use crate::core::ruleset::{self, RawPatternWithConstraints, Rule};
+use crate::core::ruleset::constraint::RawPatternWithConstraints;
+use crate::core::ruleset::{self, Rule};
 use ansi_term::Color;
 use anyhow::Result;
 use encoding_rs::Encoding;

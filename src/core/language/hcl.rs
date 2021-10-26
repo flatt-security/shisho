@@ -24,7 +24,7 @@ impl Queryable for HCL {
             .children
     }
 
-    fn is_leaf_like< N: NodeLike>(node: &N) -> bool {
+    fn is_leaf_like<N: NodeLike>(node: &N) -> bool {
         Self::is_string_literal(node)
     }
 
@@ -44,10 +44,9 @@ impl Queryable for HCL {
 mod tests {
     use super::*;
     use crate::core::matcher::MatchedItem;
-    use crate::core::pattern::Pattern;
     use crate::core::query::MetavariableId;
-    use crate::core::source::Code;    
-    use crate::match_pt;
+    use crate::core::source::Code;
+    use crate::{match_pt, replace_pt};
     use anyhow::Result;
     use std::convert::TryFrom;
 
@@ -153,7 +152,7 @@ mod tests {
                     test = ""
                     another_attr = 3
                 }
-            "#,            
+            "#,
             |c: Result<Vec<MatchedItem<Node<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 2);
@@ -443,7 +442,8 @@ mod tests {
                         .map(|x| x.to_string()),
                     Some(
                         r#"key3 = value3
-                        key4 = value4"#.to_string()
+                        key4 = value4"#
+                            .to_string()
                     )
                 );
             }
@@ -581,54 +581,30 @@ mod tests {
 
     #[test]
     fn basic_transform() {
-        let cmd = "resource \"rtype\" \"rname\" { attr = \"notchanged\" }\nresource \"rtype\" \"another\" { attr = \"notchanged\" }";
-        match_pt!(
+        replace_pt!(
             HCL,
             r#"
                 resource "rtype" "rname" { attr = :[_] }
             "#,
-            cmd,
-            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
+            "resource \"rtype\" \"rname\" { attr = \"notchanged\" }\nresource \"rtype\" \"another\" { attr = \"notchanged\" }",
+            "resource \"rtype\" \"rname\" { attr = \"changed\" }",
+            |c: Result<Vec<Code<HCL>>>| {
                 let mut c = c.unwrap();
-                assert_eq!(c.len(), 1);
-
-                let autofix =
-                    Pattern::<HCL>::try_from("resource \"rtype\" \"rname\" { attr = \"changed\" }")
-                        .unwrap();
-
-                let code: Code<HCL> = cmd.into();
-                let from_code =
-                    code.rewrite( &c.pop().unwrap(), autofix.as_roption());
-                assert!(from_code.is_ok());
-
-                assert_eq!(
-                    from_code.unwrap().as_str(),
-                    "resource \"rtype\" \"rname\" { attr = \"changed\" }\nresource \"rtype\" \"another\" { attr = \"notchanged\" }",
-                );
+                assert_eq!(c.pop().unwrap().as_str(),  "resource \"rtype\" \"rname\" { attr = \"changed\" }\nresource \"rtype\" \"another\" { attr = \"notchanged\" }");
             }
         );
     }
 
     #[test]
     fn metavariable_transform() {
-        let cmd = "resource \"rtype\" \"rname\" { attr = \"one\" }\nresource \"rtype\" \"another\" { attr = \"two\" }";
-        match_pt!(
+        replace_pt!(
             HCL,
             "resource \"rtype\" \"rname\" { attr = :[X] }\nresource \"rtype\" \"another\" { attr = :[Y] }",
-            cmd,
-            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
+            "resource \"rtype\" \"rname\" { attr = \"one\" }\nresource \"rtype\" \"another\" { attr = \"two\" }",
+            "resource \"rtype\" \"rname\" { attr = :[Y] }\nresource \"rtype\" \"another\" { attr = :[X] }",
+            |c: Result<Vec<Code<HCL>>>| {
                 let mut c = c.unwrap();
-                assert_eq!(c.len(), 1);
-
-                let code: Code<HCL> = cmd.into();
-                let autofix = Pattern::<HCL>::try_from("resource \"rtype\" \"rname\" { attr = :[Y] }\nresource \"rtype\" \"another\" { attr = :[X] }").unwrap();
-                let from_code = code.rewrite(&c.pop().unwrap(), autofix.as_roption());
-                assert!(from_code.is_ok());
-
-                assert_eq!(
-                    from_code.unwrap().as_str(),
-                    "resource \"rtype\" \"rname\" { attr = \"two\" }\nresource \"rtype\" \"another\" { attr = \"one\" }",
-                );             
+                assert_eq!(c.pop().unwrap().as_str(),  "resource \"rtype\" \"rname\" { attr = \"two\" }\nresource \"rtype\" \"another\" { attr = \"one\" }",);                         
             }
         );
     }

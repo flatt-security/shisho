@@ -2,7 +2,6 @@ use anyhow::Result;
 
 use crate::core::{language::Queryable, node::Node};
 use std::{
-    cell::Ref,
     marker::PhantomData,
     ops::{Index, Range},
 };
@@ -40,11 +39,7 @@ where
 
         let before = self.string_between(0, item.area.start_byte())?;
 
-        let snippet = roption
-            .to_builder(item)
-            .apply_filters(&roption.filters)?
-            .build()?
-            .body;
+        let snippet = roption.rewrite(item)?;
 
         let after = self.string_between(
             item.area.end_byte().min(current_code.len()),

@@ -3,15 +3,9 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 
 use crate::core::node::Range;
+use crate::core::ruleset::constraint::{Constraint, ConstraintPredicate, PatternWithConstraints};
 use crate::core::source::NormalizedSource;
-use crate::core::{
-    constraint::{Constraint, Predicate},
-    language::Queryable,
-    node::NodeLike,
-    pattern::PatternWithConstraints,
-    query::MetavariableId,
-    tree::RefTreeView,
-};
+use crate::core::{language::Queryable, node::NodeLike, query::MetavariableId, tree::RefTreeView};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CaptureItem<'tree, N: NodeLike> {
@@ -129,11 +123,11 @@ impl<'tree, N: NodeLike> MatchedItem<'tree, N> {
         let captured_item: &CaptureItem<'tree, N> = captured_item.unwrap();
 
         match &constraint.predicate {
-            Predicate::MatchQuery(q) => captured_item.matches(q),
-            Predicate::NotMatchQuery(q) => captured_item
+            ConstraintPredicate::MatchQuery(q) => captured_item.matches(q),
+            ConstraintPredicate::NotMatchQuery(q) => captured_item
                 .matches(q)
                 .map(|(matched, _)| (!matched, HashMap::new())),
-            Predicate::MatchAnyOfQuery(qs) => {
+            ConstraintPredicate::MatchAnyOfQuery(qs) => {
                 let matches = qs
                     .into_iter()
                     .map(|q| captured_item.matches(q))
@@ -149,7 +143,7 @@ impl<'tree, N: NodeLike> MatchedItem<'tree, N> {
                         });
                 Ok((matched_at_least_one, captures))
             }
-            Predicate::NotMatchAnyOfQuery(qs) => {
+            ConstraintPredicate::NotMatchAnyOfQuery(qs) => {
                 let matches = qs
                     .into_iter()
                     .map(|q| captured_item.matches(q))
@@ -157,30 +151,30 @@ impl<'tree, N: NodeLike> MatchedItem<'tree, N> {
                 Ok((!matches.iter().any(|m| m.0), CaptureMap::new()))
             }
 
-            Predicate::MatchRegex(r) => {
+            ConstraintPredicate::MatchRegex(r) => {
                 Ok((r.is_match(&captured_item.to_string()), CaptureMap::new()))
             }
-            Predicate::NotMatchRegex(r) => {
+            ConstraintPredicate::NotMatchRegex(r) => {
                 Ok((!r.is_match(&captured_item.to_string()), CaptureMap::new()))
             }
-            Predicate::MatchAnyOfRegex(rs) => Ok((
+            ConstraintPredicate::MatchAnyOfRegex(rs) => Ok((
                 rs.into_iter()
                     .any(|r| r.is_match(&captured_item.to_string())),
                 CaptureMap::new(),
             )),
-            Predicate::NotMatchAnyOfRegex(rs) => Ok((
+            ConstraintPredicate::NotMatchAnyOfRegex(rs) => Ok((
                 !rs.into_iter()
                     .any(|r| r.is_match(&captured_item.to_string())),
                 CaptureMap::new(),
             )),
 
-            Predicate::BeAnyOf(candidates) => Ok((
+            ConstraintPredicate::BeAnyOf(candidates) => Ok((
                 candidates
                     .into_iter()
                     .any(|r| r.as_str() == captured_item.to_string()),
                 CaptureMap::new(),
             )),
-            Predicate::NotBeAnyOf(candidates) => Ok((
+            ConstraintPredicate::NotBeAnyOf(candidates) => Ok((
                 !candidates
                     .into_iter()
                     .any(|r| r.as_str() == captured_item.to_string()),

@@ -39,9 +39,8 @@ mod tests {
     use anyhow::Result;
 
     use crate::core::matcher::MatchedItem;
-    use crate::core::pattern::Pattern;
     use crate::core::{query::MetavariableId, source::Code};
-    use crate::match_pt;
+    use crate::{match_pt, replace_pt};
     use std::convert::TryFrom;
 
     use super::*;
@@ -341,21 +340,14 @@ mod tests {
 
     #[test]
     fn basic_transform() {
-        match_pt!(
+        replace_pt!(
             Go,
             r#":[X] || :[X]"#,
             r#"func a() { b := 1 || 1 }"#,
-            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
+            r#":[X]"#,
+            |c: Result<Vec<Code<Go>>>| {
                 let mut c = c.unwrap();
-
-                assert_eq!(c.len(), 1);
-
-                let code: Code<Go> = "func a() { b := 1 || 1 }".into();
-                let autofix = Pattern::<Go>::try_from(":[X]").unwrap();
-                let from_code = code.rewrite(&c.pop().unwrap(), autofix.as_roption());
-                assert!(from_code.is_ok());
-
-                assert_eq!(from_code.unwrap().as_str(), "func a() { b := 1 }",);
+                assert_eq!(c.pop().unwrap().as_str(), "func a() { b := 1 }");
             }
         );
     }

@@ -67,7 +67,7 @@ pub trait Queryable {
 macro_rules! match_pt {
     ($lang:ident, $p:tt, $t:tt, $callback:expr) => {{
         let pattern = crate::core::pattern::Pattern::<$lang>::try_from($p).unwrap();
-        let pc = crate::core::pattern::PatternWithConstraints::new(pattern, vec![]);
+        let pc = crate::core::ruleset::constraint::PatternWithConstraints::new(pattern, vec![]);
 
         let query = pc.as_query();
         let tree = crate::core::tree::Tree::<$lang>::try_from($t).unwrap();
@@ -77,6 +77,30 @@ macro_rules! match_pt {
 
         $callback(
             session.collect::<anyhow::Result<Vec<crate::core::matcher::MatchedItem<crate::core::node::Node>>>>(),
+        );
+    }};
+}
+
+#[macro_export]
+macro_rules! replace_pt {
+    ($lang:ident, $p:tt, $t:tt, $r:tt, $callback:expr) => {{
+        let pattern = crate::core::pattern::Pattern::<$lang>::try_from($p).unwrap();
+        let pc = crate::core::ruleset::constraint::PatternWithConstraints::new(pattern, vec![]);
+
+        let query = pc.as_query();
+        let tree = crate::core::tree::Tree::<$lang>::try_from($t).unwrap();
+        let ptree = crate::core::tree::NormalizedTree::from(&tree);
+        let ptree = ptree.as_ref_treeview();
+        let session = ptree.matches(&query);
+        let c = session.collect::<anyhow::Result<Vec<crate::core::matcher::MatchedItem<crate::core::node::Node>>>>().unwrap();
+
+        let rpattern = crate::core::pattern::Pattern::<$lang>::try_from($r).unwrap();
+        let pf = crate::core::ruleset::filter::PatternWithFilters::new(rpattern, vec![]);
+
+        $callback(
+            c.into_iter()
+                .map(|amatch| Code::from($t).rewrite(&amatch, pf.as_roption()))
+                .collect::<anyhow::Result<Vec<crate::core::source::Code<$lang>>>>()
         );
     }};
 }

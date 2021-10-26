@@ -1,15 +1,16 @@
 use std::{cell::RefCell, rc::Rc};
 
+use anyhow::Result;
+
 use crate::core::{
     language::Queryable,
     matcher::MatchedItem,
     node::Node,
     node::RootNode,
-    pattern::{Pattern, PatternWithConstraints},
-    query::MetavariableId,
+    ruleset::filter::{PatternWithFilters, RewriteFilter},
 };
 
-use super::{builder::SnippetBuilder, node::RewritableNode};
+use super::{builder::SnippetBuilder, node::RewritableNode, tree::NormalizedRewritableTree};
 
 #[derive(Debug)]
 pub struct RewriteOption<'a, T>
@@ -17,69 +18,47 @@ where
     T: Queryable,
 {
     root_node: RootNode<'a>,
-
-    pub(crate) pattern: &'a Pattern<T>,
-    pub filters: Vec<RewriteFilter<T>>,
-}
-
-#[derive(Debug)]
-pub struct RewriteFilter<T>
-where
-    T: Queryable,
-{
-    pub target: MetavariableId,
-    pub predicate: RewriteFilterPredicate<T>,
-}
-
-#[derive(Debug)]
-pub struct PatternWithFilters<T: Queryable> {
-    pub pattern: Pattern<T>,
-    pub filters: Vec<RewriteFilter<T>>,
-}
-
-#[derive(Debug)]
-pub enum RewriteFilterPredicate<T>
-where
-    T: Queryable,
-{
-    ReplaceWithQuery((PatternWithConstraints<T>, PatternWithFilters<T>)),
+    filters: &'a Vec<RewriteFilter<T>>,
 }
 
 impl<'a, T> RewriteOption<'a, T>
 where
     T: Queryable,
 {
-    pub fn to_builder<'tree>(
+    pub fn rewrite<'tree>(
         &'a self,
         item: &'tree MatchedItem<'tree, Node<'tree>>,
-    ) -> SnippetBuilder<'tree, T> {
-        let source = self.pattern.source.clone();
+    ) -> Result<String> {
+        let rnode: &Node = (&self.root_node).into();
+        let source = rnode.source.clone();
         let source = Rc::new(RefCell::new(source));
 
-        let rnode: &Node = (&self.root_node).into();
         let rnode = RewritableNode::from_node(rnode, source.clone());
 
-        SnippetBuilder::<T>::new(source, item, rnode)
+        let segment =
+            SnippetBuilder::<T>::new(item, NormalizedRewritableTree::new(rnode, &source.borrow()))
+                .apply_filters(self.filters)?
+                .build()?;
+
+        Ok(segment.body)
     }
 }
 
-impl<'a, T> From<&'a Pattern<T>> for RewriteOption<'a, T>
+impl<'a, T> From<&'a PatternWithFilters<T>> for RewriteOption<'a, T>
 where
     T: Queryable,
 {
-    fn from(pattern: &'a Pattern<T>) -> Self {
-        let root_node = pattern.to_root_node();
+    fn from(pwf: &'a PatternWithFilters<T>) -> Self {
+        let root_node = pwf.pattern.to_root_node();
 
-        todo!("set filters");
         Self {
-            pattern,
             root_node,
-            filters: vec![],
+            filters: &pwf.filters,
         }
     }
 }
 
-impl<T> Pattern<T>
+impl<T> PatternWithFilters<T>
 where
     T: Queryable,
 {

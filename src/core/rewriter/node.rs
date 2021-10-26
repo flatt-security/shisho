@@ -1,8 +1,4 @@
-use std::{
-    borrow::Cow,
-    cell::{Ref, RefCell},
-    rc::Rc,
-};
+use std::{borrow::Cow, cell::RefCell, rc::Rc};
 
 use crate::core::{
     node::{Node, NodeLike, NodeType},

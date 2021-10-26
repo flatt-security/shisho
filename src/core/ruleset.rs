@@ -1,15 +1,23 @@
 #[cfg(test)]
 mod test;
 
+pub mod constraint;
+pub mod filter;
+
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, fs::File, path::Path, str::FromStr};
 use walkdir::WalkDir;
 
 use crate::core::{
-    language::Queryable, matcher::MatchedItem, node::Node, pattern::PatternWithConstraints,
+    language::Queryable,
+    matcher::MatchedItem,
+    node::Node,
+    ruleset::{constraint::PatternWithConstraints, filter::RawPatternWithFilters},
     tree::RefTreeView,
 };
+
+use self::constraint::{RawConstraint, RawPatternWithConstraints};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct RuleSet {
@@ -39,14 +47,6 @@ pub struct Rule {
     #[serde(default)]
     rewrite_options: Vec<String>,
     rewrite: Option<String>,
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-pub struct RawPatternWithConstraints {
-    pub pattern: String,
-
-    #[serde(default)]
-    pub constraints: Vec<RawConstraint>,
 }
 
 impl Rule {
@@ -115,10 +115,20 @@ impl Rule {
         }
     }
 
-    pub fn get_rewrite_options(&self) -> Result<Vec<String>> {
+    pub fn get_rewrite_options(&self) -> Result<Vec<RawPatternWithFilters>> {
+        todo!("load filters");
         match (&self.rewrite, &self.rewrite_options) {
-            (Some(p), patterns) if patterns.is_empty() => Ok(vec![p.to_string()]),
-            (None, patterns) => Ok(patterns.clone()),
+            (Some(p), patterns) if patterns.is_empty() => Ok(vec![RawPatternWithFilters {
+                pattern: p.to_string(),
+                filters: vec![],
+            }]),
+            (None, patterns) => Ok(patterns
+                .into_iter()
+                .map(|p| RawPatternWithFilters {
+                    pattern: p.clone(),
+                    filters: vec![],
+                })
+                .collect()),
             _ => Err(anyhow::anyhow!(
                 "You can use only one of `rewrite` or `rewrite_options`."
             )),
@@ -157,93 +167,6 @@ impl Rule {
             })
             .unwrap_or(Severity::Unknown)
     }
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "kebab-case")]
-pub struct RawConstraint {
-    pub target: String,
-    pub should: RawPredicate,
-
-    pub pattern: Option<String>,
-    #[serde(default)]
-    pub patterns: Vec<RawPatternWithConstraints>,
-
-    #[serde(default)]
-    pub constraints: Vec<RawConstraint>,
-
-    pub string: Option<String>,
-    #[serde(default)]
-    pub strings: Vec<String>,
-
-    pub regex_pattern: Option<String>,
-    #[serde(default)]
-    pub regex_patterns: Vec<String>,
-}
-
-impl RawConstraint {
-    pub fn get_pattern_with_constraints(&self) -> Result<Vec<RawPatternWithConstraints>> {
-        match (&self.pattern, &self.patterns) {
-            (Some(p), patterns) if patterns.is_empty() => Ok(vec![RawPatternWithConstraints {
-                pattern: p.to_string(),
-                constraints: self.constraints.clone(),
-            }]),
-            (None, patterns) if !patterns.is_empty() => Ok(patterns
-                .into_iter()
-                .map(|p| RawPatternWithConstraints {
-                    pattern: p.pattern.to_string(),
-                    constraints: [p.constraints.clone(), self.constraints.clone()].concat(),
-                })
-                .collect()),
-            (None, patterns) if patterns.is_empty() => Ok(vec![]),
-            _ => Err(anyhow::anyhow!(
-                "You can use only one of `pattern` or `patterns`."
-            )),
-        }
-    }
-
-    pub fn get_strings(&self) -> Result<Vec<String>> {
-        match (&self.string, &self.strings) {
-            (Some(p), patterns) if patterns.is_empty() => Ok(vec![p.to_string()]),
-            (None, patterns) if !patterns.is_empty() => Ok(patterns.clone()),
-            (None, patterns) if patterns.is_empty() => Ok(vec![]),
-            _ => Err(anyhow::anyhow!(
-                "You can use only one of `string` or `strings`."
-            )),
-        }
-    }
-
-    pub fn get_regex_patterns(&self) -> Result<Vec<String>> {
-        match (&self.regex_pattern, &self.regex_patterns) {
-            (Some(p), patterns) if patterns.is_empty() => Ok(vec![p.to_string()]),
-            (None, patterns) if !patterns.is_empty() => Ok(patterns.clone()),
-            (None, patterns) if patterns.is_empty() => Ok(vec![]),
-            _ => Err(anyhow::anyhow!(
-                "You can use only one of `regex-pattern` or `regex-patterns`."
-            )),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "kebab-case")]
-pub enum RawPredicate {
-    // takes either of a regex or a pattern
-    Match,
-    NotMatch,
-
-    // takes either of regex-patterns or patterns
-    MatchAnyOf,
-    NotMatchAnyOf,
-
-    // TODO: mark this as deprecated
-    // takes only a regex
-    MatchRegex,
-    NotMatchRegex,
-
-    // takes only string
-    BeAnyOf,
-    NotBeAnyOf,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Hash, Eq, Clone, Copy)]

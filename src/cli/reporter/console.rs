@@ -5,8 +5,7 @@ use crate::core::{
     language::Queryable,
     matcher::MatchedItem,
     node::{Node, Range},
-    pattern::Pattern,
-    ruleset::Rule,
+    ruleset::{filter::PatternWithFilters, Rule},
     source::Code,
     target::Target,
 };
@@ -104,7 +103,7 @@ impl<'a, W: std::io::Write> Reporter<'a> for ConsoleReporter<'a, W> {
                 }
                 writeln!(self.writer, "Suggested changes ({}):", idx + 1)?;
                 let old_code: Code<T> = target.body.clone().into();
-                let pattern = Pattern::try_from(rewrite.as_str())?;
+                let pattern = PatternWithFilters::try_from(rewrite)?;
                 let new_code = old_code.rewrite(&mitem, pattern.as_roption())?;
 
                 let diff = TextDiff::from_lines(target.body.as_str(), new_code.as_str());

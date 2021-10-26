@@ -1,4 +1,4 @@
-use std::{cell::RefCell, marker::PhantomData, rc::Rc};
+use std::marker::PhantomData;
 
 use crate::core::{
     language::Queryable,
@@ -6,25 +6,26 @@ use crate::core::{
     matcher::MatchedItem,
     node::NodeType,
     node::{Node, NodeLike},
-    pattern::PatternWithConstraints,
+    pattern::Pattern,
     query::MetavariableId,
-    source::NormalizedSource,
+    ruleset::{
+        constraint::PatternWithConstraints,
+        filter::{RewriteFilter, RewriteFilterPredicate},
+    },
     tree::RefTreeView,
 };
 use anyhow::{anyhow, Result};
 use regex::Captures;
 use thiserror::Error;
 
-use super::{node::RewritableNode, option::RewriteFilter, RewriteOption};
+use super::{node::RewritableNode, tree::NormalizedRewritableTree};
 
 pub struct SnippetBuilder<'tree, T>
 where
     T: Queryable,
 {
-    base_source: Rc<RefCell<NormalizedSource>>,
-
     replace_target: &'tree MatchedItem<'tree, Node<'tree>>,
-    replace_with: RewritableNode,
+    replace_with: NormalizedRewritableTree<'tree, T>,
 
     _marker: PhantomData<T>,
 }
@@ -34,17 +35,12 @@ where
     T: Queryable,
 {
     pub fn new(
-        base_source: Rc<RefCell<NormalizedSource>>,
-
         replace_target: &'tree MatchedItem<'tree, Node<'tree>>,
-        replace_with: RewritableNode,
+        replace_with: NormalizedRewritableTree<'tree, T>,
     ) -> Self {
         Self {
-            base_source,
-
-            replace_with,
             replace_target,
-
+            replace_with,
             _marker: PhantomData,
         }
     }
@@ -79,10 +75,12 @@ where
 {
     pub fn replace(
         &mut self,
+        target: &MetavariableId,
+
         pwc: &PatternWithConstraints<T>,
-        _ro: RewriteOption<T>,
+        with_pattern: &Pattern<T>,
     ) -> Result<()> {
-        let rtv = RefTreeView::from(&self.replace_with);
+        let rtv = RefTreeView::from(&self.replace_with.root);
 
         let matches = rtv
             .matches(&pwc.as_query())
@@ -91,17 +89,23 @@ where
         todo!("not implemented yet")
     }
 
-    pub fn apply_filter(&mut self, filter: RewriteFilter<T>) -> Result<&mut Self> {
-        todo!("not implemented yet");
+    pub fn apply_filter(&mut self, filter: &RewriteFilter<T>) -> Result<&mut Self> {
+        match &filter.predicate {
+            RewriteFilterPredicate::ReplaceWithQuery((pwcs, to)) => {
+                for pwc in pwcs {
+                    self.replace(&filter.target, pwc, to)?;
+                }            
+            }
+        }
         Ok(self)
     }
 
     pub fn apply_filters(&mut self, filters: &Vec<RewriteFilter<T>>) -> Result<&mut Self> {
         for filter in filters {
-            // TODO
+            self.apply_filter(filter)?;
         }
 
-        todo!("not implemented yet");
+        Ok(self)
     }
 }
 
@@ -110,12 +114,14 @@ impl<'tree, T> SnippetBuilder<'tree, T>
 where
     T: Queryable,
 {
-    pub fn build(&self) -> Result<Snippet, anyhow::Error> {
-        let pitems: Vec<(&RewritableNode, Result<Segment>)> =
-            vec![(&self.replace_with, self.build_from_node(&self.replace_with))];
+    pub fn build(&self) -> Result<Snippet> {
+        let pitems: Vec<(&RewritableNode, Result<Segment>)> = vec![(
+            &self.replace_with.root,
+            self.build_from_node(&self.replace_with.root),
+        )];
 
         let body = self
-            .build_segment_from_segments(0, self.replace_with.end_byte(), pitems)?
+            .build_segment_from_segments(0, self.replace_with.root.end_byte(), pitems)?
             .body;
 
         Ok(Snippet { body })
@@ -297,7 +303,7 @@ where
 
     #[inline]
     fn to_string_between(&self, start: usize, end: usize) -> Result<String> {
-        let source = self.base_source.borrow();
+        let source = self.replace_with.source;
         source.as_str_between(start, end).map(|x| x.to_string())
     }
 }

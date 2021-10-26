@@ -1,6 +1,9 @@
-use crate::core::{language::Queryable, node::RootNode, pattern::Pattern};
-
-use super::{constraint::Constraint, pattern::PatternWithConstraints};
+use crate::core::{
+    language::Queryable,
+    node::RootNode,
+    pattern::Pattern,
+    ruleset::constraint::{Constraint, PatternWithConstraints},
+};
 
 #[derive(Debug)]
 pub struct QueryPattern<'a, T>
