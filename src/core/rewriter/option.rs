@@ -1,7 +1,6 @@
 use crate::core::{
     language::Queryable, matcher::MatchedItem, node::Node, node::RootNode, pattern::Pattern,
 };
-use anyhow::Result;
 
 use super::builder::SnippetBuilder;
 
@@ -17,12 +16,11 @@ impl<'a, T> RewriteOption<'a, T>
 where
     T: Queryable,
 {
-    pub fn into_rewritten_snippet<'tree>(
+    pub fn into_builder<'tree>(
         self,
         item: &'tree MatchedItem<'tree, Node<'tree>>,
-    ) -> Result<String> {
-        let builder = SnippetBuilder::<T>::new(self, item).build()?;
-        Ok(builder.body)
+    ) -> SnippetBuilder<T> {
+        SnippetBuilder::<T>::new(self, item)
     }
 }
 

@@ -6,6 +6,7 @@ use crate::core::{
     matcher::MatchedItem,
     node::NodeType,
     node::{Node, NodeLike},
+    pattern::PatternWithConstraints,
     query::MetavariableId,
 };
 use anyhow::{anyhow, Result};
@@ -14,7 +15,7 @@ use thiserror::Error;
 
 use super::{node::RewritableNode, RewriteOption};
 
-pub struct SnippetBuilder<'pattern, T>
+pub struct SnippetBuilder<'tree, T>
 where
     T: Queryable,
 {
@@ -22,18 +23,17 @@ where
     source: Rc<RefCell<Vec<u8>>>,
     with_extra_newline: bool,
 
-    item: &'pattern MatchedItem<'pattern, Node<'pattern>>,
-
+    item: &'tree MatchedItem<'tree, Node<'tree>>,
     _marker: PhantomData<T>,
 }
 
-impl<'pattern, T> SnippetBuilder<'pattern, T>
+impl<'tree, 'pattern, T> SnippetBuilder<'tree, T>
 where
     T: Queryable,
 {
     pub fn new(
         autofix: RewriteOption<'pattern, T>,
-        item: &'pattern MatchedItem<'pattern, Node<'pattern>>,
+        item: &'tree MatchedItem<'tree, Node<'tree>>,
     ) -> Self {
         let source = autofix.pattern.source.clone();
         let source = Rc::new(RefCell::new(source));
@@ -45,7 +45,6 @@ where
             with_extra_newline: autofix.pattern.with_extra_newline,
 
             item,
-
             _marker: PhantomData,
         }
     }
@@ -74,7 +73,14 @@ enum SnippetBuilderError {
 }
 
 /// Tree Editor
-impl<'tree, T> SnippetBuilder<'tree, T> where T: Queryable {}
+impl<'tree, T> SnippetBuilder<'tree, T>
+where
+    T: Queryable,
+{
+    pub fn replace(&self, _pwc: &PatternWithConstraints<T>, _ro: RewriteOption<T>) -> Result<()> {
+        todo!("not implemented yet")
+    }
+}
 
 /// Snippet Constructor
 impl<'tree, T> SnippetBuilder<'tree, T>

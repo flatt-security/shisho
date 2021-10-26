@@ -27,15 +27,15 @@ impl<T> Code<T>
 where
     T: Queryable,
 {
-    pub fn to_rewritten_form(
+    pub fn rewrite(
         self,
-        item: &MatchedItem<'_, Node<'_>>,
         roption: RewriteOption<T>,
+        item: &MatchedItem<'_, Node<'_>>,
     ) -> Result<Self> {
         let current_code = self.as_str().as_bytes();
 
         let before_snippet = String::from_utf8(current_code[0..item.area.start_byte()].to_vec())?;
-        let snippet = roption.into_rewritten_snippet(item)?;
+        let snippet = roption.into_builder(item).build()?.body;
         let after_snippet = String::from_utf8(
             current_code[item.area.end_byte().min(current_code.len())..current_code.len()].to_vec(),
         )?;
