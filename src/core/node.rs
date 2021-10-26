@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
-use super::query::MetavariableId;
+use super::{query::MetavariableId, source::NormalizedSource};
 
 const SHISHO_NODE_METAVARIABLE_NAME: &str = "shisho_metavariable_name";
 const SHISHO_NODE_METAVARIABLE: &str = "shisho_metavariable";
@@ -11,10 +11,9 @@ const SHISHO_NODE_ELLIPSIS: &str = "shisho_ellipsis";
 #[derive(Debug, Clone, PartialEq)]
 pub struct Node<'tree> {
     inner: tree_sitter::Node<'tree>,
-    with_extra_newline: bool,
 
     pub children: Vec<Node<'tree>>,
-    pub(crate) source: &'tree [u8],
+    pub(crate) source: &'tree NormalizedSource,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -39,18 +38,13 @@ pub struct Position {
 }
 
 impl<'tree> Node<'tree> {
-    pub fn from_tsnode(
-        tsnode: tree_sitter::Node<'tree>,
-        source: &'tree [u8],
-        extra_newline_byte: Option<usize>,
-    ) -> Self {
+    pub fn from_tsnode(tsnode: tree_sitter::Node<'tree>, source: &'tree NormalizedSource) -> Self {
         let children: Vec<Self> = tsnode
             .children(&mut tsnode.walk())
-            .map(|c| Self::from_tsnode(c, source, extra_newline_byte))
+            .map(|c| Self::from_tsnode(c, source))
             .collect();
         Node {
             inner: tsnode,
-            with_extra_newline: extra_newline_byte == Some(tsnode.end_byte() - 1),
             children,
             source,
         }
@@ -61,29 +55,14 @@ impl<'tree> Node<'tree> {
 pub struct RootNode<'tree>(Node<'tree>);
 
 impl<'tree> RootNode<'tree> {
-    pub fn from_tstree(
-        tstree: &'tree tree_sitter::Tree,
-        source: &'tree [u8],
-        with_extra_newline: bool,
-    ) -> Self {
+    pub fn from_tstree(tstree: &'tree tree_sitter::Tree, source: &'tree NormalizedSource) -> Self {
         let tsnode = tstree.root_node();
         let children: Vec<Node<'tree>> = tsnode
             .children(&mut tsnode.walk())
-            .map(|c| {
-                Node::from_tsnode(
-                    c,
-                    source,
-                    if with_extra_newline {
-                        Some(source.len() - 1)
-                    } else {
-                        None
-                    },
-                )
-            })
+            .map(|c| Node::from_tsnode(c, source))
             .collect();
         RootNode::new(Node {
             inner: tsnode,
-            with_extra_newline,
             children,
             source,
         })
@@ -117,7 +96,6 @@ where
     Self: Sized + Clone,
 {
     fn kind(&self) -> NodeType;
-    fn with_extra_newline(&self) -> bool;
     fn children<'a>(&'a self) -> Vec<&'a Self>;
 
     fn start_byte(&self) -> usize;
@@ -128,7 +106,7 @@ where
     fn as_cow(&self) -> Cow<'_, str>;
     fn with_source<'a, F, Output>(&'a self, callback: F) -> Output
     where
-        F: Fn(&[u8]) -> Output,
+        F: Fn(&NormalizedSource) -> Output,
         Output: 'a;
 }
 
@@ -154,10 +132,6 @@ impl<'tree> NodeLike for Node<'tree> {
         }
     }
 
-    fn with_extra_newline(&self) -> bool {
-        self.with_extra_newline
-    }
-
     fn start_byte(&self) -> usize {
         self.inner.start_byte()
     }
@@ -175,13 +149,10 @@ impl<'tree> NodeLike for Node<'tree> {
     }
 
     fn as_cow(&self) -> Cow<'_, str> {
-        let last = if self.with_extra_newline {
-            self.end_byte() - 1
-        } else {
-            self.end_byte()
-        };
         std::borrow::Cow::Borrowed(
-            core::str::from_utf8(&self.source[self.start_byte()..last]).unwrap(),
+            self.source
+                .as_str_between(self.start_byte(), self.end_byte())
+                .unwrap(),
         )
     }
 
@@ -191,9 +162,9 @@ impl<'tree> NodeLike for Node<'tree> {
 
     fn with_source<'a, F, Output>(&'a self, callback: F) -> Output
     where
-        F: Fn(&[u8]) -> Output,
+        F: Fn(&NormalizedSource) -> Output,
         Output: 'a,
     {
-        callback(self.source)
+        callback(self.source.into())
     }
 }

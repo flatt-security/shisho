@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 
 use crate::core::node::Range;
+use crate::core::source::NormalizedSource;
 use crate::core::{
     constraint::{Constraint, Predicate},
     language::Queryable,
@@ -87,7 +88,7 @@ impl<'tree, N: NodeLike> From<Vec<&'tree N>> for CaptureItem<'tree, N> {
 
 pub type CaptureMap<'tree, N> = HashMap<MetavariableId, CaptureItem<'tree, N>>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MatchedItem<'tree, N: NodeLike> {
     pub area: ConsecutiveNodes<'tree, N>,
     pub captures: CaptureMap<'tree, N>,
@@ -265,22 +266,16 @@ impl<'tree, N: NodeLike> ConsecutiveNodes<'tree, N> {
         self.as_vec().last().unwrap().end_byte()
     }
 
-    pub fn with_extra_newline(&self) -> bool {
-        self.as_vec().last().unwrap().with_extra_newline()
-    }
-
     #[inline]
     pub fn to_string(&self) -> String {
-        let last = if self.with_extra_newline() {
-            self.end_byte() - 1
-        } else {
-            self.end_byte()
-        };
-
-        self.as_vec().first().unwrap().with_source(|source| {
-            core::str::from_utf8(&source[self.start_byte()..last])
-                .unwrap()
-                .to_string()
-        })
+        self.as_vec()
+            .first()
+            .unwrap()
+            .with_source(|source: &NormalizedSource| {
+                source
+                    .as_str_between(self.start_byte(), self.end_byte())
+                    .unwrap()
+                    .to_string()
+            })
     }
 }

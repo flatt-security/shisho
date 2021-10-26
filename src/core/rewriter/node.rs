@@ -1,6 +1,13 @@
-use std::{borrow::Cow, cell::RefCell, rc::Rc};
+use std::{
+    borrow::Cow,
+    cell::{Ref, RefCell},
+    rc::Rc,
+};
 
-use crate::core::node::{Node, NodeLike, NodeType};
+use crate::core::{
+    node::{Node, NodeLike, NodeType},
+    source::NormalizedSource,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RewritableNode {
@@ -12,19 +19,13 @@ pub struct RewritableNode {
     start_position: tree_sitter::Point,
     end_position: tree_sitter::Point,
 
-    with_extra_newline: bool,
-
-    pub source: Rc<RefCell<Vec<u8>>>,
+    pub source: Rc<RefCell<NormalizedSource>>,
     pub children: Vec<RewritableNode>,
 }
 
 impl NodeLike for RewritableNode {
     fn kind(&self) -> NodeType {
         self.kind.clone()
-    }
-
-    fn with_extra_newline(&self) -> bool {
-        self.with_extra_newline
     }
 
     fn start_byte(&self) -> usize {
@@ -45,14 +46,9 @@ impl NodeLike for RewritableNode {
 
     fn as_cow(&self) -> Cow<'_, str> {
         let source = self.source.borrow();
-        let last = if self.with_extra_newline {
-            self.end_byte() - 1
-        } else {
-            self.end_byte()
-        };
-
         std::borrow::Cow::Owned(
-            core::str::from_utf8(&source[self.start_byte()..last])
+            source
+                .as_str_between(self.start_byte(), self.end_byte())
                 .unwrap()
                 .to_string(),
         )
@@ -64,23 +60,22 @@ impl NodeLike for RewritableNode {
 
     fn with_source<'a, F, Output>(&'a self, callback: F) -> Output
     where
-        F: Fn(&[u8]) -> Output,
+        F: Fn(&NormalizedSource) -> Output,
         Output: 'a,
     {
         let source = self.source.borrow();
-        callback(source.as_slice())
+        callback(&source)
     }
 }
 
 impl<'tree> RewritableNode {
-    pub fn from_node(n: &Node<'tree>, source: Rc<RefCell<Vec<u8>>>) -> Self {
+    pub fn from_node(n: &Node<'tree>, source: Rc<RefCell<NormalizedSource>>) -> Self {
         RewritableNode {
             kind: n.kind(),
             start_byte: n.start_byte(),
             end_byte: n.end_byte(),
             start_position: n.start_position(),
             end_position: n.end_position(),
-            with_extra_newline: n.with_extra_newline(),
             source: source.clone(),
             children: n
                 .children

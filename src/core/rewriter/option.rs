@@ -59,7 +59,7 @@ where
         let rnode: &Node = (&self.root_node).into();
         let rnode = RewritableNode::from_node(rnode, source.clone());
 
-        SnippetBuilder::<T>::new(rnode, source, self.pattern.with_extra_newline, item)
+        SnippetBuilder::<T>::new(source, item, rnode)
     }
 }
 

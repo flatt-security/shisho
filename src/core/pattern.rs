@@ -13,8 +13,7 @@ pub struct Pattern<T>
 where
     T: Queryable,
 {
-    pub(crate) source: Vec<u8>,
-    pub(crate) with_extra_newline: bool,
+    pub(crate) source: NormalizedSource,
 
     tstree: tree_sitter::Tree,
     _marker: PhantomData<T>,
@@ -25,22 +24,12 @@ where
     T: Queryable,
 {
     pub fn to_root_node(&'_ self) -> RootNode<'_> {
-        RootNode::from_tstree(&self.tstree, &self.source, self.with_extra_newline)
+        RootNode::from_tstree(&self.tstree, &self.source)
     }
 
     #[inline]
-    pub fn string_between(&self, start: usize, end: usize) -> Result<String> {
-        let start = if self.source.len() == start && self.with_extra_newline {
-            start - 1
-        } else {
-            start
-        };
-        let end = if self.source.len() == end && self.with_extra_newline {
-            end - 1
-        } else {
-            end
-        };
-        Ok(String::from_utf8(self.source[start..end].to_vec())?)
+    pub fn as_str_between(&self, start: usize, end: usize) -> Result<&str> {
+        self.source.as_str_between(start, end)
     }
 }
 
@@ -58,11 +47,8 @@ where
             .parse(source.as_ref(), None)
             .ok_or(anyhow!("failed to load the code"))?;
 
-        let with_extra_newline = source.with_extra_newline();
         Ok(Pattern {
-            source: source.into(),
-            with_extra_newline,
-
+            source,
             tstree,
             _marker: PhantomData,
         })

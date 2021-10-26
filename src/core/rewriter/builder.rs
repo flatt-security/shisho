@@ -8,6 +8,7 @@ use crate::core::{
     node::{Node, NodeLike},
     pattern::PatternWithConstraints,
     query::MetavariableId,
+    source::NormalizedSource,
     tree::RefTreeView,
 };
 use anyhow::{anyhow, Result};
@@ -20,11 +21,11 @@ pub struct SnippetBuilder<'tree, T>
 where
     T: Queryable,
 {
-    root_node: RewritableNode,
-    source: Rc<RefCell<Vec<u8>>>,
-    with_extra_newline: bool,
+    base_source: Rc<RefCell<NormalizedSource>>,
 
-    item: &'tree MatchedItem<'tree, Node<'tree>>,
+    replace_target: &'tree MatchedItem<'tree, Node<'tree>>,
+    replace_with: RewritableNode,
+
     _marker: PhantomData<T>,
 }
 
@@ -33,16 +34,17 @@ where
     T: Queryable,
 {
     pub fn new(
-        root_node: RewritableNode,
-        source: Rc<RefCell<Vec<u8>>>,
-        with_extra_newline: bool,
-        item: &'tree MatchedItem<'tree, Node<'tree>>,
+        base_source: Rc<RefCell<NormalizedSource>>,
+
+        replace_target: &'tree MatchedItem<'tree, Node<'tree>>,
+        replace_with: RewritableNode,
     ) -> Self {
         Self {
-            root_node,
-            source,
-            with_extra_newline,
-            item,
+            base_source,
+
+            replace_with,
+            replace_target,
+
             _marker: PhantomData,
         }
     }
@@ -80,7 +82,7 @@ where
         pwc: &PatternWithConstraints<T>,
         _ro: RewriteOption<T>,
     ) -> Result<()> {
-        let rtv = RefTreeView::from(&self.root_node);
+        let rtv = RefTreeView::from(&self.replace_with);
 
         let matches = rtv
             .matches(&pwc.as_query())
@@ -89,7 +91,12 @@ where
         todo!("not implemented yet")
     }
 
-    pub fn apply_filters(&mut self, filters: &Vec<RewriteFilter<T>>) -> Result<&Self> {
+    pub fn apply_filter(&mut self, filter: RewriteFilter<T>) -> Result<&mut Self> {
+        todo!("not implemented yet");
+        Ok(self)
+    }
+
+    pub fn apply_filters(&mut self, filters: &Vec<RewriteFilter<T>>) -> Result<&mut Self> {
         for filter in filters {
             // TODO
         }
@@ -105,10 +112,10 @@ where
 {
     pub fn build(&self) -> Result<Snippet, anyhow::Error> {
         let pitems: Vec<(&RewritableNode, Result<Segment>)> =
-            vec![(&self.root_node, self.build_from_node(&self.root_node))];
+            vec![(&self.replace_with, self.build_from_node(&self.replace_with))];
 
         let body = self
-            .build_segment_from_segments(0, self.root_node.end_byte(), pitems)?
+            .build_segment_from_segments(0, self.replace_with.end_byte(), pitems)?
             .body;
 
         Ok(Snippet { body })
@@ -139,7 +146,7 @@ where
 
         let id = MetavariableId(variable_name.into());
         let value = self
-            .item
+            .replace_target
             .capture_of(&id)
             .and_then(|x| match x {
                 CaptureItem::Empty => None,
@@ -225,9 +232,9 @@ where
                     // :[FOO]
                     // :[PIYO]
                     // ```
-                    let mut glue = "".to_string();
+                    let mut glue = String::default();
                     if let Some(e) = end_byte_for_last_real_node {
-                        glue = self.string_between(e, n.start_byte())?;
+                        glue = self.to_string_between(e, n.start_byte())?;
                         end_byte_for_last_real_node = None;
                     }
 
@@ -247,7 +254,7 @@ where
                     // `child` is a normal TransformedSegment.
 
                     // (1) handle between the previous TransformedSegment and `child`.
-                    let pre_glue = self.string_between(virtual_end_byte, child.start_byte)?;
+                    let pre_glue = self.to_string_between(virtual_end_byte, child.start_byte)?;
                     body += pre_glue.as_str();
 
                     // (2) handle `child` itself
@@ -260,7 +267,7 @@ where
             }
         }
 
-        let post_glue = self.string_between(virtual_end_byte, end_byte)?;
+        let post_glue = self.to_string_between(virtual_end_byte, end_byte)?;
         body += post_glue.as_str();
 
         Ok(Segment {
@@ -289,19 +296,8 @@ where
     }
 
     #[inline]
-    fn string_between(&self, start: usize, end: usize) -> Result<String> {
-        let source = self.source.borrow();
-
-        let start = if source.len() == start && self.with_extra_newline {
-            start - 1
-        } else {
-            start
-        };
-        let end = if source.len() == end && self.with_extra_newline {
-            end - 1
-        } else {
-            end
-        };
-        Ok(String::from_utf8(source[start..end].to_vec())?)
+    fn to_string_between(&self, start: usize, end: usize) -> Result<String> {
+        let source = self.base_source.borrow();
+        source.as_str_between(start, end).map(|x| x.to_string())
     }
 }
