@@ -39,7 +39,7 @@ where
 
         let before = self.string_between(0, item.area.start_byte())?;
 
-        let snippet = roption.rewrite(item)?;
+        let snippet = roption.to_string_with(&item.captures)?;
 
         let after = self.string_between(
             item.area.end_byte().min(current_code.len()),

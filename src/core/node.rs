@@ -77,6 +77,10 @@ impl<'tree> RootNode<'tree> {
     pub fn as_node(&self) -> &Node<'tree> {
         &self.0
     }
+
+    pub fn source(&self) -> &NormalizedSource {
+        &self.as_node().source
+    }
 }
 
 impl<'tree> From<RootNode<'tree>> for Node<'tree> {

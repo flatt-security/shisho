@@ -4,13 +4,13 @@ use anyhow::Result;
 
 use crate::core::{
     language::Queryable,
-    matcher::MatchedItem,
+    matcher::{CaptureMap, MatchedItem},
     node::Node,
     node::RootNode,
     ruleset::filter::{PatternWithFilters, RewriteFilter},
 };
 
-use super::{builder::SnippetBuilder, node::RewritableNode, tree::NormalizedRewritableTree};
+use super::builder::SnippetBuilder;
 
 #[derive(Debug)]
 pub struct RewriteOption<'a, T>
@@ -25,20 +25,13 @@ impl<'a, T> RewriteOption<'a, T>
 where
     T: Queryable,
 {
-    pub fn rewrite<'tree>(
+    pub fn to_string_with<'tree>(
         &'a self,
-        item: &'tree MatchedItem<'tree, Node<'tree>>,
+        captures: &'tree CaptureMap<'tree, Node<'tree>>,
     ) -> Result<String> {
-        let rnode: &Node = (&self.root_node).into();
-        let source = rnode.source.clone();
-        let source = Rc::new(RefCell::new(source));
-
-        let rnode = RewritableNode::from_node(rnode, source.clone());
-
-        let segment =
-            SnippetBuilder::<T>::new(item, NormalizedRewritableTree::new(rnode, &source.borrow()))
-                .apply_filters(self.filters)?
-                .build()?;
+        let segment = SnippetBuilder::<T>::new(&self.root_node, captures)
+            .apply_filters(self.filters)?
+            .build()?;
 
         Ok(segment.body)
     }

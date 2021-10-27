@@ -2,30 +2,28 @@ use std::marker::PhantomData;
 
 use crate::core::{
     language::Queryable,
-    matcher::CaptureItem,
-    matcher::MatchedItem,
+    matcher::{CaptureMap, ConsecutiveNodes, MatchedItem},
     node::NodeType,
-    node::{Node, NodeLike},
+    node::{Node, NodeLike, RootNode},
     pattern::Pattern,
     query::MetavariableId,
     ruleset::{
         constraint::PatternWithConstraints,
         filter::{RewriteFilter, RewriteFilterPredicate},
     },
-    tree::RefTreeView,
 };
 use anyhow::{anyhow, Result};
 use regex::Captures;
 use thiserror::Error;
 
-use super::{node::RewritableNode, tree::NormalizedRewritableTree};
+use super::tree::{from_capture_map, CapturedValueKind, MetavariableMap};
 
 pub struct SnippetBuilder<'tree, T>
 where
     T: Queryable,
 {
-    replace_target: &'tree MatchedItem<'tree, Node<'tree>>,
-    replace_with: NormalizedRewritableTree<'tree, T>,
+    build_with: &'tree RootNode<'tree>,
+    metavariables: MetavariableMap,
 
     _marker: PhantomData<T>,
 }
@@ -35,12 +33,13 @@ where
     T: Queryable,
 {
     pub fn new(
-        replace_target: &'tree MatchedItem<'tree, Node<'tree>>,
-        replace_with: NormalizedRewritableTree<'tree, T>,
+        base: &'tree RootNode<'tree>,
+        captures: &'tree CaptureMap<'tree, Node<'tree>>,
     ) -> Self {
         Self {
-            replace_target,
-            replace_with,
+            build_with: base,
+            metavariables: from_capture_map(captures.clone()),
+
             _marker: PhantomData,
         }
     }
@@ -118,19 +117,19 @@ where
     T: Queryable,
 {
     pub fn build(&self) -> Result<Snippet> {
-        let pitems: Vec<(&RewritableNode, Result<Segment>)> = vec![(
-            &self.replace_with.root,
-            self.build_from_node(&self.replace_with.root),
+        let pitems: Vec<(&Node<'tree>, Result<Segment>)> = vec![(
+            &self.build_with.as_node(),
+            self.build_from_node(&self.build_with.as_node()),
         )];
 
         let body = self
-            .build_segment_from_segments(0, self.replace_with.root.end_byte(), pitems)?
+            .build_segment_from_segments(0, self.build_with.as_node().end_byte(), pitems)?
             .body;
 
         Ok(Snippet { body })
     }
 
-    fn build_from_node(&self, node: &RewritableNode) -> Result<Segment, anyhow::Error> {
+    fn build_from_node(&self, node: &Node<'tree>) -> Result<Segment, anyhow::Error> {
         match node.kind() {
             NodeType::Ellipsis => Err(anyhow!(
                 "cannot use ellipsis operator inside the transformation query"
@@ -145,15 +144,15 @@ where
 
     fn build_from_metavariable(
         &self,
-        node: &RewritableNode,
+        node: &Node<'tree>,
         variable_name: &str,
     ) -> Result<Segment, anyhow::Error> {
         let id = MetavariableId(variable_name.into());
         let value = self
-            .replace_target
-            .capture_of(&id)
-            .and_then(|x| match x {
-                CaptureItem::Empty => None,
+            .metavariables
+            .get(&id)
+            .and_then(|x| match x.kind {
+                CapturedValueKind::Empty => None,
                 _ => Some(x.to_string()),
             })
             .ok_or(SnippetBuilderError::MetavariableUnavailable {
@@ -169,7 +168,7 @@ where
         })
     }
 
-    fn build_from_leaf(&self, node: &RewritableNode) -> Result<Segment, anyhow::Error> {
+    fn build_from_leaf(&self, node: &Node<'tree>) -> Result<Segment, anyhow::Error> {
         assert!(node.children.is_empty() || T::is_leaf_like(node));
 
         if T::is_string_literal(node) {
@@ -183,15 +182,12 @@ where
         }
     }
 
-    fn build_from_intermediate_node(
-        &self,
-        node: &RewritableNode,
-    ) -> Result<Segment, anyhow::Error> {
+    fn build_from_intermediate_node(&self, node: &Node<'tree>) -> Result<Segment, anyhow::Error> {
         let children = node
             .children
             .iter()
             .map(|child| (child, self.build_from_node(child)))
-            .collect::<Vec<(&RewritableNode, Result<Segment>)>>();
+            .collect::<Vec<(&Node<'tree>, Result<Segment>)>>();
 
         self.build_segment_from_segments(node.start_byte(), node.end_byte(), children)
     }
@@ -201,7 +197,7 @@ where
         &self,
         start_byte: usize,
         end_byte: usize,
-        subitems: Vec<(&RewritableNode, Result<Segment>)>,
+        subitems: Vec<(&Node<'tree>, Result<Segment>)>,
     ) -> Result<Segment, anyhow::Error> {
         let mut body: String = "".into();
 
@@ -281,7 +277,7 @@ where
         })
     }
 
-    fn build_from_string_leaf(&self, node: &RewritableNode) -> Result<Segment> {
+    fn build_from_string_leaf(&self, node: &Node<'tree>) -> Result<Segment> {
         assert!((node.children.is_empty() || T::is_leaf_like(node)) && T::is_string_literal(node));
 
         let body = node.as_cow().to_string();
@@ -301,7 +297,7 @@ where
 
     #[inline]
     fn to_string_between(&self, start: usize, end: usize) -> Result<String> {
-        let source = self.replace_with.source;
+        let source = self.build_with.source();
         source.as_str_between(start, end).map(|x| x.to_string())
     }
 }
