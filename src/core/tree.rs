@@ -10,7 +10,7 @@ use std::{
 };
 
 use super::{
-    node::{Node, NodeLike, NodeLikeArena, NodeLikeId},
+    node::{Node, NodeLike, NodeLikeArena, NodeLikeId, NodeLikeRefWithId, NodeRefWithId},
     query::Query,
     source::NormalizedSource,
     view::NodeLikeView,
@@ -60,7 +60,7 @@ where
 }
 
 pub struct TreeView<'tree, T, N: NodeLike<'tree>> {
-    pub root: NodeLikeId<'tree, N>,
+    pub root_id: NodeLikeId<'tree, N>,
     pub source: &'tree NormalizedSource,
 
     arena: NodeLikeArena<'tree, N>,
@@ -69,7 +69,7 @@ pub struct TreeView<'tree, T, N: NodeLike<'tree>> {
 
 impl<'tree, T: Queryable, N: NodeLike<'tree>> NodeLikeView<'tree, N> for TreeView<'tree, T, N> {
     fn root(&'tree self) -> Option<&'tree N> {
-        self.arena.get(self.root)
+        self.arena.get(self.root_id)
     }
 
     fn get(&'tree self, id: NodeLikeId<'tree, N>) -> Option<&'tree N> {
@@ -87,7 +87,7 @@ where
         source: &'tree NormalizedSource,
     ) -> TreeView<'tree, T, N> {
         TreeView {
-            root,
+            root_id: root,
             arena,
             source,
             _marker: PhantomData,
@@ -96,6 +96,15 @@ where
 
     pub fn get(&'tree self, id: NodeLikeId<'tree, N>) -> Option<&'tree N> {
         self.arena.get(id)
+    }
+
+    pub fn get_with_id(
+        &'tree self,
+        id: NodeLikeId<'tree, N>,
+    ) -> Option<NodeLikeRefWithId<'tree, N>> {
+        self.arena
+            .get(id)
+            .map(|x| NodeLikeRefWithId { id, node: x })
     }
 }
 
@@ -122,44 +131,56 @@ where
     where
         'tree: 'query,
     {
-        TreeMatcher::new(self.traverse(), &q.pattern).filter_map(move |mut x| {
-            let captures = match x.satisfies_all(q.constraints) {
-                Ok((true, captures)) => captures,
-                Ok((false, _)) => return None,
-                Err(e) => {
-                    return Some(Err(anyhow::anyhow!(
-                        "failed to validate a match with constraints: {}",
-                        e
-                    )))
-                }
-            };
-            x.captures.extend(captures);
-            Some(Ok(x))
-        })
+        self.matches_from(self.root_id, q)
     }
 
-    pub fn traverse(&'tree self) -> TreeTreverser<'tree, T, N> {
-        TreeTreverser::new(self.get(self.root).unwrap(), self)
+    pub fn matches_from<'query>(
+        &'tree self,
+        id: NodeLikeId<'tree, N>,
+        q: &'query Query<'query, T>,
+    ) -> impl Iterator<Item = Result<MatchedItem<'tree, N>>> + 'query
+    where
+        'tree: 'query,
+    {
+        TreeMatcher::new(self, id, &q.pattern).filter_map(move |x| {
+            match x.filter(self, q.constraints) {
+                Ok(None) => None,
+                Ok(Some(x)) => Some(Ok(x)),
+                Err(e) => Some(Err(e)),
+            }
+        })
+    }
+}
+
+pub trait Traversable<'tree, T: Queryable, N: NodeLike<'tree>> {
+    fn traverse(self, from: NodeLikeId<'tree, N>) -> TreeTreverser<'tree, T, N>;
+}
+
+impl<'tree, T: Queryable + 'tree, N: NodeLike<'tree> + 'tree> Traversable<'tree, T, N>
+    for &'tree TreeView<'tree, T, N>
+{
+    fn traverse(self, id: NodeLikeId<'tree, N>) -> TreeTreverser<'tree, T, N> {
+        TreeTreverser::new(self.get_with_id(id).unwrap(), self)
     }
 }
 
 pub struct TreeTreverser<'a, T: Queryable, N: NodeLike<'a>> {
     pub tview: &'a TreeView<'a, T, N>,
-    queue: VecDeque<(usize, &'a N)>,
+    queue: VecDeque<(usize, NodeLikeRefWithId<'a, N>)>,
 }
 
 impl<'a, T: Queryable, N: NodeLike<'a>> TreeTreverser<'a, T, N> {
     #[inline]
-    pub fn new(root: &'a N, tview: &'a TreeView<'a, T, N>) -> Self {
+    pub fn new(from: NodeLikeRefWithId<'a, N>, tview: &'a TreeView<'a, T, N>) -> Self {
         Self {
-            queue: VecDeque::from(vec![(0, root)]),
+            queue: VecDeque::from(vec![(0, from)]),
             tview,
         }
     }
 }
 
 impl<'tree, T: Queryable, N: NodeLike<'tree>> Iterator for TreeTreverser<'tree, T, N> {
-    type Item = (usize, &'tree N);
+    type Item = (usize, NodeLikeRefWithId<'tree, N>);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

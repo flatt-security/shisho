@@ -1,4 +1,4 @@
-use super::node::MutNode;
+use super::node::{MutNode, MutNodeId};
 use crate::core::{matcher::CaptureMap, node::NodeLike, query::MetavariableId};
 use std::collections::HashMap;
 
@@ -14,7 +14,7 @@ pub fn from_capture_map<'ntree, 'tree, N: NodeLike<'tree>>(
 pub enum CapturedValue<'tree> {
     Empty,
     Literal(String),
-    Node(MutNode<'tree>),
+    Node((MutNodeId<'tree>, MutNode<'tree>)),
 }
 
 impl<'tree> ToString for CapturedValue<'tree> {
@@ -22,7 +22,7 @@ impl<'tree> ToString for CapturedValue<'tree> {
         match &self {
             CapturedValue::Empty => "".to_string(),
             CapturedValue::Literal(s) => s.to_string(),
-            CapturedValue::Node(n) => n.as_cow().to_string(),
+            CapturedValue::Node((_, n)) => n.as_cow().to_string(),
         }
     }
 }

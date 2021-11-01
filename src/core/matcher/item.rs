@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 
-use crate::core::node::Range;
+use crate::core::node::{NodeLikeId, NodeLikeRefWithId, Range};
 use crate::core::ruleset::constraint::{Constraint, ConstraintPredicate, PatternWithConstraints};
 use crate::core::source::NormalizedSource;
 use crate::core::tree::TreeView;
@@ -15,9 +15,10 @@ pub enum CaptureItem<'tree, N: NodeLike<'tree>> {
     Nodes(ConsecutiveNodes<'tree, N>),
 }
 
-impl<'tree, N: NodeLike<'tree>> CaptureItem<'tree, N> {
+impl<'tree, 'item, N: NodeLike<'tree>> CaptureItem<'tree, N> {
     pub fn matches<T: Queryable + 'tree>(
-        &'tree self,
+        &'item self,
+        view: &'tree TreeView<'tree, T, N>,
         q: &PatternWithConstraints<T>,
     ) -> Result<(bool, CaptureMap<'tree, N>)> {
         match self {
@@ -29,10 +30,10 @@ impl<'tree, N: NodeLike<'tree>> CaptureItem<'tree, N> {
                 let matches = n
                     .as_vec()
                     .iter()
-                    .map(|node: &&'tree N| {
-                        let ptree = TreeView::<'tree, T, N>::from(*node);
-                        let matches = ptree
-                            .matches(&q.into())
+                    .map(|r| {
+                        // TODO (y0n3uchy): multiple line match
+                        let matches = view
+                            .matches_from(r.id, &q.into())
                             .collect::<Result<Vec<MatchedItem<'tree, N>>>>()?;
                         let is_empty = matches.is_empty();
                         let captures = matches
@@ -71,8 +72,8 @@ impl<'tree, N: NodeLike<'tree>> CaptureItem<'tree, N> {
     }
 }
 
-impl<'tree, N: NodeLike<'tree>> From<Vec<&'tree N>> for CaptureItem<'tree, N> {
-    fn from(value: Vec<&'tree N>) -> Self {
+impl<'tree, N: NodeLike<'tree>> From<Vec<NodeLikeRefWithId<'tree, N>>> for CaptureItem<'tree, N> {
+    fn from(value: Vec<NodeLikeRefWithId<'tree, N>>) -> Self {
         if value.is_empty() {
             Self::Empty
         } else {
@@ -89,31 +90,29 @@ pub struct MatchedItem<'tree, N: NodeLike<'tree>> {
     pub captures: CaptureMap<'tree, N>,
 }
 
-impl<'tree, 'item, N: NodeLike<'tree>> MatchedItem<'tree, N> {
+impl<'tree, N: NodeLike<'tree>> MatchedItem<'tree, N> {
     pub fn capture_of(&self, id: &MetavariableId) -> Option<&CaptureItem<'tree, N>> {
         self.captures.get(id)
     }
 
-    pub fn satisfies_all<'c, T: Queryable + 'tree>(
-        &'item self,
+    pub fn filter<'c, T: Queryable + 'tree>(
+        mut self,
+        view: &'tree TreeView<'tree, T, N>,
         constraints: &'c [Constraint<T>],
-    ) -> Result<(bool, CaptureMap<'tree, N>)> {
-        let mut items = CaptureMap::new();
+    ) -> Result<Option<Self>> {
         for c in constraints {
-            let (satisfied, mitems) = self.satisfies(c)?;
-            if satisfied {
-                items.extend(mitems);
-            } else {
-                return Ok((false, CaptureMap::new()));
+            if !self.satisfies(view, c)? {
+                return Ok(None);
             }
         }
-        Ok((true, items))
+        Ok(Some(self))
     }
 
-    pub fn satisfies<'c, T: Queryable + 'tree>(
-        &'item self,
+    fn satisfies<'c, T: Queryable + 'tree>(
+        &'tree mut self,
+        view: &'tree TreeView<'tree, T, N>,
         constraint: &'c Constraint<T>,
-    ) -> Result<(bool, CaptureMap<'tree, N>)> {
+    ) -> Result<bool> {
         let captured_item = self.captures.get(&constraint.target);
         if captured_item.is_none() {
             return Err(anyhow::anyhow!(
@@ -124,75 +123,85 @@ impl<'tree, 'item, N: NodeLike<'tree>> MatchedItem<'tree, N> {
         let captured_item: &CaptureItem<'tree, N> = captured_item.unwrap();
 
         match &constraint.predicate {
-            ConstraintPredicate::MatchQuery(q) => captured_item.matches(q),
-            ConstraintPredicate::NotMatchQuery(q) => captured_item
-                .matches(q)
-                .map(|(matched, _)| (!matched, HashMap::new())),
+            ConstraintPredicate::MatchQuery(q) => {
+                let (satisfied, new_captures) = captured_item.matches(view, q)?;
+                if satisfied {
+                    self.captures.extend(new_captures);
+                }
+                Ok(satisfied)
+            }
+            ConstraintPredicate::NotMatchQuery(q) => {
+                captured_item.matches(view, q).map(|(matched, _)| !matched)
+            }
             ConstraintPredicate::MatchAnyOfQuery(qs) => {
                 let matches = qs
                     .into_iter()
-                    .map(|q| captured_item.matches(q))
+                    .map(|q| captured_item.matches(view, q))
                     .collect::<Result<Vec<(bool, CaptureMap<N>)>>>()?;
                 let matched_at_least_one = matches.iter().any(|m| m.0);
-                let captures =
-                    matches
-                        .into_iter()
-                        .map(|m| m.1)
-                        .fold(CaptureMap::new(), |mut acc, v| {
-                            acc.extend(v);
-                            acc
-                        });
-                Ok((matched_at_least_one, captures))
+                for (_, new_captures) in matches.into_iter().filter(|x| x.0) {
+                    self.captures.extend(new_captures);
+                }
+                Ok(matched_at_least_one)
             }
             ConstraintPredicate::NotMatchAnyOfQuery(qs) => {
                 let matches = qs
                     .into_iter()
-                    .map(|q| captured_item.matches(q))
+                    .map(|q| captured_item.matches(view, q))
                     .collect::<Result<Vec<(bool, CaptureMap<N>)>>>()?;
-                Ok((!matches.iter().any(|m| m.0), CaptureMap::new()))
+                Ok(!matches.iter().any(|m| m.0))
             }
 
-            ConstraintPredicate::MatchRegex(r) => {
-                Ok((r.is_match(&captured_item.to_string()), CaptureMap::new()))
-            }
-            ConstraintPredicate::NotMatchRegex(r) => {
-                Ok((!r.is_match(&captured_item.to_string()), CaptureMap::new()))
-            }
-            ConstraintPredicate::MatchAnyOfRegex(rs) => Ok((
-                rs.into_iter()
-                    .any(|r| r.is_match(&captured_item.to_string())),
-                CaptureMap::new(),
-            )),
-            ConstraintPredicate::NotMatchAnyOfRegex(rs) => Ok((
-                !rs.into_iter()
-                    .any(|r| r.is_match(&captured_item.to_string())),
-                CaptureMap::new(),
-            )),
+            ConstraintPredicate::MatchRegex(r) => Ok(r.is_match(&captured_item.to_string())),
+            ConstraintPredicate::NotMatchRegex(r) => Ok(!r.is_match(&captured_item.to_string())),
+            ConstraintPredicate::MatchAnyOfRegex(rs) => Ok(rs
+                .into_iter()
+                .any(|r| r.is_match(&captured_item.to_string()))),
+            ConstraintPredicate::NotMatchAnyOfRegex(rs) => Ok(!rs
+                .into_iter()
+                .any(|r| r.is_match(&captured_item.to_string()))),
 
-            ConstraintPredicate::BeAnyOf(candidates) => Ok((
-                candidates
-                    .into_iter()
-                    .any(|r| r.as_str() == captured_item.to_string()),
-                CaptureMap::new(),
-            )),
-            ConstraintPredicate::NotBeAnyOf(candidates) => Ok((
-                !candidates
-                    .into_iter()
-                    .any(|r| r.as_str() == captured_item.to_string()),
-                CaptureMap::new(),
-            )),
+            ConstraintPredicate::BeAnyOf(candidates) => Ok(candidates
+                .into_iter()
+                .any(|r| r.as_str() == captured_item.to_string())),
+            ConstraintPredicate::NotBeAnyOf(candidates) => Ok(!candidates
+                .into_iter()
+                .any(|r| r.as_str() == captured_item.to_string())),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConsecutiveNodes<'tree, N: NodeLike<'tree>> {
-    inner: Vec<&'tree N>,
+    inner: Vec<NodeLikeRefWithId<'tree, N>>,
 }
 
-impl<'tree, N: NodeLike<'tree>> TryFrom<Vec<&'tree N>> for ConsecutiveNodes<'tree, N> {
+impl<'tree, N: NodeLike<'tree>> TryFrom<Vec<(NodeLikeId<'tree, N>, &'tree N)>>
+    for ConsecutiveNodes<'tree, N>
+{
     type Error = anyhow::Error;
-    fn try_from(inner: Vec<&'tree N>) -> Result<Self, Self::Error> {
+    fn try_from(inner: Vec<(NodeLikeId<'tree, N>, &'tree N)>) -> Result<Self, Self::Error> {
+        // TODO (y0n3uchy): check all capture items are consecutive
+        if inner.is_empty() {
+            Err(anyhow::anyhow!(
+                "internal error; ConsecutiveNodes was generated from empty vec."
+            ))
+        } else {
+            Ok(ConsecutiveNodes {
+                inner: inner
+                    .into_iter()
+                    .map(|x| NodeLikeRefWithId { id: x.0, node: x.1 })
+                    .collect(),
+            })
+        }
+    }
+}
+
+impl<'tree, N: NodeLike<'tree>> TryFrom<Vec<NodeLikeRefWithId<'tree, N>>>
+    for ConsecutiveNodes<'tree, N>
+{
+    type Error = anyhow::Error;
+    fn try_from(inner: Vec<NodeLikeRefWithId<'tree, N>>) -> Result<Self, Self::Error> {
         // TODO (y0n3uchy): check all capture items are consecutive
         if inner.is_empty() {
             Err(anyhow::anyhow!(
@@ -224,18 +233,18 @@ impl<'tree, N: NodeLike<'tree>> TryFrom<Vec<ConsecutiveNodes<'tree, N>>>
 }
 
 impl<'tree, N: NodeLike<'tree>> ConsecutiveNodes<'tree, N> {
-    pub fn as_vec(&self) -> &Vec<&'tree N> {
+    pub fn as_vec(&self) -> &Vec<NodeLikeRefWithId<'tree, N>> {
         &self.inner
     }
 
-    pub fn push(&mut self, n: &'tree N) {
+    pub fn push(&mut self, n: NodeLikeRefWithId<'tree, N>) {
         self.inner.push(n)
     }
 
     pub fn range<T: Queryable>(&self) -> Range {
         Range {
-            start: T::range(*self.as_vec().first().unwrap()).start,
-            end: T::range(*self.as_vec().last().unwrap()).end,
+            start: T::range(self.as_vec().first().unwrap().node).start,
+            end: T::range(self.as_vec().last().unwrap().node).end,
         }
     }
 
@@ -248,19 +257,19 @@ impl<'tree, N: NodeLike<'tree>> ConsecutiveNodes<'tree, N> {
     }
 
     pub fn start_position(&self) -> tree_sitter::Point {
-        self.as_vec().first().unwrap().start_position()
+        self.as_vec().first().unwrap().node.start_position()
     }
 
     pub fn end_position(&self) -> tree_sitter::Point {
-        self.as_vec().last().unwrap().end_position()
+        self.as_vec().last().unwrap().node.end_position()
     }
 
     pub fn start_byte(&self) -> usize {
-        self.as_vec().first().unwrap().start_byte()
+        self.as_vec().first().unwrap().node.start_byte()
     }
 
     pub fn end_byte(&self) -> usize {
-        self.as_vec().last().unwrap().end_byte()
+        self.as_vec().last().unwrap().node.end_byte()
     }
 
     #[inline]
@@ -268,6 +277,7 @@ impl<'tree, N: NodeLike<'tree>> ConsecutiveNodes<'tree, N> {
         self.as_vec()
             .first()
             .unwrap()
+            .node
             .with_source(|source: &NormalizedSource| {
                 source
                     .as_str_between(self.start_byte(), self.end_byte())

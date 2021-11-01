@@ -1,10 +1,8 @@
 use std::{borrow::Cow, cell::RefCell, marker::PhantomData, rc::Rc};
 
 use crate::core::{
-    language::Queryable,
-    node::{Node, NodeArena, NodeLike, NodeLikeArena, NodeLikeId, NodeType},
+    node::{Node, NodeArena, NodeLike, NodeLikeArena, NodeLikeId, NodeLikeRefWithId, NodeType},
     source::NormalizedSource,
-    tree::TreeView,
     view::NodeLikeView,
 };
 
@@ -62,6 +60,19 @@ impl<'tree> NodeLike<'tree> for MutNode<'tree> {
         self.children
             .iter()
             .map(|x| tview.get(*x).unwrap())
+            .collect()
+    }
+
+    fn indexed_children<V: NodeLikeView<'tree, Self>>(
+        &'tree self,
+        tview: &'tree V,
+    ) -> Vec<NodeLikeRefWithId<'tree, Self>> {
+        self.children
+            .iter()
+            .map(|x| NodeLikeRefWithId {
+                id: *x,
+                node: tview.get(*x).unwrap(),
+            })
             .collect()
     }
 

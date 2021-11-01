@@ -92,11 +92,11 @@ where
             CapturedValue::Literal(_) => {
                 Err(anyhow::anyhow!("string literal could not be replaced"))
             }
-            CapturedValue::Node(n) => {
-                let rtv = RefTreeView::from(n);
-                let lmatches = rtv
-                    .matches(&pwc.as_query())
-                    .collect::<Result<Vec<MatchedItem<MutNode>>>>()?;
+            CapturedValue::Node((id, n)) => {
+                // let rtv = RefTreeView::from(n);
+                // let lmatches = rtv
+                //     .matches(&pwc.as_query())
+                //     .collect::<Result<Vec<MatchedItem<MutNode>>>>()?;
                 // let qp = QueryPattern::try_from(with_pattern)?;
                 // let mnode = MutNode::from_node(qp.root_node.as_node(), Rc with_pattern.source);
                 // Ok(())

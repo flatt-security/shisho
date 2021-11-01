@@ -2,10 +2,7 @@ use id_arena::{Arena, Id};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
-use super::{
-    language::Queryable, query::MetavariableId, source::NormalizedSource, tree::TreeView,
-    view::NodeLikeView,
-};
+use super::{query::MetavariableId, source::NormalizedSource, view::NodeLikeView};
 
 const SHISHO_NODE_METAVARIABLE_NAME: &str = "shisho_metavariable_name";
 const SHISHO_NODE_METAVARIABLE: &str = "shisho_metavariable";
@@ -52,6 +49,7 @@ pub struct Position {
 
 pub type NodeId<'tree> = NodeLikeId<'tree, Node<'tree>>;
 pub type NodeArena<'tree> = NodeLikeArena<'tree, Node<'tree>>;
+pub type NodeRefWithId<'tree> = NodeLikeRefWithId<'tree, Node<'tree>>;
 
 impl<'tree> Node<'tree> {
     pub fn from_tsnode<'node>(
@@ -99,6 +97,10 @@ where
 {
     fn kind(&self) -> NodeType;
     fn children<V: NodeLikeView<'tree, Self>>(&'tree self, tview: &'tree V) -> Vec<&'tree Self>;
+    fn indexed_children<V: NodeLikeView<'tree, Self>>(
+        &'tree self,
+        tview: &'tree V,
+    ) -> Vec<NodeLikeRefWithId<'tree, Self>>;
 
     fn start_byte(&self) -> usize;
     fn end_byte(&self) -> usize;
@@ -160,11 +162,68 @@ impl<'tree> NodeLike<'tree> for Node<'tree> {
             .collect()
     }
 
+    fn indexed_children<V: NodeLikeView<'tree, Self>>(
+        &'tree self,
+        tview: &'tree V,
+    ) -> Vec<NodeLikeRefWithId<'tree, Self>> {
+        self.children
+            .iter()
+            .map(|x| NodeLikeRefWithId {
+                id: *x,
+                node: tview.get(*x).unwrap(),
+            })
+            .collect()
+    }
+
     fn with_source<'a, F, Output>(&'a self, callback: F) -> Output
     where
         F: Fn(&NormalizedSource) -> Output,
         Output: 'a,
     {
         callback(self.source.into())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub struct NodeLikeRefWithId<'tree, N: NodeLike<'tree>> {
+    pub id: NodeLikeId<'tree, N>,
+    pub node: &'tree N,
+}
+
+impl<'tree, N: NodeLike<'tree>> NodeLikeRefWithId<'tree, N> {
+    pub fn kind(&self) -> NodeType {
+        self.node.kind()
+    }
+
+    pub fn start_byte(&self) -> usize {
+        self.node.start_byte()
+    }
+
+    pub fn end_byte(&self) -> usize {
+        self.node.end_byte()
+    }
+
+    pub fn start_position(&self) -> tree_sitter::Point {
+        self.node.start_position()
+    }
+
+    pub fn end_position(&self) -> tree_sitter::Point {
+        self.node.end_position()
+    }
+
+    pub fn as_cow(&self) -> Cow<'_, str> {
+        self.node.as_cow()
+    }
+
+    pub fn children<V: NodeLikeView<'tree, N>>(&'tree self, tview: &'tree V) -> Vec<Self> {
+        self.node.indexed_children(tview)
+    }
+
+    pub fn with_source<'a, F, Output>(&'a self, callback: F) -> Output
+    where
+        F: Fn(&NormalizedSource) -> Output,
+        Output: 'a,
+    {
+        self.node.with_source(callback)
     }
 }

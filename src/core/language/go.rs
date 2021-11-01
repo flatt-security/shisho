@@ -17,9 +17,7 @@ impl Queryable for Go {
         tree_sitter_go_query::language()
     }
 
-    fn root_nodes<'tree, N: NodeLike<'tree>, V: NodeLikeView<'tree, N>>(
-        pview: &'tree V,
-    ) -> Vec<&'tree N> {
+    fn root_nodes<'tree>(pview: &'tree PatternView<'tree, Self>) -> Vec<&'tree PatternNode<'tree>> {
         let root = pview.root().unwrap();
         root.children(pview)
     }

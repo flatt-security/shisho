@@ -1,6 +1,6 @@
 use super::{
     language::Queryable,
-    node::{Node, NodeLike, NodeLikeArena, NodeLikeId},
+    node::{Node, NodeLikeArena, NodeLikeId},
     source::NormalizedSource,
     view::NodeLikeView,
 };
