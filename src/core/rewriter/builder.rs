@@ -1,22 +1,26 @@
-use std::marker::PhantomData;
+use std::{convert::TryFrom, marker::PhantomData};
 
 use crate::core::{
     language::Queryable,
-    matcher::{CaptureMap, ConsecutiveNodes, MatchedItem},
+    matcher::{CaptureMap, MatchedItem},
     node::NodeType,
     node::{Node, NodeLike, RootNode},
     pattern::Pattern,
-    query::MetavariableId,
+    query::{MetavariableId, QueryPattern},
     ruleset::{
         constraint::PatternWithConstraints,
         filter::{RewriteFilter, RewriteFilterPredicate},
     },
+    tree::RefTreeView,
 };
 use anyhow::{anyhow, Result};
 use regex::Captures;
 use thiserror::Error;
 
-use super::tree::{from_capture_map, CapturedValueKind, MetavariableMap};
+use super::{
+    node::MutNode,
+    tree::{from_capture_map, CapturedValue, MetavariableMap},
+};
 
 pub struct SnippetBuilder<'tree, T>
 where
@@ -32,9 +36,9 @@ impl<'tree, T> SnippetBuilder<'tree, T>
 where
     T: Queryable,
 {
-    pub fn new(
+    pub fn new<'base>(
         base: &'tree RootNode<'tree>,
-        captures: &'tree CaptureMap<'tree, Node<'tree>>,
+        captures: &'base CaptureMap<'base, Node<'base>>,
     ) -> Self {
         Self {
             build_with: base,
@@ -77,17 +81,33 @@ where
         target: &MetavariableId,
 
         pwc: &PatternWithConstraints<T>,
-        with_pattern: &Pattern<T>,
+        p: &Pattern<T>,
     ) -> Result<()> {
-        // let rtv = RefTreeView::from(from capture);
+        let t = self
+            .metavariables
+            .get_mut(target)
+            .ok_or(anyhow::anyhow!("metavariable is undefined"))?;
+        match t {
+            CapturedValue::Empty => Ok(()),
+            CapturedValue::Literal(_) => {
+                Err(anyhow::anyhow!("string literal could not be replaced"))
+            }
+            CapturedValue::Node(n) => {
+                let rtv = RefTreeView::from(n);
+                let lmatches = rtv
+                    .matches(&pwc.as_query())
+                    .collect::<Result<Vec<MatchedItem<MutNode>>>>()?;
+                // let qp = QueryPattern::try_from(with_pattern)?;
+                // let mnode = MutNode::from_node(qp.root_node.as_node(), Rc with_pattern.source);
+                // Ok(())
 
-        // let matches = rtv
-        //     .matches(&pwc.as_query())
-        //     .collect::<Result<Vec<MatchedItem<RewritableNode>>>>()?;
+                // TODO: replace matched parts of trees with `p` in `n`
+                // TODO: replace matched parts of string with `p` in `n`
+                // TODO: fix indices of each node of `n`
 
-        // todo!("not implemented yet")
-
-        Ok(())
+                todo!("not implemented yet")
+            }
+        }
     }
 
     pub fn apply_filter(&mut self, filter: &RewriteFilter<T>) -> Result<&mut Self> {
@@ -151,8 +171,8 @@ where
         let value = self
             .metavariables
             .get(&id)
-            .and_then(|x| match x.kind {
-                CapturedValueKind::Empty => None,
+            .and_then(|x| match x {
+                CapturedValue::Empty => None,
                 _ => Some(x.to_string()),
             })
             .ok_or(SnippetBuilderError::MetavariableUnavailable {

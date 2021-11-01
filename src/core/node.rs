@@ -1,3 +1,4 @@
+use id_arena::{Arena, Id};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
@@ -8,11 +9,19 @@ const SHISHO_NODE_METAVARIABLE: &str = "shisho_metavariable";
 const SHISHO_NODE_ELLIPSIS_METAVARIABLE: &str = "shisho_ellipsis_metavariable";
 const SHISHO_NODE_ELLIPSIS: &str = "shisho_ellipsis";
 
+type NodeId<'tree> = Id<Node<'tree>>;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Node<'tree> {
-    inner: tree_sitter::Node<'tree>,
+    kind: NodeType,
 
-    pub children: Vec<Node<'tree>>,
+    start_byte: usize,
+    end_byte: usize,
+
+    start_position: tree_sitter::Point,
+    end_position: tree_sitter::Point,
+
+    pub children: Vec<NodeId<'tree>>,
     pub(crate) source: &'tree NormalizedSource,
 }
 
@@ -38,16 +47,39 @@ pub struct Position {
 }
 
 impl<'tree> Node<'tree> {
-    pub fn from_tsnode(tsnode: tree_sitter::Node<'tree>, source: &'tree NormalizedSource) -> Self {
-        let children: Vec<Self> = tsnode
+    pub fn from_tsnode(
+        tsnode: tree_sitter::Node<'tree>,
+        source: &'tree NormalizedSource,
+        arena: &'tree mut Arena<Node>,
+    ) -> NodeId<'tree> {
+        let children: Vec<NodeId> = tsnode
             .children(&mut tsnode.walk())
-            .map(|c| Self::from_tsnode(c, source))
+            .map(|c| Self::from_tsnode(c, source, arena))
             .collect();
-        Node {
-            inner: tsnode,
+
+        let kind = match tsnode.kind() {
+            s if s == SHISHO_NODE_METAVARIABLE => NodeType::Metavariable(MetavariableId(
+                get_metavariable_id(&children, arena).to_string(),
+            )),
+            s if s == SHISHO_NODE_ELLIPSIS => NodeType::Ellipsis,
+            s if s == SHISHO_NODE_ELLIPSIS_METAVARIABLE => NodeType::EllipsisMetavariable(
+                MetavariableId(get_metavariable_id(&children, arena).to_string()),
+            ),
+            s => NodeType::Normal(s),
+        };
+
+        arena.alloc(Node {
+            kind,
+
+            start_byte: tsnode.start_byte(),
+            end_byte: tsnode.end_byte(),
+
+            start_position: tsnode.start_position(),
+            end_position: tsnode.end_position(),
+
             children,
             source,
-        }
+        })
     }
 }
 
@@ -57,15 +89,8 @@ pub struct RootNode<'tree>(Node<'tree>);
 impl<'tree> RootNode<'tree> {
     pub fn from_tstree(tstree: &'tree tree_sitter::Tree, source: &'tree NormalizedSource) -> Self {
         let tsnode = tstree.root_node();
-        let children: Vec<Node<'tree>> = tsnode
-            .children(&mut tsnode.walk())
-            .map(|c| Node::from_tsnode(c, source))
-            .collect();
-        RootNode::new(Node {
-            inner: tsnode,
-            children,
-            source,
-        })
+        let node = Node::from_tsnode(tsnode, source);
+        RootNode::new(node)
     }
 }
 
@@ -95,12 +120,12 @@ impl<'tree> From<&'tree RootNode<'tree>> for &'tree Node<'tree> {
     }
 }
 
-pub trait NodeLike
+pub trait NodeLike<'tree>
 where
     Self: Sized + Clone + std::fmt::Debug,
 {
     fn kind(&self) -> NodeType;
-    fn children<'a>(&'a self) -> Vec<&'a Self>;
+    fn children(&'tree self, arena: &'tree Arena<Node<'tree>>) -> Vec<&'tree Self>;
 
     fn start_byte(&self) -> usize;
     fn end_byte(&self) -> usize;
@@ -114,42 +139,34 @@ where
         Output: 'a;
 }
 
-fn get_metavariable_id<'a>(node: &'a Node<'_>) -> Cow<'a, str> {
-    node.children
+fn get_metavariable_id<'a>(children: &'a Vec<NodeId<'_>>, arena: &'a Arena<Node>) -> Cow<'a, str> {
+    children
         .iter()
+        .map(|x| arena.get(*x).unwrap())
         .find(|child| child.kind() == NodeType::Normal(SHISHO_NODE_METAVARIABLE_NAME))
         .map(|child| child.as_cow())
         .expect(format!("no {} found", SHISHO_NODE_METAVARIABLE_NAME).as_str())
 }
 
-impl<'tree> NodeLike for Node<'tree> {
+impl<'tree> NodeLike<'tree> for Node<'tree> {
     fn kind(&self) -> NodeType {
-        match self.inner.kind() {
-            s if s == SHISHO_NODE_METAVARIABLE => {
-                NodeType::Metavariable(MetavariableId(get_metavariable_id(self).to_string()))
-            }
-            s if s == SHISHO_NODE_ELLIPSIS => NodeType::Ellipsis,
-            s if s == SHISHO_NODE_ELLIPSIS_METAVARIABLE => NodeType::EllipsisMetavariable(
-                MetavariableId(get_metavariable_id(self).to_string()),
-            ),
-            s => NodeType::Normal(s),
-        }
+        self.kind
     }
 
     fn start_byte(&self) -> usize {
-        self.inner.start_byte()
+        self.start_byte
     }
 
     fn end_byte(&self) -> usize {
-        self.inner.end_byte()
+        self.end_byte
     }
 
     fn start_position(&self) -> tree_sitter::Point {
-        self.inner.start_position()
+        self.start_position
     }
 
     fn end_position(&self) -> tree_sitter::Point {
-        self.inner.end_position()
+        self.end_position
     }
 
     fn as_cow(&self) -> Cow<'_, str> {
@@ -160,8 +177,11 @@ impl<'tree> NodeLike for Node<'tree> {
         )
     }
 
-    fn children<'a>(&'a self) -> Vec<&'a Self> {
-        self.children.iter().collect()
+    fn children(&'tree self, arena: &'tree Arena<Node<'tree>>) -> Vec<&'tree Self> {
+        self.children
+            .iter()
+            .map(|x| arena.get(*x).unwrap())
+            .collect()
     }
 
     fn with_source<'a, F, Output>(&'a self, callback: F) -> Output

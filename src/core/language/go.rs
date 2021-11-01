@@ -18,15 +18,15 @@ impl Queryable for Go {
         &root.as_node().children
     }
 
-    fn is_skippable<N: NodeLike>(node: &N) -> bool {
+    fn is_skippable<'tree, N: NodeLike<'tree>>(node: &N) -> bool {
         node.kind() == NodeType::Normal("\n")
     }
 
-    fn is_leaf_like<N: NodeLike>(node: &N) -> bool {
+    fn is_leaf_like<'tree, N: NodeLike<'tree>>(node: &N) -> bool {
         Self::is_string_literal(node)
     }
 
-    fn is_string_literal<N: NodeLike>(node: &N) -> bool {
+    fn is_string_literal<'tree, N: NodeLike<'tree>>(node: &N) -> bool {
         matches!(
             node.kind(),
             NodeType::Normal("interpreted_string_literal") | NodeType::Normal("raw_string_literal")

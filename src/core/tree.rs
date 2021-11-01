@@ -120,12 +120,12 @@ where
     }
 }
 
-pub struct RefTreeView<'tree, T, N: NodeLike> {
+pub struct RefTreeView<'tree, T, N: NodeLike<'tree>> {
     pub view_root: &'tree N,
     _marker: PhantomData<T>,
 }
 
-impl<'tree, 'view, T, N: NodeLike> RefTreeView<'tree, T, N>
+impl<'tree, 'view, T, N: NodeLike<'tree>> RefTreeView<'tree, T, N>
 where
     T: Queryable + 'tree,
     'tree: 'view,
@@ -171,7 +171,7 @@ where
     }
 }
 
-impl<'tree, T, N: NodeLike> From<&'tree N> for RefTreeView<'tree, T, N>
+impl<'tree, T, N: NodeLike<'tree>> From<&'tree N> for RefTreeView<'tree, T, N>
 where
     T: Queryable,
 {
@@ -183,11 +183,11 @@ where
     }
 }
 
-pub struct TreeTreverser<'a, N: NodeLike> {
+pub struct TreeTreverser<'a, N: NodeLike<'a>> {
     queue: VecDeque<(usize, &'a N)>,
 }
 
-impl<'a, N: NodeLike> TreeTreverser<'a, N> {
+impl<'a, N: NodeLike<'a>> TreeTreverser<'a, N> {
     #[inline]
     pub fn new(root: &'a N) -> Self {
         Self {
@@ -196,8 +196,8 @@ impl<'a, N: NodeLike> TreeTreverser<'a, N> {
     }
 }
 
-impl<'a, N: NodeLike> Iterator for TreeTreverser<'a, N> {
-    type Item = (usize, &'a N);
+impl<'tree, N: NodeLike<'tree>> Iterator for TreeTreverser<'tree, N> {
+    type Item = (usize, &'tree N);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

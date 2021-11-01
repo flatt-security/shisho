@@ -18,15 +18,15 @@ impl Queryable for Dockerfile {
         &root.as_node().children
     }
 
-    fn is_skippable<N: NodeLike>(node: &N) -> bool {
+    fn is_skippable<'tree, N: NodeLike<'tree>>(node: &N) -> bool {
         node.kind() == NodeType::Normal("\n")
     }
 
-    fn is_leaf_like<N: NodeLike>(node: &N) -> bool {
+    fn is_leaf_like<'tree, N: NodeLike<'tree>>(node: &N) -> bool {
         Self::is_string_literal(node)
     }
 
-    fn is_string_literal<N: NodeLike>(node: &N) -> bool {
+    fn is_string_literal<'tree, N: NodeLike<'tree>>(node: &N) -> bool {
         matches!(
             node.kind(),
             NodeType::Normal("shell_fragment")
@@ -36,7 +36,7 @@ impl Queryable for Dockerfile {
         )
     }
 
-    fn node_value_eq<NL: NodeLike, NR: NodeLike>(l: &NL, r: &NR) -> bool {
+    fn node_value_eq<'nl, 'nr, NL: NodeLike<'nl>, NR: NodeLike<'nr>>(l: &NL, r: &NR) -> bool {
         l.as_cow().to_ascii_uppercase() == r.as_cow().to_ascii_uppercase()
     }
 }

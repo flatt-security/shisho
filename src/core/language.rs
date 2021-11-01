@@ -16,23 +16,23 @@ pub trait Queryable {
     fn unwrap_root<'tree, 'a>(root: &'a RootNode<'tree>) -> &'a Vec<Node<'tree>>;
 
     /// `is_skippable` returns whether the given node could be ignored on matching.
-    fn is_skippable<N: NodeLike>(_node: &N) -> bool {
+    fn is_skippable<'tree, N: NodeLike<'tree>>(_node: &N) -> bool {
         false
     }
 
-    fn is_leaf_like<N: NodeLike>(_node: &N) -> bool {
+    fn is_leaf_like<'tree, N: NodeLike<'tree>>(_node: &N) -> bool {
         false
     }
 
-    fn is_string_literal<N: NodeLike>(_node: &N) -> bool {
+    fn is_string_literal<'tree, N: NodeLike<'tree>>(_node: &N) -> bool {
         false
     }
 
-    fn range<N: NodeLike>(node: &N) -> Range {
+    fn range<'tree, N: NodeLike<'tree>>(node: &N) -> Range {
         Self::default_range(node)
     }
 
-    fn default_range<N: NodeLike>(node: &N) -> Range {
+    fn default_range<'tree, N: NodeLike<'tree>>(node: &N) -> Range {
         if node.as_cow().ends_with('\n') {
             Range {
                 start: Position {
@@ -58,7 +58,7 @@ pub trait Queryable {
         }
     }
 
-    fn node_value_eq<NL: NodeLike, NR: NodeLike>(l: &NL, r: &NR) -> bool {
+    fn node_value_eq<'nl, 'nr, NL: NodeLike<'nl>, NR: NodeLike<'nr>>(l: &NL, r: &NR) -> bool {
         *l.as_cow() == *r.as_cow()
     }
 }

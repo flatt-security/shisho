@@ -6,7 +6,7 @@ use crate::core::{
 };
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct RewritableNode {
+pub struct MutNode {
     kind: NodeType,
 
     start_byte: usize,
@@ -15,11 +15,11 @@ pub struct RewritableNode {
     start_position: tree_sitter::Point,
     end_position: tree_sitter::Point,
 
+    children: Vec<Self>,
     pub source: Rc<RefCell<NormalizedSource>>,
-    pub children: Vec<RewritableNode>,
 }
 
-impl NodeLike for RewritableNode {
+impl NodeLike for MutNode {
     fn kind(&self) -> NodeType {
         self.kind.clone()
     }
@@ -64,20 +64,22 @@ impl NodeLike for RewritableNode {
     }
 }
 
-impl<'tree> RewritableNode {
-    pub fn from_node(n: &Node<'tree>, source: Rc<RefCell<NormalizedSource>>) -> Self {
-        RewritableNode {
+impl MutNode {
+    pub fn from_node<'ntree>(n: &Node<'ntree>, source: Rc<RefCell<NormalizedSource>>) -> MutNode {
+        let children = n
+            .children
+            .iter()
+            .map(|x| Self::from_node(x, source.clone()))
+            .collect();
+
+        MutNode {
             kind: n.kind(),
             start_byte: n.start_byte(),
             end_byte: n.end_byte(),
             start_position: n.start_position(),
             end_position: n.end_position(),
             source: source.clone(),
-            children: n
-                .children
-                .iter()
-                .map(|x| Self::from_node(x, source.clone()))
-                .collect(),
+            children,
         }
     }
 }

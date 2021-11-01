@@ -24,18 +24,18 @@ impl Queryable for HCL {
             .children
     }
 
-    fn is_leaf_like<N: NodeLike>(node: &N) -> bool {
+    fn is_leaf_like<'tree, N: NodeLike<'tree>>(node: &N) -> bool {
         Self::is_string_literal(node)
     }
 
-    fn is_string_literal<N: NodeLike>(node: &N) -> bool {
+    fn is_string_literal<'tree, N: NodeLike<'tree>>(node: &N) -> bool {
         matches!(
             node.kind(),
             NodeType::Normal("string_lit") | NodeType::Normal("quoted_template")
         )
     }
 
-    fn is_skippable<N: NodeLike>(node: &N) -> bool {
+    fn is_skippable<'tree, N: NodeLike<'tree>>(node: &N) -> bool {
         node.kind() == NodeType::Normal("\n")
     }
 }
