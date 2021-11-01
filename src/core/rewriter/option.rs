@@ -4,8 +4,9 @@ use anyhow::Result;
 
 use crate::core::{
     language::Queryable,
-    matcher::{CaptureMap},
+    matcher::CaptureMap,
     node::Node,
+    pattern::PatternView,
     ruleset::filter::{PatternWithFilters, RewriteFilter},
 };
 
@@ -16,7 +17,7 @@ pub struct RewriteOption<'a, T>
 where
     T: Queryable,
 {
-    root_node: RootNode<'a>,
+    pview: PatternView<'a, T>,
     filters: &'a Vec<RewriteFilter<T>>,
 }
 
@@ -28,7 +29,7 @@ where
         &'a self,
         captures: &'tree CaptureMap<'tree, Node<'tree>>,
     ) -> Result<String> {
-        let segment = SnippetBuilder::<T>::new(&self.root_node, captures)
+        let segment = SnippetBuilder::<T>::new(&self.pview, captures)
             .apply_filters(self.filters)?
             .build()?;
 
@@ -41,10 +42,8 @@ where
     T: Queryable,
 {
     fn from(pwf: &'a PatternWithFilters<T>) -> Self {
-        let root_node = pwf.pattern.to_root_node();
-
         Self {
-            root_node,
+            pview: PatternView::from(&pwf.pattern),
             filters: &pwf.filters,
         }
     }

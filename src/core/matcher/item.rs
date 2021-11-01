@@ -17,7 +17,7 @@ pub enum CaptureItem<'tree, N: NodeLike<'tree>> {
 
 impl<'tree, N: NodeLike<'tree>> CaptureItem<'tree, N> {
     pub fn matches<T: Queryable + 'tree>(
-        &self,
+        &'tree self,
         q: &PatternWithConstraints<T>,
     ) -> Result<(bool, CaptureMap<'tree, N>)> {
         match self {
@@ -89,13 +89,13 @@ pub struct MatchedItem<'tree, N: NodeLike<'tree>> {
     pub captures: CaptureMap<'tree, N>,
 }
 
-impl<'tree, N: NodeLike<'tree>> MatchedItem<'tree, N> {
+impl<'tree, 'item, N: NodeLike<'tree>> MatchedItem<'tree, N> {
     pub fn capture_of(&self, id: &MetavariableId) -> Option<&CaptureItem<'tree, N>> {
         self.captures.get(id)
     }
 
     pub fn satisfies_all<'c, T: Queryable + 'tree>(
-        &self,
+        &'item self,
         constraints: &'c [Constraint<T>],
     ) -> Result<(bool, CaptureMap<'tree, N>)> {
         let mut items = CaptureMap::new();
@@ -111,10 +111,10 @@ impl<'tree, N: NodeLike<'tree>> MatchedItem<'tree, N> {
     }
 
     pub fn satisfies<'c, T: Queryable + 'tree>(
-        &self,
+        &'item self,
         constraint: &'c Constraint<T>,
     ) -> Result<(bool, CaptureMap<'tree, N>)> {
-        let captured_item = self.capture_of(&constraint.target);
+        let captured_item = self.captures.get(&constraint.target);
         if captured_item.is_none() {
             return Err(anyhow::anyhow!(
                 "uncaptured variable was specified as constraint target: {}",

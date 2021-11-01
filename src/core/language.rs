@@ -8,7 +8,10 @@ pub use self::docker::Dockerfile;
 pub use self::go::Go;
 pub use self::hcl::HCL;
 
-use super::pattern::{PatternNode, PatternView};
+use super::{
+    pattern::{PatternNode, PatternView},
+    view::NodeLikeView,
+};
 
 pub trait Queryable
 where
@@ -18,7 +21,9 @@ where
     fn query_language() -> tree_sitter::Language;
 
     /// `unwrap_root` takes a root of the query tree and returns nodes for matching.
-    fn root_nodes<'tree>(pview: PatternView<'tree, Self>) -> Vec<&'tree PatternNode<'tree>>;
+    fn root_nodes<'tree, N: NodeLike<'tree>, V: NodeLikeView<'tree, N>>(
+        pview: &'tree V,
+    ) -> Vec<&'tree N>;
 
     /// `is_skippable` returns whether the given node could be ignored on matching.
     fn is_skippable<'tree, N: NodeLike<'tree>>(_node: &N) -> bool {

@@ -1,12 +1,18 @@
-use std::{borrow::Cow, cell::RefCell, rc::Rc};
+use std::{borrow::Cow, cell::RefCell, marker::PhantomData, rc::Rc};
 
 use crate::core::{
-    node::{Node, NodeLike, NodeType},
+    language::Queryable,
+    node::{Node, NodeArena, NodeLike, NodeLikeArena, NodeLikeId, NodeType},
     source::NormalizedSource,
+    tree::TreeView,
+    view::NodeLikeView,
 };
 
+pub type MutNodeId<'tree> = NodeLikeId<'tree, MutNode<'tree>>;
+pub type MutNodeArena<'tree> = NodeLikeArena<'tree, MutNode<'tree>>;
+
 #[derive(Debug, Clone, PartialEq)]
-pub struct MutNode {
+pub struct MutNode<'tree> {
     kind: NodeType,
 
     start_byte: usize,
@@ -15,11 +21,13 @@ pub struct MutNode {
     start_position: tree_sitter::Point,
     end_position: tree_sitter::Point,
 
-    children: Vec<Self>,
+    children: Vec<MutNodeId<'tree>>,
     pub source: Rc<RefCell<NormalizedSource>>,
+
+    _marker: PhantomData<&'tree ()>,
 }
 
-impl<'tree> NodeLike<'tree> for MutNode {
+impl<'tree> NodeLike<'tree> for MutNode<'tree> {
     fn kind(&self) -> NodeType {
         self.kind.clone()
     }
@@ -50,8 +58,11 @@ impl<'tree> NodeLike<'tree> for MutNode {
         )
     }
 
-    fn children<'a>(&'a self) -> Vec<&'a Self> {
-        self.children.iter().collect()
+    fn children<V: NodeLikeView<'tree, Self>>(&'tree self, tview: &'tree V) -> Vec<&'tree Self> {
+        self.children
+            .iter()
+            .map(|x| tview.get(*x).unwrap())
+            .collect()
     }
 
     fn with_source<'a, F, Output>(&'a self, callback: F) -> Output
@@ -64,15 +75,25 @@ impl<'tree> NodeLike<'tree> for MutNode {
     }
 }
 
-impl MutNode {
-    pub fn from_node<'ntree, 'b>(n: &Node<'ntree>, source: &'b NormalizedSource) -> MutNode {
-        let children = n
-            .children
-            .iter()
-            .map(|x| Self::from_node(x, source))
-            .collect();
+impl<'tree> MutNode<'tree> {
+    pub fn from_node<'ntree, 'b>(
+        n: &'ntree Node<'ntree>,
+        base_arena: &'ntree NodeArena<'ntree>,
 
-        MutNode {
+        source: Rc<RefCell<NormalizedSource>>,
+        new_arena: &'tree mut MutNodeArena<'tree>,
+    ) -> MutNodeId<'tree> {
+        let mut children = vec![];
+        for x in n.children {
+            children.push(Self::from_node(
+                base_arena.get(x).unwrap(),
+                base_arena,
+                source,
+                new_arena,
+            ));
+        }
+
+        new_arena.alloc(MutNode {
             kind: n.kind(),
             start_byte: n.start_byte(),
             end_byte: n.end_byte(),
@@ -80,6 +101,7 @@ impl MutNode {
             end_position: n.end_position(),
             source,
             children,
-        }
+            _marker: PhantomData,
+        })
     }
 }

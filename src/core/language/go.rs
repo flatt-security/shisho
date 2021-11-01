@@ -2,6 +2,7 @@ use super::Queryable;
 use crate::core::{
     node::{NodeLike, NodeType},
     pattern::{PatternNode, PatternNodeId, PatternView},
+    view::NodeLikeView,
 };
 
 #[derive(Debug, Clone)]
@@ -16,9 +17,11 @@ impl Queryable for Go {
         tree_sitter_go_query::language()
     }
 
-    fn root_nodes<'tree>(pview: PatternView<'tree, Self>) -> Vec<&'tree PatternNode<'tree>> {
-        let root = pview.get(pview.root).unwrap();
-        root.children(&pview.arena)
+    fn root_nodes<'tree, N: NodeLike<'tree>, V: NodeLikeView<'tree, N>>(
+        pview: &'tree V,
+    ) -> Vec<&'tree N> {
+        let root = pview.root().unwrap();
+        root.children(pview)
     }
 
     fn is_skippable<'tree, N: NodeLike<'tree>>(node: &N) -> bool {

@@ -2,20 +2,22 @@ use super::node::MutNode;
 use crate::core::{matcher::CaptureMap, node::NodeLike, query::MetavariableId};
 use std::collections::HashMap;
 
-pub type MetavariableMap = HashMap<MetavariableId, CapturedValue>;
+pub type MetavariableMap<'tree> = HashMap<MetavariableId, CapturedValue<'tree>>;
 
-pub fn from_capture_map<'tree, N: NodeLike<'tree>>(_: CaptureMap<'tree, N>) -> MetavariableMap {
+pub fn from_capture_map<'ntree, 'tree, N: NodeLike<'tree>>(
+    _: CaptureMap<'tree, N>,
+) -> MetavariableMap<'ntree> {
     todo!("convert all")
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum CapturedValue {
+pub enum CapturedValue<'tree> {
     Empty,
     Literal(String),
-    Node(MutNode),
+    Node(MutNode<'tree>),
 }
 
-impl ToString for CapturedValue {
+impl<'tree> ToString for CapturedValue<'tree> {
     fn to_string(&self) -> String {
         match &self {
             CapturedValue::Empty => "".to_string(),

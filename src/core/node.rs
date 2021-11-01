@@ -2,7 +2,10 @@ use id_arena::{Arena, Id};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
-use super::{query::MetavariableId, source::NormalizedSource};
+use super::{
+    language::Queryable, query::MetavariableId, source::NormalizedSource, tree::TreeView,
+    view::NodeLikeView,
+};
 
 const SHISHO_NODE_METAVARIABLE_NAME: &str = "shisho_metavariable_name";
 const SHISHO_NODE_METAVARIABLE: &str = "shisho_metavariable";
@@ -47,6 +50,7 @@ pub struct Position {
     pub column: usize,
 }
 
+pub type NodeId<'tree> = NodeLikeId<'tree, Node<'tree>>;
 pub type NodeArena<'tree> = NodeLikeArena<'tree, Node<'tree>>;
 
 impl<'tree> Node<'tree> {
@@ -58,10 +62,10 @@ impl<'tree> Node<'tree> {
     where
         'tree: 'node,
     {
-        let children: Vec<NodeLikeId<'tree, Node<'tree>>> = tsnode
-            .children(&mut tsnode.walk())
-            .map(move |c| Self::from_tsnode(c, source, arena))
-            .collect();
+        let mut children: Vec<NodeId<'tree>> = vec![];
+        for c in tsnode.children(&mut tsnode.walk()) {
+            children.push(Self::from_tsnode(c, source, arena));
+        }
 
         let kind = match tsnode.kind() {
             s if s == SHISHO_NODE_METAVARIABLE => NodeType::Metavariable(MetavariableId(
@@ -94,7 +98,7 @@ where
     Self: Sized + Clone + std::fmt::Debug,
 {
     fn kind(&self) -> NodeType;
-    fn children(&'tree self, arena: &'tree Arena<Self>) -> Vec<&'tree Self>;
+    fn children<V: NodeLikeView<'tree, Self>>(&'tree self, tview: &'tree V) -> Vec<&'tree Self>;
 
     fn start_byte(&self) -> usize;
     fn end_byte(&self) -> usize;
@@ -149,10 +153,10 @@ impl<'tree> NodeLike<'tree> for Node<'tree> {
         )
     }
 
-    fn children(&'tree self, arena: &'tree Arena<Node<'tree>>) -> Vec<&'tree Self> {
+    fn children<V: NodeLikeView<'tree, Self>>(&'tree self, tview: &'tree V) -> Vec<&'tree Self> {
         self.children
             .iter()
-            .map(|x| arena.get(*x).unwrap())
+            .map(|x| tview.get(*x).unwrap())
             .collect()
     }
 

@@ -4,9 +4,11 @@ use crate::core::{
         match_string_pattern, CaptureItem, ConsecutiveNodes, MatchedItem, MatcherState,
         UnverifiedMetavariable,
     },
-    node::{Node, NodeLike, NodeType},
+    node::{Node, NodeLike, NodeLikeArena, NodeType},
+    pattern::PatternView,
     query::QueryPattern,
     tree::TreeTreverser,
+    view::NodeLikeView,
 };
 
 use std::{convert::TryFrom, marker::PhantomData};
@@ -14,10 +16,10 @@ use std::{convert::TryFrom, marker::PhantomData};
 /// `TreeMatcher` iterates possible matches between query and tree to traverse.
 pub struct TreeMatcher<'tree, 'query, T: Queryable, N: NodeLike<'tree>> {
     /// Tree to traverse
-    traverser: TreeTreverser<'tree, N>,
+    traverser: TreeTreverser<'tree, T, N>,
 
     /// Query
-    query: &'query RootNode<'query>,
+    query: &'query PatternView<'query, T>,
 
     /// local state for implementing `Iterator`/    
     items: Vec<MatchedItem<'tree, N>>,
@@ -27,9 +29,10 @@ pub struct TreeMatcher<'tree, 'query, T: Queryable, N: NodeLike<'tree>> {
 }
 
 impl<'tree, 'query, T: Queryable, N: NodeLike<'tree>> TreeMatcher<'tree, 'query, T, N> {
-    pub fn new(traverser: TreeTreverser<'tree, N>, query: &'query QueryPattern<T>) -> Self {
+    pub fn new(traverser: TreeTreverser<'tree, T, N>, query: &'query QueryPattern<T>) -> Self {
         TreeMatcher {
             query: &query.pview,
+
             traverser,
             items: vec![],
 
@@ -205,13 +208,14 @@ impl<'tree, 'query, T: Queryable, N: NodeLike<'tree>> TreeMatcher<'tree, 'query,
                         // (2): get matches of children
                         self.match_sibilings(
                             tnode
-                                .children()
+                                .children(self.traverser.tview)
                                 .into_iter()
                                 .filter(|n| !T::is_skippable(*n))
                                 .collect(),
                             qnode
                                 .children
-                                .iter()
+                                .into_iter()
+                                .map(|id| self.query.get(id).unwrap())
                                 .filter(|n| !T::is_skippable(*n))
                                 .collect(),
                         )
@@ -293,7 +297,7 @@ where
 
             if let Some((depth, tnode)) = self.traverser.next() {
                 let tnodes: Vec<&N> = tnode
-                    .children()
+                    .children(self.traverser.tview)
                     .into_iter()
                     .filter(|n| !T::is_skippable(*n))
                     .collect();

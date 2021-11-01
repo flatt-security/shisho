@@ -5,7 +5,7 @@ use crate::cli::reporter::{ConsoleReporter, JSONReporter, Reporter, ReporterType
 use crate::cli::{CommonOpts, ReportOpts};
 use crate::core::source::NormalizedSource;
 use crate::core::target::TargetLoader;
-use crate::core::tree::NormalizedTree;
+use crate::core::tree::TreeView;
 use crate::core::{
     language::{Dockerfile, Go, Queryable, HCL},
     ruleset::{self, Rule},
@@ -165,8 +165,7 @@ fn handle_typed_rules<'a, E: Reporter<'a>, Lang: Queryable>(
 ) -> Result<usize> {
     let source = NormalizedSource::from(target.body.as_str());
     let tree = Tree::<Lang>::try_from(source).unwrap();
-    let ptree = NormalizedTree::from(&tree);
-    let ptree = ptree.as_ref_treeview();
+    let ptree = TreeView::from(&tree);
 
     let mut total_findings = 0;
     for rule in rules {

@@ -2,6 +2,7 @@ use super::{
     language::Queryable,
     node::{Node, NodeLike, NodeLikeArena, NodeLikeId},
     source::NormalizedSource,
+    view::NodeLikeView,
 };
 use anyhow::{anyhow, Result};
 use std::{
@@ -71,8 +72,9 @@ pub type PatternNodeArena<'tree> = NodeLikeArena<'tree, Node<'tree>>;
 #[derive(Debug)]
 pub struct PatternView<'tree, T> {
     pub root: PatternNodeId<'tree>,
-    pub arena: PatternNodeArena<'tree>,
     pub source: &'tree NormalizedSource,
+
+    arena: PatternNodeArena<'tree>,
     _marker: PhantomData<T>,
 }
 
@@ -92,8 +94,14 @@ where
             _marker: PhantomData,
         }
     }
+}
 
-    pub fn get(&'tree self, id: PatternNodeId<'tree>) -> Option<&'tree PatternNode<'tree>> {
+impl<'tree, T: Queryable> NodeLikeView<'tree, Node<'tree>> for PatternView<'tree, T> {
+    fn root(&'tree self) -> Option<&'tree Node<'tree>> {
+        self.arena.get(self.root)
+    }
+
+    fn get(&'tree self, id: PatternNodeId<'tree>) -> Option<&'tree Node<'tree>> {
         self.arena.get(id)
     }
 }

@@ -13,6 +13,7 @@ use super::{
     node::{Node, NodeLike, NodeLikeArena, NodeLikeId},
     query::Query,
     source::NormalizedSource,
+    view::NodeLikeView,
 };
 
 pub struct Tree<'tree, T> {
@@ -60,9 +61,20 @@ where
 
 pub struct TreeView<'tree, T, N: NodeLike<'tree>> {
     pub root: NodeLikeId<'tree, N>,
-    pub arena: NodeLikeArena<'tree, N>,
     pub source: &'tree NormalizedSource,
+
+    arena: NodeLikeArena<'tree, N>,
     _marker: PhantomData<T>,
+}
+
+impl<'tree, T: Queryable, N: NodeLike<'tree>> NodeLikeView<'tree, N> for TreeView<'tree, T, N> {
+    fn root(&'tree self) -> Option<&'tree N> {
+        self.arena.get(self.root)
+    }
+
+    fn get(&'tree self, id: NodeLikeId<'tree, N>) -> Option<&'tree N> {
+        self.arena.get(id)
+    }
 }
 
 impl<'tree, T, N: NodeLike<'tree>> TreeView<'tree, T, N>
@@ -126,33 +138,33 @@ where
         })
     }
 
-    pub fn traverse(&'tree self) -> TreeTreverser<'tree, N> {
-        TreeTreverser::new(self.get(self.root).unwrap(), &self.arena)
+    pub fn traverse(&'tree self) -> TreeTreverser<'tree, T, N> {
+        TreeTreverser::new(self.get(self.root).unwrap(), self)
     }
 }
 
-pub struct TreeTreverser<'a, N: NodeLike<'a>> {
+pub struct TreeTreverser<'a, T: Queryable, N: NodeLike<'a>> {
+    pub tview: &'a TreeView<'a, T, N>,
     queue: VecDeque<(usize, &'a N)>,
-    arena: &'a NodeLikeArena<'a, N>,
 }
 
-impl<'a, N: NodeLike<'a>> TreeTreverser<'a, N> {
+impl<'a, T: Queryable, N: NodeLike<'a>> TreeTreverser<'a, T, N> {
     #[inline]
-    pub fn new(root: &'a N, arena: &'a NodeLikeArena<'a, N>) -> Self {
+    pub fn new(root: &'a N, tview: &'a TreeView<'a, T, N>) -> Self {
         Self {
             queue: VecDeque::from(vec![(0, root)]),
-            arena,
+            tview,
         }
     }
 }
 
-impl<'tree, N: NodeLike<'tree>> Iterator for TreeTreverser<'tree, N> {
+impl<'tree, T: Queryable, N: NodeLike<'tree>> Iterator for TreeTreverser<'tree, T, N> {
     type Item = (usize, &'tree N);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((depth, node)) = self.queue.pop_front() {
-            let children = node.children(self.arena).into_iter();
+            let children = node.children(self.tview).into_iter();
             self.queue.extend(children.map(|child| (depth + 1, child)));
 
             Some((depth, node))

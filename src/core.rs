@@ -8,3 +8,4 @@ pub mod ruleset;
 pub mod source;
 pub mod target;
 pub mod tree;
+pub mod view;
