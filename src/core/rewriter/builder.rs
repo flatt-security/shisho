@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crate::core::{
     language::Queryable,
-    matcher::{CaptureMap, MatchedItem},
+    matcher::CaptureMap,
     node::NodeType,
     node::{Node, NodeLike},
     pattern::{Pattern, PatternView},
@@ -17,10 +17,7 @@ use anyhow::{anyhow, Result};
 use regex::Captures;
 use thiserror::Error;
 
-use super::{
-    node::MutNode,
-    tree::{from_capture_map, CapturedValue, MetavariableMap},
-};
+use super::tree::{from_capture_map, CapturedValue, MetavariableMap};
 
 pub struct SnippetBuilder<'btree, 'ntree, T>
 where

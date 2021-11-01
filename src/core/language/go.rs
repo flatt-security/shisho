@@ -1,7 +1,7 @@
 use super::Queryable;
 use crate::core::{
     node::{NodeLike, NodeType},
-    pattern::{PatternNode, PatternNodeId, PatternView},
+    pattern::{PatternNode, PatternView},
     view::NodeLikeView,
 };
 
