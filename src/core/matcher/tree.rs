@@ -90,7 +90,7 @@ impl<'tree, 'query, T: Queryable, N: NodeLike<'tree>> TreeMatcher<'tree, 'query,
                             subtree: ConsecutiveNodes::try_from(nodes).ok(),
                             captures,
                         },
-                        t.map(|x| *x),
+                        t.map(|x| x.clone()),
                     ))
                 }
 
@@ -130,6 +130,7 @@ impl<'tree, 'query, T: Queryable, N: NodeLike<'tree>> TreeMatcher<'tree, 'query,
                     }
                     NodeType::EllipsisMetavariable(mid) => {
                         let mut captured_nodes: Vec<NodeLikeRefWithId<'_, N>> = vec![];
+
                         // NOTE: this loop must end with `tsibilings.len()`
                         for tcidx in tidx..=tsibilings.len() {
                             queue.push((
@@ -141,13 +142,15 @@ impl<'tree, 'query, T: Queryable, N: NodeLike<'tree>> TreeMatcher<'tree, 'query,
                                 ]
                                 .concat(),
                             ));
-                            if let Some(&tchild) = tsibilings.get(tcidx) {
-                                captured_nodes.push(tchild);
+                            if let Some(tchild) = tsibilings.get(tcidx) {
+                                captured_nodes.push(tchild.clone());
                             }
                         }
                     }
                     _ => {
-                        for submatch in self.match_intermediate_node(Some(*tchild), Some(*qchild)) {
+                        for submatch in
+                            self.match_intermediate_node(Some(tchild.clone()), Some(*qchild))
+                        {
                             queue.push((
                                 tidx + 1,
                                 qidx + 1,
@@ -181,7 +184,7 @@ impl<'tree, 'query, T: Queryable, N: NodeLike<'tree>> TreeMatcher<'tree, 'query,
                 match qnode.kind() {
                     NodeType::Metavariable(mid) => {
                         // MATCH: a metavariable node matches any node.
-                        let item = CaptureItem::from(vec![tnode]);
+                        let item = CaptureItem::from(vec![tnode.clone()]);
                         vec![MatcherState {
                             subtree: ConsecutiveNodes::try_from(vec![tnode]).ok(),
                             captures: vec![(mid, item)],
@@ -218,8 +221,8 @@ impl<'tree, 'query, T: Queryable, N: NodeLike<'tree>> TreeMatcher<'tree, 'query,
                                 .collect(),
                             qnode
                                 .children
-                                .into_iter()
-                                .map(|id| self.query.get(id).unwrap())
+                                .iter()
+                                .map(|id| self.query.get(*id).unwrap())
                                 .filter(|n| !T::is_skippable(*n))
                                 .collect(),
                         )
@@ -228,7 +231,7 @@ impl<'tree, 'query, T: Queryable, N: NodeLike<'tree>> TreeMatcher<'tree, 'query,
                             if trailling.is_none() {
                                 // in this case children match completely.
                                 Some(MatcherState {
-                                    subtree: ConsecutiveNodes::try_from(vec![tnode]).ok(),
+                                    subtree: ConsecutiveNodes::try_from(vec![tnode.clone()]).ok(),
                                     captures: submatch.captures,
                                 })
                             } else {
@@ -262,7 +265,7 @@ impl<'tree, 'query, T: Queryable, N: NodeLike<'tree>> TreeMatcher<'tree, 'query,
             match_string_pattern(&tnode.as_cow(), &qnode.as_cow())
                 .into_iter()
                 .map(|captures| MatcherState {
-                    subtree: ConsecutiveNodes::try_from(vec![tnode]).ok(),
+                    subtree: ConsecutiveNodes::try_from(vec![tnode.clone()]).ok(),
                     captures,
                 })
                 .collect()

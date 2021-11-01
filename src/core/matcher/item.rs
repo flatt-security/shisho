@@ -63,7 +63,7 @@ impl<'tree, 'item, N: NodeLike<'tree>> CaptureItem<'tree, N> {
         }
     }
 
-    pub fn to_string(&'tree self) -> String {
+    pub fn to_string(&self) -> String {
         match self {
             CaptureItem::Empty => "".to_string(),
             CaptureItem::Literal(s) => s.to_string(),
@@ -109,7 +109,7 @@ impl<'tree, N: NodeLike<'tree>> MatchedItem<'tree, N> {
     }
 
     fn satisfies<'c, T: Queryable + 'tree>(
-        &'tree mut self,
+        &mut self,
         view: &'tree TreeView<'tree, T, N>,
         constraint: &'c Constraint<T>,
     ) -> Result<bool> {
@@ -120,7 +120,7 @@ impl<'tree, N: NodeLike<'tree>> MatchedItem<'tree, N> {
                 constraint.target.0
             ));
         }
-        let captured_item: &CaptureItem<'tree, N> = captured_item.unwrap();
+        let captured_item = captured_item.unwrap().clone();
 
         match &constraint.predicate {
             ConstraintPredicate::MatchQuery(q) => {

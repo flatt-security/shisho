@@ -20,8 +20,8 @@ impl Queryable for HCL {
 
     fn root_nodes<'tree>(pview: &'tree PatternView<'tree, Self>) -> Vec<&'tree PatternNode<'tree>> {
         let root = pview.root().unwrap();
-        let first = root
-            .children(pview)
+        let children = root.children(pview);
+        let first = children
             .get(0)
             .expect("failed to load the code; no root element");
         first.children(pview)

@@ -89,17 +89,17 @@ impl<'tree> NodeLike<'tree> for MutNode<'tree> {
 impl<'tree> MutNode<'tree> {
     pub fn from_node<'ntree, 'b>(
         n: &'ntree Node<'ntree>,
-        base_arena: &'ntree NodeArena<'ntree>,
+        base_arena: &NodeArena<'ntree>,
 
         source: Rc<RefCell<NormalizedSource>>,
-        new_arena: &'tree mut MutNodeArena<'tree>,
+        new_arena: &mut MutNodeArena<'tree>,
     ) -> MutNodeId<'tree> {
         let mut children = vec![];
-        for x in n.children {
+        for x in &n.children {
             children.push(Self::from_node(
-                base_arena.get(x).unwrap(),
+                base_arena.get(*x).unwrap(),
                 base_arena,
-                source,
+                source.clone(),
                 new_arena,
             ));
         }

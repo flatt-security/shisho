@@ -55,7 +55,7 @@ impl<'tree> Node<'tree> {
     pub fn from_tsnode<'node>(
         tsnode: tree_sitter::Node<'node>,
         source: &'tree NormalizedSource,
-        arena: &'tree mut NodeArena<'tree>,
+        arena: &mut NodeArena<'tree>,
     ) -> NodeLikeId<'tree, Self>
     where
         'tree: 'node,
@@ -66,12 +66,12 @@ impl<'tree> Node<'tree> {
         }
 
         let kind = match tsnode.kind() {
-            s if s == SHISHO_NODE_METAVARIABLE => NodeType::Metavariable(MetavariableId(
-                get_metavariable_id(&children, arena).to_string(),
-            )),
+            s if s == SHISHO_NODE_METAVARIABLE => {
+                NodeType::Metavariable(MetavariableId(get_metavariable_id(&children, arena)))
+            }
             s if s == SHISHO_NODE_ELLIPSIS => NodeType::Ellipsis,
             s if s == SHISHO_NODE_ELLIPSIS_METAVARIABLE => NodeType::EllipsisMetavariable(
-                MetavariableId(get_metavariable_id(&children, arena).to_string()),
+                MetavariableId(get_metavariable_id(&children, arena)),
             ),
             s => NodeType::Normal(s),
         };
@@ -117,18 +117,19 @@ where
 fn get_metavariable_id<'a>(
     children: &'a Vec<NodeLikeId<'_, Node>>,
     arena: &'a Arena<Node>,
-) -> Cow<'a, str> {
+) -> String {
     children
         .iter()
         .map(|x| arena.get(*x).unwrap())
         .find(|child| child.kind() == NodeType::Normal(SHISHO_NODE_METAVARIABLE_NAME))
         .map(|child| child.as_cow())
+        .map(|child| child.to_string())
         .expect(format!("no {} found", SHISHO_NODE_METAVARIABLE_NAME).as_str())
 }
 
 impl<'tree> NodeLike<'tree> for Node<'tree> {
     fn kind(&self) -> NodeType {
-        self.kind
+        self.kind.clone()
     }
 
     fn start_byte(&self) -> usize {
@@ -215,7 +216,7 @@ impl<'tree, N: NodeLike<'tree>> NodeLikeRefWithId<'tree, N> {
         self.node.as_cow()
     }
 
-    pub fn children<V: NodeLikeView<'tree, N>>(&'tree self, tview: &'tree V) -> Vec<Self> {
+    pub fn children<V: NodeLikeView<'tree, N>>(&self, tview: &'tree V) -> Vec<Self> {
         self.node.indexed_children(tview)
     }
 
