@@ -45,10 +45,10 @@ impl<'a, W: std::io::Write> Reporter<'a> for JSONReporter<'a, W> {
         }
     }
 
-    fn add_entry<T: Queryable>(
+    fn add_entry<'tree, T: Queryable>(
         &mut self,
         target: &Target,
-        items: Vec<(&Rule, MatchedItem<'_, Node<'_>>)>,
+        items: Vec<(&Rule, MatchedItem<'tree, Node<'tree>>)>,
     ) -> Result<()> {
         for (rule, mitem) in items {
             let mut r = Entry {

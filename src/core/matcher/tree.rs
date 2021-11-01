@@ -4,7 +4,7 @@ use crate::core::{
         match_string_pattern, CaptureItem, ConsecutiveNodes, MatchedItem, MatcherState,
         UnverifiedMetavariable,
     },
-    node::{Node, NodeLike, NodeType, RootNode},
+    node::{Node, NodeLike, NodeType},
     query::QueryPattern,
     tree::TreeTreverser,
 };
@@ -12,7 +12,7 @@ use crate::core::{
 use std::{convert::TryFrom, marker::PhantomData};
 
 /// `TreeMatcher` iterates possible matches between query and tree to traverse.
-pub struct TreeMatcher<'tree, 'query, T: Queryable, N: NodeLike> {
+pub struct TreeMatcher<'tree, 'query, T: Queryable, N: NodeLike<'tree>> {
     /// Tree to traverse
     traverser: TreeTreverser<'tree, N>,
 
@@ -26,10 +26,10 @@ pub struct TreeMatcher<'tree, 'query, T: Queryable, N: NodeLike> {
     _marker: PhantomData<T>,
 }
 
-impl<'tree, 'query, T: Queryable, N: NodeLike> TreeMatcher<'tree, 'query, T, N> {
+impl<'tree, 'query, T: Queryable, N: NodeLike<'tree>> TreeMatcher<'tree, 'query, T, N> {
     pub fn new(traverser: TreeTreverser<'tree, N>, query: &'query QueryPattern<T>) -> Self {
         TreeMatcher {
-            query: &query.root_node,
+            query: &query.pview,
             traverser,
             items: vec![],
 
@@ -38,7 +38,7 @@ impl<'tree, 'query, T: Queryable, N: NodeLike> TreeMatcher<'tree, 'query, T, N> 
     }
 }
 
-impl<'tree, 'query, T: Queryable, N: NodeLike> TreeMatcher<'tree, 'query, T, N> {
+impl<'tree, 'query, T: Queryable, N: NodeLike<'tree>> TreeMatcher<'tree, 'query, T, N> {
     /// `match_sibilings` takes two sibiling nodes (one for the code tree to search, one for the query tree) and returns zero or more matches.    
     /// Each element of return value accompanies with a value with `Option<&Node>`.
     ///
@@ -274,15 +274,15 @@ impl<'tree, 'query, T: Queryable, N: NodeLike> TreeMatcher<'tree, 'query, T, N> 
     }
 }
 
-impl<'tree, 'query, T, N: NodeLike> Iterator for TreeMatcher<'tree, 'query, T, N>
+impl<'tree, 'query, T, N: NodeLike<'tree>> Iterator for TreeMatcher<'tree, 'query, T, N>
 where
     T: Queryable,
 {
     type Item = MatchedItem<'tree, N>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let qnodes: Vec<&Node<'query>> = T::unwrap_root(self.query)
-            .iter()
+        let qnodes: Vec<&Node<'query>> = T::root_nodes(self.query)
+            .into_iter()
             .filter(|n| !T::is_skippable(*n))
             .collect();
 

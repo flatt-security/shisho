@@ -9,7 +9,8 @@ const SHISHO_NODE_METAVARIABLE: &str = "shisho_metavariable";
 const SHISHO_NODE_ELLIPSIS_METAVARIABLE: &str = "shisho_ellipsis_metavariable";
 const SHISHO_NODE_ELLIPSIS: &str = "shisho_ellipsis";
 
-type NodeId<'tree> = Id<Node<'tree>>;
+pub type NodeLikeId<'tree, N: NodeLike<'tree>> = Id<N>;
+pub type NodeLikeArena<'tree, N: NodeLike<'tree>> = Arena<N>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Node<'tree> {
@@ -21,7 +22,7 @@ pub struct Node<'tree> {
     start_position: tree_sitter::Point,
     end_position: tree_sitter::Point,
 
-    pub children: Vec<NodeId<'tree>>,
+    pub children: Vec<NodeLikeId<'tree, Self>>,
     pub(crate) source: &'tree NormalizedSource,
 }
 
@@ -46,15 +47,20 @@ pub struct Position {
     pub column: usize,
 }
 
+pub type NodeArena<'tree> = NodeLikeArena<'tree, Node<'tree>>;
+
 impl<'tree> Node<'tree> {
-    pub fn from_tsnode(
-        tsnode: tree_sitter::Node<'tree>,
+    pub fn from_tsnode<'node>(
+        tsnode: tree_sitter::Node<'node>,
         source: &'tree NormalizedSource,
-        arena: &'tree mut Arena<Node>,
-    ) -> NodeId<'tree> {
-        let children: Vec<NodeId> = tsnode
+        arena: &'tree mut NodeArena<'tree>,
+    ) -> NodeLikeId<'tree, Self>
+    where
+        'tree: 'node,
+    {
+        let children: Vec<NodeLikeId<'tree, Node<'tree>>> = tsnode
             .children(&mut tsnode.walk())
-            .map(|c| Self::from_tsnode(c, source, arena))
+            .map(move |c| Self::from_tsnode(c, source, arena))
             .collect();
 
         let kind = match tsnode.kind() {
@@ -83,49 +89,12 @@ impl<'tree> Node<'tree> {
     }
 }
 
-#[derive(Debug)]
-pub struct RootNode<'tree>(Node<'tree>);
-
-impl<'tree> RootNode<'tree> {
-    pub fn from_tstree(tstree: &'tree tree_sitter::Tree, source: &'tree NormalizedSource) -> Self {
-        let tsnode = tstree.root_node();
-        let node = Node::from_tsnode(tsnode, source);
-        RootNode::new(node)
-    }
-}
-
-impl<'tree> RootNode<'tree> {
-    pub fn new(node: Node<'tree>) -> Self {
-        Self(node)
-    }
-
-    pub fn as_node(&self) -> &Node<'tree> {
-        &self.0
-    }
-
-    pub fn source(&self) -> &NormalizedSource {
-        &self.as_node().source
-    }
-}
-
-impl<'tree> From<RootNode<'tree>> for Node<'tree> {
-    fn from(r: RootNode<'tree>) -> Self {
-        r.0
-    }
-}
-
-impl<'tree> From<&'tree RootNode<'tree>> for &'tree Node<'tree> {
-    fn from(r: &'tree RootNode<'tree>) -> Self {
-        &r.0
-    }
-}
-
 pub trait NodeLike<'tree>
 where
     Self: Sized + Clone + std::fmt::Debug,
 {
     fn kind(&self) -> NodeType;
-    fn children(&'tree self, arena: &'tree Arena<Node<'tree>>) -> Vec<&'tree Self>;
+    fn children(&'tree self, arena: &'tree Arena<Self>) -> Vec<&'tree Self>;
 
     fn start_byte(&self) -> usize;
     fn end_byte(&self) -> usize;
@@ -139,7 +108,10 @@ where
         Output: 'a;
 }
 
-fn get_metavariable_id<'a>(children: &'a Vec<NodeId<'_>>, arena: &'a Arena<Node>) -> Cow<'a, str> {
+fn get_metavariable_id<'a>(
+    children: &'a Vec<NodeLikeId<'_, Node>>,
+    arena: &'a Arena<Node>,
+) -> Cow<'a, str> {
     children
         .iter()
         .map(|x| arena.get(*x).unwrap())

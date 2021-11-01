@@ -19,7 +19,7 @@ pub struct MutNode {
     pub source: Rc<RefCell<NormalizedSource>>,
 }
 
-impl NodeLike for MutNode {
+impl<'tree> NodeLike<'tree> for MutNode {
     fn kind(&self) -> NodeType {
         self.kind.clone()
     }
@@ -65,11 +65,11 @@ impl NodeLike for MutNode {
 }
 
 impl MutNode {
-    pub fn from_node<'ntree>(n: &Node<'ntree>, source: Rc<RefCell<NormalizedSource>>) -> MutNode {
+    pub fn from_node<'ntree, 'b>(n: &Node<'ntree>, source: &'b NormalizedSource) -> MutNode {
         let children = n
             .children
             .iter()
-            .map(|x| Self::from_node(x, source.clone()))
+            .map(|x| Self::from_node(x, source))
             .collect();
 
         MutNode {
@@ -78,7 +78,7 @@ impl MutNode {
             end_byte: n.end_byte(),
             start_position: n.start_position(),
             end_position: n.end_position(),
-            source: source.clone(),
+            source,
             children,
         }
     }

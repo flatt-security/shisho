@@ -15,7 +15,7 @@ use crate::core::{
     matcher::MatchedItem,
     node::Node,
     ruleset::{constraint::PatternWithConstraints, filter::RawPatternWithFilters},
-    tree::RefTreeView,
+    tree::TreeView,
 };
 
 use self::{
@@ -89,13 +89,12 @@ impl Rule {
         }
     }
 
-    pub fn find<'tree, 'item, T>(
+    pub fn find<'tree, T>(
         &self,
-        tree: &'tree RefTreeView<'tree, T, Node<'tree>>,
-    ) -> Result<Vec<MatchedItem<'item, Node<'tree>>>>
+        tree: &'tree TreeView<'tree, T, Node<'tree>>,
+    ) -> Result<Vec<MatchedItem<'tree, Node<'tree>>>>
     where
         T: Queryable,
-        'tree: 'item,
     {
         let patterns = self.get_patterns()?;
         let mut matches = vec![];

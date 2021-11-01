@@ -4,9 +4,8 @@ use anyhow::Result;
 
 use crate::core::{
     language::Queryable,
-    matcher::{CaptureMap, MatchedItem},
+    matcher::{CaptureMap},
     node::Node,
-    node::RootNode,
     ruleset::filter::{PatternWithFilters, RewriteFilter},
 };
 

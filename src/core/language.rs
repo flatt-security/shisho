@@ -2,18 +2,23 @@ mod docker;
 mod go;
 mod hcl;
 
-use crate::core::node::{Node, NodeLike, Position, Range, RootNode};
+use crate::core::node::{NodeLike, Position, Range};
 
 pub use self::docker::Dockerfile;
 pub use self::go::Go;
 pub use self::hcl::HCL;
 
-pub trait Queryable {
+use super::pattern::{PatternNode, PatternView};
+
+pub trait Queryable
+where
+    Self: Sized,
+{
     fn target_language() -> tree_sitter::Language;
     fn query_language() -> tree_sitter::Language;
 
     /// `unwrap_root` takes a root of the query tree and returns nodes for matching.
-    fn unwrap_root<'tree, 'a>(root: &'a RootNode<'tree>) -> &'a Vec<Node<'tree>>;
+    fn root_nodes<'tree>(pview: PatternView<'tree, Self>) -> Vec<&'tree PatternNode<'tree>>;
 
     /// `is_skippable` returns whether the given node could be ignored on matching.
     fn is_skippable<'tree, N: NodeLike<'tree>>(_node: &N) -> bool {
@@ -71,8 +76,7 @@ macro_rules! match_pt {
 
         let query = pc.as_query();
         let tree = crate::core::tree::Tree::<$lang>::try_from($t).unwrap();
-        let ptree = crate::core::tree::NormalizedTree::from(&tree);
-        let ptree = ptree.as_ref_treeview();
+        let ptree = crate::core::tree::TreeView::from(&tree);
         let session = ptree.matches(&query);
 
         $callback(
@@ -89,8 +93,7 @@ macro_rules! replace_pt {
 
         let query = pc.as_query();
         let tree = crate::core::tree::Tree::<$lang>::try_from($t).unwrap();
-        let ptree = crate::core::tree::NormalizedTree::from(&tree);
-        let ptree = ptree.as_ref_treeview();
+        let ptree = crate::core::tree::TreeView::from(&tree);
         let session = ptree.matches(&query);
         let c = session.collect::<anyhow::Result<Vec<crate::core::matcher::MatchedItem<crate::core::node::Node>>>>().unwrap();
 

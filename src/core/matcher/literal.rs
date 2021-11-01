@@ -5,7 +5,7 @@ use crate::core::{
 };
 use regex::Captures;
 
-pub fn match_string_pattern<'tree, 'query, 'captured, N: NodeLike>(
+pub fn match_string_pattern<'tree, 'query, 'captured, N: NodeLike<'captured>>(
     tvalue: &'tree str,
     qvalue: &'query str,
 ) -> Vec<Vec<UnverifiedMetavariable<'captured, N>>> {

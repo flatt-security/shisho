@@ -12,12 +12,12 @@ use super::ConsecutiveNodes;
 pub type UnverifiedMetavariable<'tree, N> = (MetavariableId, CaptureItem<'tree, N>);
 
 #[derive(Debug, Default, Clone)]
-pub struct MatcherState<'tree, N: NodeLike> {
+pub struct MatcherState<'tree, N: NodeLike<'tree>> {
     pub(crate) subtree: Option<ConsecutiveNodes<'tree, N>>,
     pub(crate) captures: Vec<UnverifiedMetavariable<'tree, N>>,
 }
 
-impl<'tree, N: NodeLike> From<MatcherState<'tree, N>> for Option<MatchedItem<'tree, N>> {
+impl<'tree, N: NodeLike<'tree>> From<MatcherState<'tree, N>> for Option<MatchedItem<'tree, N>> {
     fn from(value: MatcherState<'tree, N>) -> Self {
         let mut captures = CaptureMap::<N>::new();
 
@@ -41,7 +41,9 @@ impl<'tree, N: NodeLike> From<MatcherState<'tree, N>> for Option<MatchedItem<'tr
     }
 }
 
-fn fold_capture<N: NodeLike>(capture_items: Vec<CaptureItem<'_, N>>) -> Option<CaptureItem<'_, N>> {
+fn fold_capture<'tree, N: NodeLike<'tree>>(
+    capture_items: Vec<CaptureItem<'tree, N>>,
+) -> Option<CaptureItem<'tree, N>> {
     let mut it = capture_items.into_iter();
     let first = it.next();
     it.fold(first, |acc, capture| match acc {

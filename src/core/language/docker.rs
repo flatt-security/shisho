@@ -1,5 +1,8 @@
 use super::Queryable;
-use crate::core::node::{Node, NodeLike, NodeType, RootNode};
+use crate::core::{
+    node::{NodeLike, NodeType},
+    pattern::{PatternNode, PatternView},
+};
 
 #[derive(Debug, Clone)]
 pub struct Dockerfile;
@@ -13,9 +16,9 @@ impl Queryable for Dockerfile {
         tree_sitter_dockerfile_query::language()
     }
 
-    fn unwrap_root<'tree, 'a>(root: &'a RootNode<'tree>) -> &'a Vec<Node<'tree>> {
-        // see `//third_party/tree-sitter-dockerfile-query/grammar.js`
-        &root.as_node().children
+    fn root_nodes<'tree>(pview: PatternView<'tree, Self>) -> Vec<&'tree PatternNode<'tree>> {
+        let root = pview.get(pview.root).unwrap();
+        root.children(&pview.arena)
     }
 
     fn is_skippable<'tree, N: NodeLike<'tree>>(node: &N) -> bool {
@@ -45,7 +48,7 @@ impl Queryable for Dockerfile {
 mod tests {
     use super::*;
     use crate::{
-        core::{matcher::MatchedItem, query::MetavariableId},
+        core::{matcher::MatchedItem, node::Node, query::MetavariableId},
         match_pt,
     };
     use anyhow::Result;

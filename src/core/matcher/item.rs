@@ -5,16 +5,17 @@ use std::convert::TryFrom;
 use crate::core::node::Range;
 use crate::core::ruleset::constraint::{Constraint, ConstraintPredicate, PatternWithConstraints};
 use crate::core::source::NormalizedSource;
-use crate::core::{language::Queryable, node::NodeLike, query::MetavariableId, tree::RefTreeView};
+use crate::core::tree::TreeView;
+use crate::core::{language::Queryable, node::NodeLike, query::MetavariableId};
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum CaptureItem<'tree, N: NodeLike> {
+pub enum CaptureItem<'tree, N: NodeLike<'tree>> {
     Empty,
     Literal(String),
     Nodes(ConsecutiveNodes<'tree, N>),
 }
 
-impl<'tree, N: NodeLike> CaptureItem<'tree, N> {
+impl<'tree, N: NodeLike<'tree>> CaptureItem<'tree, N> {
     pub fn matches<T: Queryable + 'tree>(
         &self,
         q: &PatternWithConstraints<T>,
@@ -29,7 +30,7 @@ impl<'tree, N: NodeLike> CaptureItem<'tree, N> {
                     .as_vec()
                     .iter()
                     .map(|node: &&'tree N| {
-                        let ptree = RefTreeView::<'tree, T, N>::from(*node);
+                        let ptree = TreeView::<'tree, T, N>::from(*node);
                         let matches = ptree
                             .matches(&q.into())
                             .collect::<Result<Vec<MatchedItem<'tree, N>>>>()?;
@@ -70,7 +71,7 @@ impl<'tree, N: NodeLike> CaptureItem<'tree, N> {
     }
 }
 
-impl<'tree, N: NodeLike> From<Vec<&'tree N>> for CaptureItem<'tree, N> {
+impl<'tree, N: NodeLike<'tree>> From<Vec<&'tree N>> for CaptureItem<'tree, N> {
     fn from(value: Vec<&'tree N>) -> Self {
         if value.is_empty() {
             Self::Empty
@@ -83,12 +84,12 @@ impl<'tree, N: NodeLike> From<Vec<&'tree N>> for CaptureItem<'tree, N> {
 pub type CaptureMap<'tree, N> = HashMap<MetavariableId, CaptureItem<'tree, N>>;
 
 #[derive(Debug, Clone)]
-pub struct MatchedItem<'tree, N: NodeLike> {
+pub struct MatchedItem<'tree, N: NodeLike<'tree>> {
     pub area: ConsecutiveNodes<'tree, N>,
     pub captures: CaptureMap<'tree, N>,
 }
 
-impl<'tree, N: NodeLike> MatchedItem<'tree, N> {
+impl<'tree, N: NodeLike<'tree>> MatchedItem<'tree, N> {
     pub fn capture_of(&self, id: &MetavariableId) -> Option<&CaptureItem<'tree, N>> {
         self.captures.get(id)
     }
@@ -185,11 +186,11 @@ impl<'tree, N: NodeLike> MatchedItem<'tree, N> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ConsecutiveNodes<'tree, N: NodeLike> {
+pub struct ConsecutiveNodes<'tree, N: NodeLike<'tree>> {
     inner: Vec<&'tree N>,
 }
 
-impl<'tree, N: NodeLike> TryFrom<Vec<&'tree N>> for ConsecutiveNodes<'tree, N> {
+impl<'tree, N: NodeLike<'tree>> TryFrom<Vec<&'tree N>> for ConsecutiveNodes<'tree, N> {
     type Error = anyhow::Error;
     fn try_from(inner: Vec<&'tree N>) -> Result<Self, Self::Error> {
         // TODO (y0n3uchy): check all capture items are consecutive
@@ -203,7 +204,9 @@ impl<'tree, N: NodeLike> TryFrom<Vec<&'tree N>> for ConsecutiveNodes<'tree, N> {
     }
 }
 
-impl<'tree, N: NodeLike> TryFrom<Vec<ConsecutiveNodes<'tree, N>>> for ConsecutiveNodes<'tree, N> {
+impl<'tree, N: NodeLike<'tree>> TryFrom<Vec<ConsecutiveNodes<'tree, N>>>
+    for ConsecutiveNodes<'tree, N>
+{
     type Error = anyhow::Error;
 
     fn try_from(cns: Vec<ConsecutiveNodes<'tree, N>>) -> Result<Self, Self::Error> {
@@ -220,7 +223,7 @@ impl<'tree, N: NodeLike> TryFrom<Vec<ConsecutiveNodes<'tree, N>>> for Consecutiv
     }
 }
 
-impl<'tree, N: NodeLike> ConsecutiveNodes<'tree, N> {
+impl<'tree, N: NodeLike<'tree>> ConsecutiveNodes<'tree, N> {
     pub fn as_vec(&self) -> &Vec<&'tree N> {
         &self.inner
     }

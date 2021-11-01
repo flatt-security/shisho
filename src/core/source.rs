@@ -30,9 +30,9 @@ impl<T> Code<T>
 where
     T: Queryable,
 {
-    pub fn rewrite(
+    pub fn rewrite<'tree>(
         self,
-        item: &MatchedItem<'_, Node<'_>>,
+        item: &MatchedItem<'tree, Node<'tree>>,
         roption: RewriteOption<T>,
     ) -> Result<Self> {
         let current_code = self.as_str().as_bytes();

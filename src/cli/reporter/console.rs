@@ -23,10 +23,10 @@ impl<'a, W: std::io::Write> Reporter<'a> for ConsoleReporter<'a, W> {
         Self { writer }
     }
 
-    fn add_entry<T: Queryable>(
+    fn add_entry<'tree, T: Queryable>(
         &mut self,
         target: &Target,
-        items: Vec<(&Rule, MatchedItem<'_, Node<'_>>)>,
+        items: Vec<(&Rule, MatchedItem<'tree, Node<'tree>>)>,
     ) -> Result<()> {
         let lines = target.body.split('\n').collect::<Vec<&str>>();
 

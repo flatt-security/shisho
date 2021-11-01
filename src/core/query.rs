@@ -1,16 +1,17 @@
 use crate::core::{
     language::Queryable,
-    node::RootNode,
     pattern::Pattern,
     ruleset::constraint::{Constraint, PatternWithConstraints},
 };
+
+use super::pattern::PatternView;
 
 #[derive(Debug)]
 pub struct QueryPattern<'a, T>
 where
     T: Queryable,
 {
-    pub root_node: RootNode<'a>,
+    pub pview: PatternView<'a, T>,
     pattern: &'a Pattern<T>,
 }
 
@@ -22,8 +23,8 @@ where
     T: Queryable,
 {
     fn from(pattern: &'a Pattern<T>) -> Self {
-        let root_node = pattern.to_root_node();
-        QueryPattern { root_node, pattern }
+        let pview = PatternView::from(pattern);
+        QueryPattern { pview, pattern }
     }
 }
 

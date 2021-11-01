@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 pub type MetavariableMap = HashMap<MetavariableId, CapturedValue>;
 
-pub fn from_capture_map<'tree, N: NodeLike>(_: CaptureMap<'tree, N>) -> MetavariableMap {
+pub fn from_capture_map<'tree, N: NodeLike<'tree>>(_: CaptureMap<'tree, N>) -> MetavariableMap {
     todo!("convert all")
 }
 

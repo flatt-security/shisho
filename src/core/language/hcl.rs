@@ -1,4 +1,7 @@
-use crate::core::node::{Node, NodeLike, NodeType, RootNode};
+use crate::core::{
+    node::{NodeLike, NodeType},
+    pattern::{PatternNode, PatternView},
+};
 
 use super::Queryable;
 
@@ -14,14 +17,13 @@ impl Queryable for HCL {
         tree_sitter_hcl_query::language()
     }
 
-    fn unwrap_root<'tree, 'a>(root: &'a RootNode<'tree>) -> &'a Vec<Node<'tree>> {
-        // see `//third_party/tree-sitter-hcl-query/grammar.js`
-        &root
-            .as_node()
-            .children
+    fn root_nodes<'tree>(pview: PatternView<'tree, Self>) -> Vec<&'tree PatternNode<'tree>> {
+        let root = pview.get(pview.root).unwrap();
+        let first_child = root
+            .children(&pview.arena)
             .get(0)
-            .expect("failed to load the code; no root element")
-            .children
+            .expect("failed to load the code; no root element");
+        first_child.children(&pview.arena)
     }
 
     fn is_leaf_like<'tree, N: NodeLike<'tree>>(node: &N) -> bool {
@@ -44,6 +46,7 @@ impl Queryable for HCL {
 mod tests {
     use super::*;
     use crate::core::matcher::MatchedItem;
+    use crate::core::node::Node;
     use crate::core::query::MetavariableId;
     use crate::core::source::Code;
     use crate::{match_pt, replace_pt};

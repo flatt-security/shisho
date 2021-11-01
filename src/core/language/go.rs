@@ -1,5 +1,8 @@
 use super::Queryable;
-use crate::core::node::{Node, NodeLike, NodeType, RootNode};
+use crate::core::{
+    node::{NodeLike, NodeType},
+    pattern::{PatternNode, PatternNodeId, PatternView},
+};
 
 #[derive(Debug, Clone)]
 pub struct Go;
@@ -13,9 +16,9 @@ impl Queryable for Go {
         tree_sitter_go_query::language()
     }
 
-    fn unwrap_root<'tree, 'a>(root: &'a RootNode<'tree>) -> &'a Vec<Node<'tree>> {
-        // see `//third_party/tree-sitter-go-query/grammar.js`
-        &root.as_node().children
+    fn root_nodes<'tree>(pview: PatternView<'tree, Self>) -> Vec<&'tree PatternNode<'tree>> {
+        let root = pview.get(pview.root).unwrap();
+        root.children(&pview.arena)
     }
 
     fn is_skippable<'tree, N: NodeLike<'tree>>(node: &N) -> bool {
@@ -39,6 +42,7 @@ mod tests {
     use anyhow::Result;
 
     use crate::core::matcher::MatchedItem;
+    use crate::core::node::Node;
     use crate::core::{query::MetavariableId, source::Code};
     use crate::{match_pt, replace_pt};
     use std::convert::TryFrom;
