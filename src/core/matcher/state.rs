@@ -1,13 +1,9 @@
 use itertools::Itertools;
 
-use crate::core::{
-    matcher::{CaptureItem, MatchedItem},
-    node::NodeLike,
-    query::MetavariableId,
-};
+use crate::core::{matcher::CaptureItem, node::NodeLike, query::MetavariableId};
 
-use super::CaptureMap;
 use super::ConsecutiveNodes;
+use super::{CaptureMap, UnconstrainedMatchedItem};
 
 pub type UnverifiedMetavariable<'tree, N> = (MetavariableId, CaptureItem<'tree, N>);
 
@@ -17,7 +13,9 @@ pub struct MatcherState<'tree, N: NodeLike<'tree>> {
     pub(crate) captures: Vec<UnverifiedMetavariable<'tree, N>>,
 }
 
-impl<'tree, N: NodeLike<'tree>> From<MatcherState<'tree, N>> for Option<MatchedItem<'tree, N>> {
+impl<'tree, N: NodeLike<'tree>> From<MatcherState<'tree, N>>
+    for Option<UnconstrainedMatchedItem<'tree, N>>
+{
     fn from(value: MatcherState<'tree, N>) -> Self {
         let mut captures = CaptureMap::<N>::new();
 
@@ -34,7 +32,7 @@ impl<'tree, N: NodeLike<'tree>> From<MatcherState<'tree, N>> for Option<MatchedI
             }
         }
 
-        Some(MatchedItem {
+        Some(UnconstrainedMatchedItem {
             area: value.subtree.unwrap(),
             captures,
         })

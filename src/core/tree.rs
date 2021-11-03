@@ -155,10 +155,10 @@ where
     where
         'tree: 'query,
     {
-        self.matches_from(self.root_id, q)
+        self.matches_under_node(self.root_id, q)
     }
 
-    pub fn matches_from<'query>(
+    pub fn matches_under_node<'query>(
         &'tree self,
         id: NodeLikeId<'tree, N>,
         q: &'query Query<'query, T>,
@@ -166,30 +166,45 @@ where
     where
         'tree: 'query,
     {
-        TreeMatcher::new(self, id, &q.pattern).filter_map(move |x| {
-            match x.filter(self, q.constraints) {
-                Ok(None) => None,
-                Ok(Some(x)) => Some(Ok(x)),
-                Err(e) => Some(Err(e)),
-            }
-        })
+        self.matches_under_sibilings(vec![id], q)
+    }
+
+    pub fn matches_under_sibilings<'query>(
+        &'tree self,
+        ids: Vec<NodeLikeId<'tree, N>>,
+        q: &'query Query<'query, T>,
+    ) -> impl Iterator<Item = Result<MatchedItem<'tree, N>>> + 'query
+    where
+        'tree: 'query,
+    {
+        TreeMatcher::from_sibilings(self, self, ids, &q.pattern)
+            .map(move |unconstrained_mitem| {
+                match unconstrained_mitem.apply_constraints(self, q.constraints) {
+                    Ok(constrained_mitems) => constrained_mitems
+                        .into_iter()
+                        .map(|mitem| Ok(mitem))
+                        .collect(),
+                    Err(e) => vec![Err(e)],
+                }
+            })
+            .flatten()
     }
 }
 
 pub trait Traversable<'tree, T: Queryable, N: NodeLike<'tree>> {
-    fn traverse(self, from: NodeLikeId<'tree, N>) -> TreeTreverser<'tree, T, N>;
+    fn traverse(&'tree self, from: NodeLikeId<'tree, N>) -> TreeTreverser<'tree, T, N>;
 }
 
 impl<'tree, T: Queryable + 'tree, N: NodeLike<'tree> + 'tree> Traversable<'tree, T, N>
-    for &'tree TreeView<'tree, T, N>
+    for TreeView<'tree, T, N>
 {
-    fn traverse(self, id: NodeLikeId<'tree, N>) -> TreeTreverser<'tree, T, N> {
+    fn traverse(&'tree self, id: NodeLikeId<'tree, N>) -> TreeTreverser<'tree, T, N> {
         TreeTreverser::new(self.get_with_id(id).unwrap(), self)
     }
 }
 
 pub struct TreeTreverser<'a, T: Queryable, N: NodeLike<'a>> {
-    pub tview: &'a TreeView<'a, T, N>,
+    tview: &'a TreeView<'a, T, N>,
     queue: VecDeque<(usize, NodeLikeRefWithId<'a, N>)>,
 }
 

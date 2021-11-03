@@ -3,7 +3,9 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 
-use crate::core::{language::Queryable, pattern::Pattern, query::MetavariableId};
+use crate::core::{
+    language::Queryable, pattern::Pattern, query::MetavariableId, source::NormalizedSource,
+};
 
 #[derive(Debug)]
 pub struct Constraint<T>
@@ -19,10 +21,10 @@ pub enum ConstraintPredicate<T>
 where
     T: Queryable,
 {
-    MatchQuery(PatternWithConstraints<T>),
-    NotMatchQuery(PatternWithConstraints<T>),
-    MatchAnyOfQuery(Vec<PatternWithConstraints<T>>),
-    NotMatchAnyOfQuery(Vec<PatternWithConstraints<T>>),
+    MatchQuery(Pattern<T>),
+    NotMatchQuery(Pattern<T>),
+    MatchAnyOfQuery(Vec<Pattern<T>>),
+    NotMatchAnyOfQuery(Vec<Pattern<T>>),
 
     MatchRegex(Regex),
     NotMatchRegex(Regex),
@@ -51,6 +53,7 @@ pub struct RawConstraint {
     #[serde(default)]
     pub patterns: Vec<RawPatternWithConstraints>,
 
+    /// deprecated field
     #[serde(default)]
     pub constraints: Vec<RawConstraint>,
 
@@ -64,23 +67,20 @@ pub struct RawConstraint {
 }
 
 impl RawConstraint {
-    pub fn get_pattern_with_constraints(&self) -> Result<Vec<RawPatternWithConstraints>> {
-        match (&self.pattern, &self.patterns) {
-            (Some(p), patterns) if patterns.is_empty() => Ok(vec![RawPatternWithConstraints {
-                pattern: p.to_string(),
-                constraints: self.constraints.clone(),
-            }]),
-            (None, patterns) if !patterns.is_empty() => Ok(patterns
-                .into_iter()
-                .map(|p| RawPatternWithConstraints {
-                    pattern: p.pattern.to_string(),
-                    constraints: [p.constraints.clone(), self.constraints.clone()].concat(),
-                })
-                .collect()),
-            (None, patterns) if patterns.is_empty() => Ok(vec![]),
-            _ => Err(anyhow::anyhow!(
-                "You can use only one of `pattern` or `patterns`."
-            )),
+    pub fn get_patterns(&self) -> Result<Vec<String>> {
+        if !self.constraints.is_empty() || self.patterns.iter().any(|p| !p.constraints.is_empty()) {
+            Err(anyhow::anyhow!("You can't use `constraints` inside constraints; constraint nesting is removed from v0.5.3."))
+        } else {
+            match (&self.pattern, &self.patterns) {
+                (Some(p), patterns) if patterns.is_empty() => Ok(vec![p.to_string()]),
+                (None, patterns) if !patterns.is_empty() => {
+                    Ok(patterns.iter().map(|x| x.pattern.clone()).collect())
+                }
+                (None, patterns) if patterns.is_empty() => Ok(vec![]),
+                _ => Err(anyhow::anyhow!(
+                    "You can use only one of `pattern` or `patterns`."
+                )),
+            }
         }
     }
 
@@ -137,11 +137,12 @@ where
     fn try_from(rc: RawConstraint) -> Result<Self, Self::Error> {
         let predicate = match rc.should {
             RawConstraintPredicate::Match | RawConstraintPredicate::NotMatch => {
-                let mut rpwcs = rc.get_pattern_with_constraints()?;
+                let mut rpwcs = rc.get_patterns()?;
                 let mut rrps = rc.get_regex_patterns()?;
                 match (rpwcs.len(), rrps.len()) {
                     (1, 0) => {
-                        let pc = PatternWithConstraints::<T>::try_from(rpwcs.pop().unwrap())?;
+                        let pc =
+                            Pattern::<T>::try_from(NormalizedSource::from(rpwcs.pop().unwrap()))?;
                         if rc.should == RawConstraintPredicate::Match {
                             ConstraintPredicate::MatchQuery(pc)
                         } else if rc.should == RawConstraintPredicate::NotMatch {
@@ -173,14 +174,14 @@ where
                 }
             }
             RawConstraintPredicate::MatchAnyOf | RawConstraintPredicate::NotMatchAnyOf => {
-                let rpwcs = rc.get_pattern_with_constraints()?;
+                let rpwcs = rc.get_patterns()?;
                 let rrps = rc.get_regex_patterns()?;
                 match (rpwcs.len(), rrps.len()) {
                     (l, 0) if l > 0 => {
                         let pwcs = rpwcs
                             .into_iter()
-                            .map(|x| PatternWithConstraints::<T>::try_from(x))
-                            .collect::<Result<Vec<PatternWithConstraints<T>>>>()?;
+                            .map(|x| Pattern::<T>::try_from(NormalizedSource::from(x)))
+                            .collect::<Result<Vec<Pattern<T>>>>()?;
                         if rc.should == RawConstraintPredicate::MatchAnyOf {
                             ConstraintPredicate::MatchAnyOfQuery(pwcs)
                         } else if rc.should == RawConstraintPredicate::NotMatchAnyOf {
@@ -215,12 +216,7 @@ where
                 }
             }
             RawConstraintPredicate::BeAnyOf | RawConstraintPredicate::NotBeAnyOf => {
-                if rc
-                    .get_pattern_with_constraints()
-                    .map(|x| x.len())
-                    .unwrap_or(0)
-                    > 0
-                {
+                if rc.get_patterns().map(|x| x.len()).unwrap_or(0) > 0 {
                     return Err(anyhow::anyhow!("(not-)be-any-of cannot handle pattern(s) and regex-pattern(s). use string(s) instead."));
                 }
                 if rc.get_regex_patterns().map(|x| x.len()).unwrap_or(0) > 0 {
@@ -243,9 +239,9 @@ where
 
             RawConstraintPredicate::MatchRegex => {
                 // TODO (y0n3uchy): deprecate match-regex + patterns
-                let patterns = rc.get_pattern_with_constraints()?;
+                let patterns = rc.get_patterns()?;
                 if patterns.len() == 1 {
-                    let r = Regex::new(patterns.get(0).unwrap().pattern.as_str())?;
+                    let r = Regex::new(patterns.get(0).unwrap().as_str())?;
                     ConstraintPredicate::MatchRegex(r)
                 } else {
                     return Err(anyhow::anyhow!("match-regex accepts only one pattern once"));
@@ -253,9 +249,9 @@ where
             }
             RawConstraintPredicate::NotMatchRegex => {
                 // TODO (y0n3uchy): deprecate match-regex + patterns
-                let patterns = rc.get_pattern_with_constraints()?;
+                let patterns = rc.get_patterns()?;
                 if patterns.len() == 1 {
-                    let r = Regex::new(patterns.get(0).unwrap().pattern.as_str())?;
+                    let r = Regex::new(patterns.get(0).unwrap().as_str())?;
                     ConstraintPredicate::NotMatchRegex(r)
                 } else {
                     return Err(anyhow::anyhow!(

@@ -1,44 +1,59 @@
 use crate::core::{
     language::Queryable,
     matcher::{
-        match_string_pattern, CaptureItem, ConsecutiveNodes, MatchedItem, MatcherState,
-        UnverifiedMetavariable,
+        match_string_pattern, CaptureItem, ConsecutiveNodes, MatcherState, UnverifiedMetavariable,
     },
-    node::{CSTNode, NodeLike, NodeLikeId, NodeLikeRefWithId, NodeType},
+    node::{NodeLike, NodeLikeId, NodeLikeRefWithId, NodeType},
     pattern::{PatternNode, PatternView},
     query::QueryPattern,
-    tree::RootedTreeLike,
+    tree::{RootedTreeLike, TreeView},
     tree::{Traversable, TreeTreverser},
 };
 
-use std::{convert::TryFrom, marker::PhantomData};
+use std::{convert::TryFrom, iter::Flatten, marker::PhantomData, vec::IntoIter};
+
+use super::UnconstrainedMatchedItem;
 
 /// `TreeMatcher` iterates possible matches between query and tree to traverse.
 pub struct TreeMatcher<'tree, 'query, T: Queryable, N: NodeLike<'tree>> {
     /// Tree to traverse
-    traverser: TreeTreverser<'tree, T, N>,
+    traverser: Flatten<IntoIter<TreeTreverser<'tree, T, N>>>,
 
     /// Query
     query: &'query PatternView<'query, T>,
 
+    top: Option<Vec<NodeLikeId<'tree, N>>>,
+    tview: &'tree TreeView<'tree, T, N>,
+
     /// local state for implementing `Iterator`/    
-    items: Vec<MatchedItem<'tree, N>>,
+    items: Vec<UnconstrainedMatchedItem<'tree, N>>,
 
     /// just a marker
     _marker: PhantomData<T>,
 }
 
 impl<'tree, 'query, T: Queryable, N: NodeLike<'tree>> TreeMatcher<'tree, 'query, T, N> {
-    pub fn new<TR: Traversable<'tree, T, N> + 'tree>(
-        traverser: TR,
-        from: NodeLikeId<'tree, N>,
+    pub fn from_sibilings<TR: Traversable<'tree, T, N> + 'tree>(
+        tview: &'tree TreeView<'tree, T, N>,
+        traverser: &'tree TR,
+        sibilings: Vec<NodeLikeId<'tree, N>>,
         query: &'query QueryPattern<T>,
     ) -> Self {
+        let top = sibilings.clone();
+
         TreeMatcher {
             query: &query.pview,
 
-            traverser: traverser.traverse(from),
+            traverser: sibilings
+                .into_iter()
+                .map(|x| traverser.traverse(x))
+                .collect::<Vec<TreeTreverser<'tree, T, N>>>()
+                .into_iter()
+                .flatten(),
             items: vec![],
+
+            tview,
+            top: Some(top),
 
             _marker: PhantomData,
         }
@@ -215,7 +230,7 @@ impl<'tree, 'query, T: Queryable, N: NodeLike<'tree>> TreeMatcher<'tree, 'query,
                         // (2): get matches of children
                         self.match_sibilings(
                             tnode
-                                .children(self.traverser.tview)
+                                .children(self.tview)
                                 .into_iter()
                                 .filter(|n| !T::is_skippable((*n).node))
                                 .collect(),
@@ -289,10 +304,10 @@ impl<'tree, 'query, T, N: NodeLike<'tree>> Iterator for TreeMatcher<'tree, 'quer
 where
     T: Queryable,
 {
-    type Item = MatchedItem<'tree, N>;
+    type Item = UnconstrainedMatchedItem<'tree, N>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let qnodes: Vec<&CSTNode<'query>> = T::root_nodes(self.query)
+        let qnodes: Vec<&PatternNode<'query>> = T::root_nodes(self.query)
             .into_iter()
             .filter(|n| !T::is_skippable(*n))
             .collect();
@@ -302,30 +317,32 @@ where
                 return Some(mitem);
             }
 
-            if let Some((depth, tnode)) = self.traverser.next() {
+            let tcandidates = if let Some((_depth, tnode)) = self.traverser.next() {
                 let tnodes: Vec<NodeLikeRefWithId<'_, N>> = tnode
-                    .children(self.traverser.tview)
+                    .children(self.tview)
                     .into_iter()
                     .filter(|n| !T::is_skippable((*n).node))
                     .collect();
-                let tcandidates =
-                    (0..tnodes.len())
-                        .map(|i| tnodes[i..].to_vec())
-                        .chain(if depth == 0 {
-                            vec![vec![tnode]].into_iter()
-                        } else {
-                            vec![].into_iter()
-                        });
-                for tsibilings in tcandidates {
-                    let items = self
-                        .match_sibilings(tsibilings, qnodes.clone())
-                        .into_iter()
-                        .filter_map(|(mitem, _)| Option::<MatchedItem<N>>::from(mitem))
-                        .collect::<Vec<MatchedItem<N>>>();
-                    self.items.extend(items);
-                }
+                (0..tnodes.len()).map(|i| tnodes[i..].to_vec()).collect()
+            } else if let Some(top) = self.top.take() {
+                vec![top
+                    .iter()
+                    .map(|x| NodeLikeRefWithId {
+                        id: x.clone(),
+                        node: self.tview.get(x.clone()).unwrap(),
+                    })
+                    .collect()]
             } else {
                 return None;
+            };
+
+            for tsibilings in tcandidates {
+                let items = self
+                    .match_sibilings(tsibilings, qnodes.clone())
+                    .into_iter()
+                    .filter_map(|(mitem, _)| Option::<UnconstrainedMatchedItem<N>>::from(mitem))
+                    .collect::<Vec<UnconstrainedMatchedItem<N>>>();
+                self.items.extend(items);
             }
         }
     }

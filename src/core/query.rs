@@ -49,6 +49,13 @@ impl<T> PatternWithConstraints<T>
 where
     T: Queryable,
 {
+    pub fn without_constraints(pattern: Pattern<T>) -> Self {
+        Self {
+            pattern,
+            constraints: vec![],
+        }
+    }
+
     pub fn as_query(&'_ self) -> Query<'_, T> {
         self.into()
     }

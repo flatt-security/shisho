@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 
 use crate::core::node::{NodeLikeId, NodeLikeRefWithId, Range, TSPoint};
-use crate::core::ruleset::constraint::{Constraint, ConstraintPredicate, PatternWithConstraints};
+use crate::core::pattern::Pattern;
+use crate::core::query::Query;
+use crate::core::ruleset::constraint::{Constraint, ConstraintPredicate};
 use crate::core::source::NormalizedSource;
 use crate::core::tree::TreeView;
 use crate::core::{language::Queryable, node::NodeLike, query::MetavariableId};
@@ -16,53 +18,6 @@ pub enum CaptureItem<'tree, N: NodeLike<'tree>> {
 }
 
 impl<'tree, 'item, N: NodeLike<'tree>> CaptureItem<'tree, N> {
-    pub fn matches<T: Queryable + 'tree>(
-        &'item self,
-        view: &'tree TreeView<'tree, T, N>,
-        q: &PatternWithConstraints<T>,
-    ) -> Result<(bool, CaptureMap<'tree, N>)> {
-        match self {
-            CaptureItem::Empty => Ok((false, CaptureMap::new())),
-            CaptureItem::Literal(_) => Err(anyhow::anyhow!(
-                "match-query predicate for string literals is not supported"
-            )),
-            CaptureItem::Nodes(n) => {
-                let matches = n
-                    .as_vec()
-                    .iter()
-                    .map(|r| {
-                        // TODO (y0n3uchy): multiple line match
-                        let matches = view
-                            .matches_from(r.id, &q.into())
-                            .collect::<Result<Vec<MatchedItem<'tree, N>>>>()?;
-                        let is_empty = matches.is_empty();
-                        let captures = matches
-                            .into_iter()
-                            .map(|m: MatchedItem<'tree, N>| m.captures)
-                            .fold(
-                                CaptureMap::new(),
-                                |mut acc: CaptureMap<'tree, N>, v: CaptureMap<'tree, N>| {
-                                    acc.extend(v);
-                                    acc
-                                },
-                            );
-                        Ok((!is_empty, captures))
-                    })
-                    .collect::<Result<Vec<(bool, CaptureMap<'tree, N>)>>>()?;
-                let matched_at_least_one = matches.iter().any(|m| m.0);
-                let captures =
-                    matches
-                        .into_iter()
-                        .map(|m| m.1)
-                        .fold(CaptureMap::new(), |mut acc, v| {
-                            acc.extend(v);
-                            acc
-                        });
-                Ok((matched_at_least_one, captures))
-            }
-        }
-    }
-
     pub fn to_string(&self) -> String {
         match self {
             CaptureItem::Empty => "".to_string(),
@@ -95,24 +50,56 @@ impl<'tree, N: NodeLike<'tree>> MatchedItem<'tree, N> {
         self.captures.get(id)
     }
 
-    pub fn filter<'c, T: Queryable + 'tree>(
-        mut self,
-        view: &'tree TreeView<'tree, T, N>,
-        constraints: &'c [Constraint<T>],
-    ) -> Result<Option<Self>> {
-        for c in constraints {
-            if !self.satisfies(view, c)? {
-                return Ok(None);
-            }
+    pub fn into_unconstrained(self) -> UnconstrainedMatchedItem<'tree, N> {
+        UnconstrainedMatchedItem {
+            area: self.area,
+            captures: self.captures,
         }
-        Ok(Some(self))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct UnconstrainedMatchedItem<'tree, N: NodeLike<'tree>> {
+    pub area: ConsecutiveNodes<'tree, N>,
+    pub captures: CaptureMap<'tree, N>,
+}
+
+impl<'tree, N: NodeLike<'tree>> UnconstrainedMatchedItem<'tree, N> {
+    pub fn capture_of(&self, id: &MetavariableId) -> Option<&CaptureItem<'tree, N>> {
+        self.captures.get(id)
     }
 
-    fn satisfies<'c, T: Queryable + 'tree>(
-        &mut self,
+    pub fn into_constrained(self) -> MatchedItem<'tree, N> {
+        MatchedItem {
+            area: self.area,
+            captures: self.captures,
+        }
+    }
+
+    pub fn apply_constraints<'c, T: Queryable + 'tree>(
+        self,
+        view: &'tree TreeView<'tree, T, N>,
+        constraints: &'c [Constraint<T>],
+    ) -> Result<Vec<MatchedItem<'tree, N>>> {
+        let mut r = vec![self];
+        for c in constraints {
+            r = r
+                .into_iter()
+                .map(|x| x.apply_constraint(view, c))
+                .collect::<Result<Vec<Vec<MatchedItem<'tree, N>>>>>()?
+                .into_iter()
+                .flatten()
+                .map(|x| x.into_unconstrained())
+                .collect();
+        }
+        Ok(r.into_iter().map(|x| x.into_constrained()).collect())
+    }
+
+    fn apply_constraint<'c, T: Queryable + 'tree>(
+        self,
         view: &'tree TreeView<'tree, T, N>,
         constraint: &'c Constraint<T>,
-    ) -> Result<bool> {
+    ) -> Result<Vec<MatchedItem<'tree, N>>> {
         let captured_item = self.captures.get(&constraint.target);
         if captured_item.is_none() {
             return Err(anyhow::anyhow!(
@@ -124,49 +111,119 @@ impl<'tree, N: NodeLike<'tree>> MatchedItem<'tree, N> {
 
         match &constraint.predicate {
             ConstraintPredicate::MatchQuery(q) => {
-                let (satisfied, new_captures) = captured_item.matches(view, q)?;
-                if satisfied {
-                    self.captures.extend(new_captures);
-                }
-                Ok(satisfied)
+                self.apply_constraint_with_item(view, q, &captured_item)
             }
-            ConstraintPredicate::NotMatchQuery(q) => {
-                captured_item.matches(view, q).map(|(matched, _)| !matched)
-            }
-            ConstraintPredicate::MatchAnyOfQuery(qs) => {
-                let matches = qs
-                    .into_iter()
-                    .map(|q| captured_item.matches(view, q))
-                    .collect::<Result<Vec<(bool, CaptureMap<N>)>>>()?;
-                let matched_at_least_one = matches.iter().any(|m| m.0);
-                for (_, new_captures) in matches.into_iter().filter(|x| x.0) {
-                    self.captures.extend(new_captures);
-                }
-                Ok(matched_at_least_one)
-            }
+            ConstraintPredicate::NotMatchQuery(q) => Ok(
+                if self
+                    .apply_constraint_with_item(view, q, &captured_item)?
+                    .is_empty()
+                {
+                    vec![self.into_constrained()]
+                } else {
+                    vec![]
+                },
+            ),
+            ConstraintPredicate::MatchAnyOfQuery(qs) => Ok(qs
+                .into_iter()
+                .map(|q| self.apply_constraint_with_item(view, q, &captured_item))
+                .collect::<Result<Vec<Vec<MatchedItem<_>>>>>()?
+                .into_iter()
+                .flatten()
+                .collect()),
             ConstraintPredicate::NotMatchAnyOfQuery(qs) => {
                 let matches = qs
                     .into_iter()
-                    .map(|q| captured_item.matches(view, q))
-                    .collect::<Result<Vec<(bool, CaptureMap<N>)>>>()?;
-                Ok(!matches.iter().any(|m| m.0))
+                    .map(|q| self.apply_constraint_with_item(view, q, &captured_item))
+                    .collect::<Result<Vec<Vec<_>>>>()?;
+                Ok(if matches.into_iter().all(|x| x.is_empty()) {
+                    vec![self.into_constrained()]
+                } else {
+                    vec![]
+                })
             }
+            ConstraintPredicate::MatchRegex(r) => Ok(if r.is_match(&captured_item.to_string()) {
+                vec![self.into_constrained()]
+            } else {
+                vec![]
+            }),
+            ConstraintPredicate::NotMatchRegex(r) => {
+                Ok(if !r.is_match(&captured_item.to_string()) {
+                    vec![self.into_constrained()]
+                } else {
+                    vec![]
+                })
+            }
+            ConstraintPredicate::MatchAnyOfRegex(rs) => Ok(
+                if rs
+                    .into_iter()
+                    .any(|r| r.is_match(&captured_item.to_string()))
+                {
+                    vec![self.into_constrained()]
+                } else {
+                    vec![]
+                },
+            ),
+            ConstraintPredicate::NotMatchAnyOfRegex(rs) => Ok(
+                if !rs
+                    .into_iter()
+                    .any(|r| r.is_match(&captured_item.to_string()))
+                {
+                    vec![self.into_constrained()]
+                } else {
+                    vec![]
+                },
+            ),
+            ConstraintPredicate::BeAnyOf(candidates) => Ok(
+                if candidates
+                    .into_iter()
+                    .any(|r| r.as_str() == captured_item.to_string())
+                {
+                    vec![self.into_constrained()]
+                } else {
+                    vec![]
+                },
+            ),
+            ConstraintPredicate::NotBeAnyOf(candidates) => Ok(
+                if !candidates
+                    .into_iter()
+                    .any(|r| r.as_str() == captured_item.to_string())
+                {
+                    vec![self.into_constrained()]
+                } else {
+                    vec![]
+                },
+            ),
+        }
+    }
 
-            ConstraintPredicate::MatchRegex(r) => Ok(r.is_match(&captured_item.to_string())),
-            ConstraintPredicate::NotMatchRegex(r) => Ok(!r.is_match(&captured_item.to_string())),
-            ConstraintPredicate::MatchAnyOfRegex(rs) => Ok(rs
-                .into_iter()
-                .any(|r| r.is_match(&captured_item.to_string()))),
-            ConstraintPredicate::NotMatchAnyOfRegex(rs) => Ok(!rs
-                .into_iter()
-                .any(|r| r.is_match(&captured_item.to_string()))),
+    fn apply_constraint_with_item<T: Queryable + 'tree>(
+        &self,
+        view: &'tree TreeView<'tree, T, N>,
 
-            ConstraintPredicate::BeAnyOf(candidates) => Ok(candidates
+        pattern: &Pattern<T>,
+        item: &CaptureItem<'tree, N>,
+    ) -> Result<Vec<MatchedItem<'tree, N>>> {
+        match item {
+            CaptureItem::Empty => Ok(vec![self.clone().into_constrained()]),
+            CaptureItem::Literal(_) => Err(anyhow::anyhow!(
+                "match-query predicate for string literals is not supported"
+            )),
+            CaptureItem::Nodes(n) => Ok(view
+                .matches_under_sibilings(
+                    n.as_vec().iter().map(|r| r.id).collect(),
+                    &Query {
+                        pattern: pattern.into(),
+                        constraints: &vec![],
+                    },
+                )
+                .collect::<Result<Vec<MatchedItem<'tree, N>>>>()?
                 .into_iter()
-                .any(|r| r.as_str() == captured_item.to_string())),
-            ConstraintPredicate::NotBeAnyOf(candidates) => Ok(!candidates
-                .into_iter()
-                .any(|r| r.as_str() == captured_item.to_string())),
+                .map(|mitem| {
+                    let mut x = self.clone().into_constrained();
+                    x.captures.extend(mitem.captures);
+                    x
+                })
+                .collect()),
         }
     }
 }

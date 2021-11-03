@@ -15,11 +15,10 @@ rules:
           inner {
             :[...Z]
           }
-        constraints:
-          - target: Z
-            should: match
-            pattern: |
-              test = :[HOO]
+      - target: Z
+        should: match
+        pattern: |
+          test = :[HOO]
     rewrite_options:
       - |
         resource "block" :[NAME] {        

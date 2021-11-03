@@ -15,7 +15,7 @@ use crate::core::{
     matcher::MatchedItem,
     node::CSTNode,
     ruleset::{constraint::PatternWithConstraints, filter::RawPatternWithFilters},
-    tree::TreeView,
+    tree::CSTView,
 };
 
 use self::{
@@ -91,7 +91,7 @@ impl Rule {
 
     pub fn find<'tree, T>(
         &self,
-        tree: &'tree TreeView<'tree, T, CSTNode<'tree>>,
+        tree: &'tree CSTView<'tree, T>,
     ) -> Result<Vec<MatchedItem<'tree, CSTNode<'tree>>>>
     where
         T: Queryable,
