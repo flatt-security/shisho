@@ -1,9 +1,9 @@
 use anyhow::Result;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
+use std::{convert::TryFrom, marker::PhantomData};
 
-use crate::core::{language::Queryable, pattern::Pattern, source::NormalizedSource};
+use crate::core::{language::Queryable, source::NormalizedSource};
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct MetavariableId(pub String);
@@ -14,18 +14,17 @@ where
     T: Queryable,
 {
     pub target: MetavariableId,
-    pub predicate: ConstraintPredicate<T>,
+    pub predicate: ConstraintPredicate,
+
+    _marker: PhantomData<T>,
 }
 
 #[derive(Debug)]
-pub enum ConstraintPredicate<T>
-where
-    T: Queryable,
-{
-    MatchQuery(Pattern<T>),
-    NotMatchQuery(Pattern<T>),
-    MatchAnyOfQuery(Vec<Pattern<T>>),
-    NotMatchAnyOfQuery(Vec<Pattern<T>>),
+pub enum ConstraintPredicate {
+    MatchQuery(NormalizedSource),
+    NotMatchQuery(NormalizedSource),
+    MatchAnyOfQuery(Vec<NormalizedSource>),
+    NotMatchAnyOfQuery(Vec<NormalizedSource>),
 
     MatchRegex(Regex),
     NotMatchRegex(Regex),
@@ -142,8 +141,7 @@ where
                 let mut rrps = rc.get_regex_patterns()?;
                 match (rpwcs.len(), rrps.len()) {
                     (1, 0) => {
-                        let pc =
-                            Pattern::<T>::try_from(NormalizedSource::from(rpwcs.pop().unwrap()))?;
+                        let pc = NormalizedSource::from(rpwcs.pop().unwrap());
                         if rc.should == RawConstraintPredicate::Match {
                             ConstraintPredicate::MatchQuery(pc)
                         } else if rc.should == RawConstraintPredicate::NotMatch {
@@ -181,8 +179,8 @@ where
                     (l, 0) if l > 0 => {
                         let pwcs = rpwcs
                             .into_iter()
-                            .map(|x| Pattern::<T>::try_from(NormalizedSource::from(x)))
-                            .collect::<Result<Vec<Pattern<T>>>>()?;
+                            .map(|x| NormalizedSource::from(x))
+                            .collect::<Vec<NormalizedSource>>();
                         if rc.should == RawConstraintPredicate::MatchAnyOf {
                             ConstraintPredicate::MatchAnyOfQuery(pwcs)
                         } else if rc.should == RawConstraintPredicate::NotMatchAnyOf {
@@ -265,21 +263,34 @@ where
         Ok(Constraint {
             target: MetavariableId(rc.target),
             predicate,
+            _marker: PhantomData,
         })
     }
 }
 
 #[derive(Debug)]
 pub struct PatternWithConstraints<T: Queryable> {
-    pub pattern: Pattern<T>,
+    pub pattern: NormalizedSource,
     pub constraints: Vec<Constraint<T>>,
 }
 
 impl<T: Queryable> PatternWithConstraints<T> {
-    pub fn new(pattern: Pattern<T>, constraints: Vec<Constraint<T>>) -> Self {
+    pub fn new(pattern: NormalizedSource, constraints: Vec<Constraint<T>>) -> Self {
         Self {
             pattern,
             constraints,
+        }
+    }
+}
+
+impl<T> PatternWithConstraints<T>
+where
+    T: Queryable,
+{
+    pub fn without_constraints(pattern: NormalizedSource) -> Self {
+        Self {
+            pattern,
+            constraints: vec![],
         }
     }
 }
@@ -288,7 +299,7 @@ impl<T: Queryable> TryFrom<RawPatternWithConstraints> for PatternWithConstraints
     type Error = anyhow::Error;
 
     fn try_from(rpc: RawPatternWithConstraints) -> Result<Self> {
-        let pattern = Pattern::<T>::try_from(rpc.pattern.as_str())?;
+        let pattern = NormalizedSource::from(rpc.pattern.as_str());
         let constraints = rpc
             .constraints
             .iter()

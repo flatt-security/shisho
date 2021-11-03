@@ -6,8 +6,8 @@ use crate::core::{
         match_string_pattern, CaptureItem, ConsecutiveNodes, MatcherState, UnverifiedMetavariable,
     },
     node::{NodeLike, NodeLikeId, NodeLikeRefWithId, NodeType},
-    pattern::{PatternNode, PatternView},
-    tree::{RootedTreeLike, Traversable, TreeTreverser, TreeView},
+    pattern::{Pattern, PatternNode},
+    tree::{Traversable, TreeLike, TreeTreverser, TreeView},
 };
 
 use std::{convert::TryFrom, iter::Flatten, marker::PhantomData, vec::IntoIter};
@@ -20,7 +20,7 @@ pub struct TreeMatcher<'tree, 'query, T: Queryable, N: NodeLike<'tree>> {
     traverser: Flatten<IntoIter<TreeTreverser<'tree, T, N>>>,
 
     /// Query
-    query: &'query PatternView<'query, T>,
+    query: &'query Pattern<'query, T>,
 
     top: Option<Vec<NodeLikeId<'tree, N>>>,
     tview: &'tree TreeView<'tree, T, N>,
@@ -37,7 +37,7 @@ impl<'tree, 'query, T: Queryable, N: NodeLike<'tree>> TreeMatcher<'tree, 'query,
         tview: &'tree TreeView<'tree, T, N>,
         traverser: &'tree TR,
         sibilings: Vec<NodeLikeId<'tree, N>>,
-        query: &'query PatternView<'query, T>,
+        query: &'query Pattern<'query, T>,
     ) -> Self {
         let top = sibilings.clone();
 
@@ -355,28 +355,17 @@ where
     T: Queryable + 'tree,
     N: NodeLike<'tree> + 'tree,
 {
-    pub fn matches<'query>(
+    pub fn find<'query>(
         &'tree self,
         q: &'query Query<'query, T>,
     ) -> impl Iterator<Item = Result<MatchedItem<'tree, N>>> + 'query
     where
         'tree: 'query,
     {
-        self.matches_under_node(self.root_id, q)
+        self.find_under_sibilings(self.roots.clone(), q)
     }
 
-    pub fn matches_under_node<'query>(
-        &'tree self,
-        id: NodeLikeId<'tree, N>,
-        q: &'query Query<'query, T>,
-    ) -> impl Iterator<Item = Result<MatchedItem<'tree, N>>> + 'query
-    where
-        'tree: 'query,
-    {
-        self.matches_under_sibilings(vec![id], q)
-    }
-
-    pub fn matches_under_sibilings<'query>(
+    pub fn find_under_sibilings<'query>(
         &'tree self,
         ids: Vec<NodeLikeId<'tree, N>>,
         q: &'query Query<'query, T>,

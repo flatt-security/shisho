@@ -1,6 +1,6 @@
 use crate::core::{
     node::{NodeLike, NodeType},
-    pattern::{PatternNode, PatternView},
+    pattern::{Pattern, PatternNode},
     tree::RootedTreeLike,
 };
 
@@ -18,8 +18,8 @@ impl Queryable for HCL {
         tree_sitter_hcl_query::language()
     }
 
-    fn root_nodes<'tree>(pview: &'tree PatternView<'tree, Self>) -> Vec<&'tree PatternNode<'tree>> {
-        let root = pview.root().unwrap();
+    fn root_nodes<'tree>(pview: &'tree Pattern<'tree, Self>) -> Vec<&'tree PatternNode<'tree>> {
+        let root = pview.root();
         let children = root.children(pview);
         let first = children
             .get(0)

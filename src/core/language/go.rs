@@ -1,7 +1,7 @@
 use super::Queryable;
 use crate::core::{
     node::{NodeLike, NodeType},
-    pattern::{PatternNode, PatternView},
+    pattern::{Pattern, PatternNode},
     tree::RootedTreeLike,
 };
 
@@ -17,8 +17,8 @@ impl Queryable for Go {
         tree_sitter_go_query::language()
     }
 
-    fn root_nodes<'tree>(pview: &'tree PatternView<'tree, Self>) -> Vec<&'tree PatternNode<'tree>> {
-        let root = pview.root().unwrap();
+    fn root_nodes<'tree>(pview: &'tree Pattern<'tree, Self>) -> Vec<&'tree PatternNode<'tree>> {
+        let root = pview.root();
         root.children(pview)
     }
 

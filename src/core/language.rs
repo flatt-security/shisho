@@ -8,7 +8,7 @@ pub use self::docker::Dockerfile;
 pub use self::go::Go;
 pub use self::hcl::HCL;
 
-use super::pattern::{PatternNode, PatternView};
+use super::pattern::{Pattern, PatternNode};
 
 pub trait Queryable
 where
@@ -18,7 +18,7 @@ where
     fn query_language() -> tree_sitter::Language;
 
     /// `unwrap_root` takes a root of the query tree and returns nodes for matching.
-    fn root_nodes<'tree>(pview: &'tree PatternView<'tree, Self>) -> Vec<&'tree PatternNode<'tree>>;
+    fn root_nodes<'tree>(pview: &'tree Pattern<'tree, Self>) -> Vec<&'tree PatternNode<'tree>>;
 
     /// `is_skippable` returns whether the given node could be ignored on matching.
     fn is_skippable<'tree, N: NodeLike<'tree>>(_node: &N) -> bool {
@@ -71,15 +71,14 @@ where
 #[macro_export]
 macro_rules! match_pt {
     ($lang:ident, $p:tt, $t:tt, $callback:expr) => {{
-        let pattern = crate::core::pattern::Pattern::<$lang>::try_from($p).unwrap();
-        let pc = crate::core::ruleset::constraint::PatternWithConstraints::new(pattern, vec![]);
+        let pc = crate::core::ruleset::constraint::PatternWithConstraints::new(crate::core::source::NormalizedSource::from($p), vec![]);
 
         let source = crate::core::source::NormalizedSource::from($t);
         let code = crate::core::tree::CST::<$lang>::try_from(&source).unwrap();
         let view = crate::core::tree::CSTView::from(&code);
 
-        let query = pc.as_query();
-        let session = view.matches(&query);
+        let query = crate::core::matcher::Query::try_from(&pc).unwrap();
+        let session = view.find(&query);
 
         $callback(
             session.collect::<anyhow::Result<Vec<crate::core::matcher::MatchedItem<crate::core::node::CSTNode>>>>(),
@@ -90,23 +89,21 @@ macro_rules! match_pt {
 #[macro_export]
 macro_rules! replace_pt {
     ($lang:ident, $p:tt, $t:tt, $r:tt, $callback:expr) => {{
-        let pattern = crate::core::pattern::Pattern::<$lang>::try_from($p).unwrap();
-        let pc = crate::core::ruleset::constraint::PatternWithConstraints::new(pattern, vec![]);
+        let pc = crate::core::ruleset::constraint::PatternWithConstraints::new(crate::core::source::NormalizedSource::from($p), vec![]);
 
         let source = crate::core::source::NormalizedSource::from($t);
         let code = crate::core::tree::CST::<$lang>::try_from(&source).unwrap();
         let view = crate::core::tree::CSTView::from(&code);
 
-        let query = pc.as_query();
-        let session = view.matches(&query);
+        let query = crate::core::matcher::Query::try_from(&pc).unwrap();
+        let session = view.find(&query);
         let c = session.collect::<anyhow::Result<Vec<crate::core::matcher::MatchedItem<crate::core::node::CSTNode>>>>().unwrap();
 
-        let rpattern = crate::core::pattern::Pattern::<$lang>::try_from($r).unwrap();
-        let pf = crate::core::ruleset::filter::PatternWithFilters::new(rpattern, vec![]);
+        let pf = crate::core::ruleset::filter::PatternWithFilters::new(crate::core::source::NormalizedSource::from($r), vec![]);
 
         $callback(
             c.into_iter()
-                .map(|amatch| Code::from($t).rewrite(&view, &amatch, pf.as_roption()))
+                .map(|amatch| Code::from($t).rewrite(&view, &amatch, crate::core::rewriter::RewriteOption::try_from(&pf)?))
                 .collect::<anyhow::Result<Vec<crate::core::source::Code<$lang>>>>()
         );
     }};

@@ -2,7 +2,11 @@ use id_arena::{Arena, Id};
 use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, ops::Sub};
 
-use super::{ruleset::constraint::MetavariableId, source::NormalizedSource, tree::RootedTreeLike};
+use super::{
+    ruleset::constraint::MetavariableId,
+    source::NormalizedSource,
+    tree::{RootedTreeLike, TreeLike},
+};
 
 const SHISHO_NODE_METAVARIABLE_NAME: &str = "shisho_metavariable_name";
 const SHISHO_NODE_METAVARIABLE: &str = "shisho_metavariable";
@@ -66,8 +70,8 @@ where
     Self: Sized + Clone + std::fmt::Debug,
 {
     fn kind(&self) -> NodeType;
-    fn children<V: RootedTreeLike<'tree, Self>>(&'tree self, tview: &'tree V) -> Vec<&'tree Self>;
-    fn indexed_children<V: RootedTreeLike<'tree, Self>>(
+    fn children<V: TreeLike<'tree, Self>>(&'tree self, tview: &'tree V) -> Vec<&'tree Self>;
+    fn indexed_children<V: TreeLike<'tree, Self>>(
         &'tree self,
         tview: &'tree V,
     ) -> Vec<NodeLikeRefWithId<'tree, Self>>;
@@ -114,7 +118,7 @@ impl<'tree, N: NodeLike<'tree>> NodeLikeRefWithId<'tree, N> {
         self.node.as_cow()
     }
 
-    pub fn children<V: RootedTreeLike<'tree, N>>(&self, tview: &'tree V) -> Vec<Self> {
+    pub fn children<V: TreeLike<'tree, N>>(&self, tview: &'tree V) -> Vec<Self> {
         self.node.indexed_children(tview)
     }
 
@@ -230,14 +234,14 @@ impl<'tree> NodeLike<'tree> for CSTNode<'tree> {
         )
     }
 
-    fn children<V: RootedTreeLike<'tree, Self>>(&'tree self, tview: &'tree V) -> Vec<&'tree Self> {
+    fn children<V: TreeLike<'tree, Self>>(&'tree self, tview: &'tree V) -> Vec<&'tree Self> {
         self.children
             .iter()
             .map(|x| tview.get(*x).unwrap())
             .collect()
     }
 
-    fn indexed_children<V: RootedTreeLike<'tree, Self>>(
+    fn indexed_children<V: TreeLike<'tree, Self>>(
         &'tree self,
         tview: &'tree V,
     ) -> Vec<NodeLikeRefWithId<'tree, Self>> {

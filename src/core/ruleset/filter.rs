@@ -2,7 +2,10 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, str::FromStr};
 
-use crate::core::{language::Queryable, pattern::Pattern, ruleset::util::string_or_struct};
+use crate::core::{
+    language::Queryable, pattern::Pattern, ruleset::util::string_or_struct,
+    source::NormalizedSource,
+};
 
 use super::constraint::{
     MetavariableId, PatternWithConstraints, RawConstraint, RawPatternWithConstraints,
@@ -22,17 +25,17 @@ pub enum RewriteFilterPredicate<T>
 where
     T: Queryable,
 {
-    ReplaceWithQuery((Vec<PatternWithConstraints<T>>, Pattern<T>)),
+    ReplaceWithQuery((Vec<PatternWithConstraints<T>>, NormalizedSource)),
 }
 
 #[derive(Debug)]
 pub struct PatternWithFilters<T: Queryable> {
-    pub pattern: Pattern<T>,
+    pub pattern: NormalizedSource,
     pub filters: Vec<RewriteFilter<T>>,
 }
 
-impl<T: Queryable> PatternWithFilters<T> {
-    pub fn new(pattern: Pattern<T>, filters: Vec<RewriteFilter<T>>) -> Self {
+impl<'source, T: Queryable> PatternWithFilters<T> {
+    pub fn new(pattern: NormalizedSource, filters: Vec<RewriteFilter<T>>) -> Self {
         Self { pattern, filters }
     }
 }
@@ -108,7 +111,7 @@ impl<T: Queryable> TryFrom<RawPatternWithFilters> for PatternWithFilters<T> {
     type Error = anyhow::Error;
 
     fn try_from(rpc: RawPatternWithFilters) -> Result<Self> {
-        let pattern = Pattern::<T>::try_from(rpc.pattern.as_str())?;
+        let pattern = NormalizedSource::from(rpc.pattern.as_str());
         let filters = rpc
             .filters
             .iter()
@@ -133,7 +136,7 @@ where
                     .map(|x| PatternWithConstraints::<T>::try_from(x))
                     .collect::<Result<Vec<PatternWithConstraints<T>>>>()?;
 
-                let to_pattern = Pattern::<T>::try_from(r.to.as_str())?;
+                let to_pattern = NormalizedSource::from(r.to.as_str());
                 Ok(RewriteFilter {
                     target: MetavariableId(r.target),
                     predicate: RewriteFilterPredicate::ReplaceWithQuery((

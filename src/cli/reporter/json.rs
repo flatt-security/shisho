@@ -5,6 +5,7 @@ use crate::core::{
     language::Queryable,
     matcher::MatchedItem,
     node::{CSTNode, Range},
+    rewriter::RewriteOption,
     ruleset::{filter::PatternWithFilters, Rule},
     source::Code,
     target::Target,
@@ -65,7 +66,8 @@ impl<'a, W: std::io::Write> Reporter<'a> for JSONReporter<'a, W> {
             for rewrite in rule.get_rewrite_options()? {
                 let old_code: Code<T> = target.body.clone().into();
                 let pattern = PatternWithFilters::try_from(rewrite)?;
-                let new_code = old_code.rewrite(view, &mitem, pattern.as_roption())?;
+                let new_code =
+                    old_code.rewrite(view, &mitem, RewriteOption::try_from(&pattern)?)?;
 
                 let diff = TextDiff::from_lines(target.body.as_str(), new_code.as_str())
                     .unified_diff()

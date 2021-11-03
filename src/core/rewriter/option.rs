@@ -1,10 +1,12 @@
+use std::convert::TryFrom;
+
 use anyhow::Result;
 
 use crate::core::{
     language::Queryable,
     matcher::CaptureMap,
     node::CSTNode,
-    pattern::PatternView,
+    pattern::Pattern,
     ruleset::filter::{PatternWithFilters, RewriteFilter},
     tree::CSTView,
 };
@@ -16,7 +18,7 @@ pub struct RewriteOption<'a, T>
 where
     T: Queryable,
 {
-    pview: PatternView<'a, T>,
+    pattern: Pattern<'a, T>,
     filters: &'a Vec<RewriteFilter<T>>,
 }
 
@@ -29,7 +31,7 @@ where
         view: &'tree CSTView<'tree, T>,
         captures: &'tree CaptureMap<'tree, CSTNode<'tree>>,
     ) -> Result<String> {
-        let segment = SnippetBuilder::<T>::new(&self.pview, view, captures)
+        let segment = SnippetBuilder::<T>::new(&self.pattern, view, captures)
             .apply_filters(self.filters)?
             .build()?;
 
@@ -37,23 +39,17 @@ where
     }
 }
 
-impl<'a, T> From<&'a PatternWithFilters<T>> for RewriteOption<'a, T>
+impl<'a, T> TryFrom<&'a PatternWithFilters<T>> for RewriteOption<'a, T>
 where
     T: Queryable,
 {
-    fn from(pwf: &'a PatternWithFilters<T>) -> Self {
-        Self {
-            pview: PatternView::from(&pwf.pattern),
-            filters: &pwf.filters,
-        }
-    }
-}
+    type Error = anyhow::Error;
 
-impl<T> PatternWithFilters<T>
-where
-    T: Queryable,
-{
-    pub fn as_roption(&'_ self) -> RewriteOption<'_, T> {
-        self.into()
+    fn try_from(value: &'a PatternWithFilters<T>) -> Result<Self, Self::Error> {
+        let p = Pattern::<T>::try_from(&value.pattern)?;
+        Ok(Self {
+            pattern: p,
+            filters: &value.filters,
+        })
     }
 }

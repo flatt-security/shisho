@@ -2,7 +2,7 @@ use super::{
     language::Queryable,
     node::{CSTNode, NodeLikeArena, NodeLikeId},
     source::NormalizedSource,
-    tree::RootedTreeLike,
+    tree::{RootedTreeLike, TreeLike},
 };
 use anyhow::{anyhow, Result};
 use std::{
@@ -11,33 +11,21 @@ use std::{
 };
 
 #[derive(Debug)]
-pub struct Pattern<T>
+struct TSPattern<T>
 where
     T: Queryable,
 {
-    pub(crate) source: NormalizedSource,
-
     tstree: tree_sitter::Tree,
     _marker: PhantomData<T>,
 }
 
-impl<T> Pattern<T>
-where
-    T: Queryable,
-{
-    #[inline]
-    pub fn as_str_between(&self, start: usize, end: usize) -> Result<&str> {
-        self.source.as_str_between(start, end)
-    }
-}
-
-impl<T> TryFrom<NormalizedSource> for Pattern<T>
+impl<T> TryFrom<&NormalizedSource> for TSPattern<T>
 where
     T: Queryable,
 {
     type Error = anyhow::Error;
 
-    fn try_from(source: NormalizedSource) -> Result<Self, anyhow::Error> {
+    fn try_from(source: &NormalizedSource) -> Result<Self, anyhow::Error> {
         let mut parser = tree_sitter::Parser::new();
         parser.set_language(T::query_language())?;
 
@@ -45,23 +33,10 @@ where
             .parse(source.as_normalized(), None)
             .ok_or(anyhow!("failed to load the code"))?;
 
-        Ok(Pattern {
-            source,
+        Ok(TSPattern {
             tstree,
             _marker: PhantomData,
         })
-    }
-}
-
-impl<T> TryFrom<&str> for Pattern<T>
-where
-    T: Queryable,
-{
-    type Error = anyhow::Error;
-
-    fn try_from(source: &str) -> Result<Self, anyhow::Error> {
-        let source = NormalizedSource::from(source);
-        source.try_into()
     }
 }
 
@@ -70,7 +45,7 @@ pub type PatternNodeId<'tree> = NodeLikeId<'tree, PatternNode<'tree>>;
 pub type PatternNodeArena<'tree> = NodeLikeArena<'tree, PatternNode<'tree>>;
 
 #[derive(Debug)]
-pub struct PatternView<'tree, T> {
+pub struct Pattern<'tree, T> {
     pub root: PatternNodeId<'tree>,
     pub source: &'tree NormalizedSource,
 
@@ -78,7 +53,7 @@ pub struct PatternView<'tree, T> {
     _marker: PhantomData<T>,
 }
 
-impl<'tree, T> PatternView<'tree, T>
+impl<'tree, T> Pattern<'tree, T>
 where
     T: Queryable,
 {
@@ -86,8 +61,8 @@ where
         root: PatternNodeId<'tree>,
         arena: PatternNodeArena<'tree>,
         source: &'tree NormalizedSource,
-    ) -> PatternView<'tree, T> {
-        PatternView {
+    ) -> Pattern<'tree, T> {
+        Pattern {
             root,
             arena,
             source,
@@ -96,23 +71,37 @@ where
     }
 }
 
-impl<'tree, T: Queryable> RootedTreeLike<'tree, PatternNode<'tree>> for PatternView<'tree, T> {
-    fn root(&'tree self) -> Option<&'tree PatternNode<'tree>> {
-        self.arena.get(self.root)
+impl<'tree, T: Queryable> RootedTreeLike<'tree, PatternNode<'tree>> for Pattern<'tree, T> {
+    fn root(&'tree self) -> &'tree PatternNode<'tree> {
+        self.arena.get(self.root).unwrap()
     }
+}
 
+impl<'tree, T: Queryable> TreeLike<'tree, PatternNode<'tree>> for Pattern<'tree, T> {
     fn get(&'tree self, id: PatternNodeId<'tree>) -> Option<&'tree PatternNode<'tree>> {
         self.arena.get(id)
     }
 }
 
-impl<'tree, T> From<&'tree Pattern<T>> for PatternView<'tree, T>
+impl<'tree, T> From<(TSPattern<T>, &'tree NormalizedSource)> for Pattern<'tree, T>
 where
     T: Queryable,
 {
-    fn from(p: &'tree Pattern<T>) -> Self {
+    fn from((p, source): (TSPattern<T>, &'tree NormalizedSource)) -> Self {
         let mut arena = NodeLikeArena::new();
-        let root = PatternNode::from_tsnode(p.tstree.root_node(), &p.source, &mut arena);
-        PatternView::new(root, arena, &p.source)
+        let root = PatternNode::from_tsnode(p.tstree.root_node(), source, &mut arena);
+        Pattern::new(root, arena, source)
+    }
+}
+
+impl<'tree, T> TryFrom<&'tree NormalizedSource> for Pattern<'tree, T>
+where
+    T: Queryable,
+{
+    type Error = anyhow::Error;
+
+    fn try_from(value: &'tree NormalizedSource) -> Result<Self, Self::Error> {
+        let p = TSPattern::try_from(value)?;
+        Ok((p, value).into())
     }
 }

@@ -5,6 +5,7 @@ use crate::core::{
     language::Queryable,
     matcher::MatchedItem,
     node::{CSTNode, Range},
+    rewriter::RewriteOption,
     ruleset::{filter::PatternWithFilters, Rule},
     source::Code,
     target::Target,
@@ -106,7 +107,8 @@ impl<'a, W: std::io::Write> Reporter<'a> for ConsoleReporter<'a, W> {
                 writeln!(self.writer, "Suggested changes ({}):", idx + 1)?;
                 let old_code: Code<T> = target.body.clone().into();
                 let pattern = PatternWithFilters::try_from(rewrite)?;
-                let new_code = old_code.rewrite(view, &mitem, pattern.as_roption())?;
+                let new_code =
+                    old_code.rewrite(view, &mitem, RewriteOption::try_from(&pattern)?)?;
 
                 let diff = TextDiff::from_lines(target.body.as_str(), new_code.as_str());
                 for (group_idx, group) in diff.grouped_ops(1).iter().enumerate() {

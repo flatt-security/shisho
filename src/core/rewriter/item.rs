@@ -5,7 +5,7 @@ use crate::core::{
     rewriter::node::MutNode,
     ruleset::constraint::MetavariableId,
     source::NormalizedSource,
-    tree::RootedTreeLike,
+    tree::TreeLike,
 };
 use std::{cell::RefCell, collections::HashMap, marker::PhantomData, rc::Rc};
 
@@ -18,7 +18,7 @@ pub fn from_capture_map<
     'btree,
     T: Queryable,
     N: NodeLike<'btree>,
-    V: RootedTreeLike<'btree, N>,
+    V: TreeLike<'btree, N>,
 >(
     bview: &'btree V,
     cmap: &'btree CaptureMap<'btree, N>,
@@ -35,7 +35,7 @@ pub fn from_capture_item<
     'btree,
     T: Queryable,
     N: NodeLike<'btree>,
-    V: RootedTreeLike<'btree, N>,
+    V: TreeLike<'btree, N>,
 >(
     bview: &'btree V,
     cmap: &'btree CaptureItem<'btree, N>,
@@ -51,7 +51,7 @@ pub fn from_capture_item<
 
             let byte_offset = nodes.start_byte();
             let position_offset = nodes.start_position();
-            let ids = nodes
+            let roots = nodes
                 .as_vec()
                 .into_iter()
                 .map(|n| {
@@ -60,19 +60,15 @@ pub fn from_capture_item<
                         bview,
                         source.clone(),
                         &mut arena,
+                        None,
                         byte_offset,
                         position_offset,
                     )
                 })
                 .collect::<Vec<MutNodeId>>();
 
-            let root_id = if ids.len() > 1 {
-                MutNode::create_unifier(ids, &mut arena)
-            } else {
-                ids[0]
-            };
             MutCaptureItem::Tree {
-                root_id,
+                roots,
                 source,
                 arena,
                 _marker: PhantomData,
@@ -86,7 +82,7 @@ pub enum MutCaptureItem<'tree, T: Queryable> {
     Empty,
     Literal(String),
     Tree {
-        root_id: MutNodeId<'tree>,
+        roots: Vec<MutNodeId<'tree>>,
         source: Rc<RefCell<NormalizedSource>>,
         arena: MutNodeArena<'tree>,
         _marker: PhantomData<T>,
@@ -98,8 +94,19 @@ impl<'tree, T: Queryable> ToString for MutCaptureItem<'tree, T> {
         match &self {
             MutCaptureItem::Empty => "".to_string(),
             MutCaptureItem::Literal(s) => s.to_string(),
-            MutCaptureItem::Tree { root_id, arena, .. } => {
-                arena.get(root_id.clone()).unwrap().as_cow().to_string()
+            MutCaptureItem::Tree {
+                roots,
+                arena,
+                source,
+                ..
+            } => {
+                let start = arena.get(roots.first().unwrap().clone()).unwrap().clone();
+                let end = arena.get(roots.last().unwrap().clone()).unwrap().clone();
+                let source = source.borrow();
+                source
+                    .as_str_between(start.start_byte(), end.end_byte())
+                    .unwrap()
+                    .to_string()
             }
         }
     }

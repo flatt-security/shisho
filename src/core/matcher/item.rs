@@ -4,11 +4,10 @@ use std::convert::TryFrom;
 
 use super::query::Query;
 use crate::core::node::{NodeLikeId, NodeLikeRefWithId, Range, TSPoint};
-use crate::core::pattern::Pattern;
 use crate::core::ruleset::constraint::{Constraint, ConstraintPredicate, MetavariableId};
 use crate::core::source::NormalizedSource;
 use crate::core::tree::TreeView;
-use crate::core::{language::Queryable, node::NodeLike};
+use crate::core::{language::Queryable, node::NodeLike, pattern::Pattern};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CaptureItem<'tree, N: NodeLike<'tree>> {
@@ -110,11 +109,11 @@ impl<'tree, N: NodeLike<'tree>> UnconstrainedMatchedItem<'tree, N> {
         let captured_item = captured_item.unwrap().clone();
         match &constraint.predicate {
             ConstraintPredicate::MatchQuery(q) => {
-                self.apply_constraint_with_item(view, q, &captured_item)
+                self.apply_constraint_with_item(view, Pattern::<T>::try_from(q)?, &captured_item)
             }
             ConstraintPredicate::NotMatchQuery(q) => Ok(
                 if self
-                    .apply_constraint_with_item(view, q, &captured_item)?
+                    .apply_constraint_with_item(view, Pattern::<T>::try_from(q)?, &captured_item)?
                     .is_empty()
                 {
                     vec![self.into_constrained()]
@@ -124,7 +123,13 @@ impl<'tree, N: NodeLike<'tree>> UnconstrainedMatchedItem<'tree, N> {
             ),
             ConstraintPredicate::MatchAnyOfQuery(qs) => Ok(qs
                 .into_iter()
-                .map(|q| self.apply_constraint_with_item(view, q, &captured_item))
+                .map(|q| {
+                    self.apply_constraint_with_item(
+                        view,
+                        Pattern::<T>::try_from(q)?,
+                        &captured_item,
+                    )
+                })
                 .collect::<Result<Vec<Vec<MatchedItem<_>>>>>()?
                 .into_iter()
                 .flatten()
@@ -132,7 +137,13 @@ impl<'tree, N: NodeLike<'tree>> UnconstrainedMatchedItem<'tree, N> {
             ConstraintPredicate::NotMatchAnyOfQuery(qs) => {
                 let matches = qs
                     .into_iter()
-                    .map(|q| self.apply_constraint_with_item(view, q, &captured_item))
+                    .map(|q| {
+                        self.apply_constraint_with_item(
+                            view,
+                            Pattern::<T>::try_from(q)?,
+                            &captured_item,
+                        )
+                    })
                     .collect::<Result<Vec<Vec<_>>>>()?;
                 Ok(if matches.into_iter().all(|x| x.is_empty()) {
                     vec![self.into_constrained()]
@@ -199,7 +210,7 @@ impl<'tree, N: NodeLike<'tree>> UnconstrainedMatchedItem<'tree, N> {
         &self,
         view: &'tree TreeView<'tree, T, N>,
 
-        pattern: &Pattern<T>,
+        pattern: Pattern<T>,
         item: &CaptureItem<'tree, N>,
     ) -> Result<Vec<MatchedItem<'tree, N>>> {
         match item {
@@ -209,10 +220,10 @@ impl<'tree, N: NodeLike<'tree>> UnconstrainedMatchedItem<'tree, N> {
             )),
             CaptureItem::Nodes(n) => {
                 Ok(view
-                    .matches_under_sibilings(
+                    .find_under_sibilings(
                         n.as_vec().iter().map(|r| r.id).collect(),
                         &Query {
-                            pattern: pattern.into(),
+                            pattern,
                             constraints: &vec![],
                         },
                     )

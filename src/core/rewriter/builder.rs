@@ -1,17 +1,18 @@
-use std::marker::PhantomData;
+use std::{convert::TryFrom, marker::PhantomData};
 
 use crate::core::{
     language::Queryable,
     matcher::{CaptureMap, MatchedItem, Query},
     node::NodeType,
     node::{CSTNode, NodeLike},
-    pattern::{Pattern, PatternView},
+    pattern::Pattern,
     rewriter::node::MutNode,
     ruleset::{
         constraint::MetavariableId,
         filter::{RewriteFilter, RewriteFilterPredicate},
     },
-    tree::{CSTView, RootedTreeLike, TreeView},
+    source::NormalizedSource,
+    tree::{CSTView, RootedTreeLike, TreeLike, TreeView},
 };
 use anyhow::{anyhow, Result};
 use regex::Captures;
@@ -23,7 +24,7 @@ pub struct SnippetBuilder<'btree, 'ntree, T>
 where
     T: Queryable,
 {
-    build_with: &'ntree PatternView<'ntree, T>,
+    build_with: &'ntree Pattern<'ntree, T>,
     metavariables: MetavariableMap<'btree, T>,
 
     _marker: PhantomData<T>,
@@ -34,7 +35,7 @@ where
     T: Queryable,
 {
     pub fn new<'base>(
-        build_with: &'ntree PatternView<'ntree, T>,
+        build_with: &'ntree Pattern<'ntree, T>,
 
         view: &'btree CSTView<'btree, T>,
         captures: &'btree CaptureMap<'btree, CSTNode<'btree>>,
@@ -79,7 +80,7 @@ where
         target: &MetavariableId,
 
         q: &Query<'_, T>,
-        p: &Pattern<T>,
+        p: &NormalizedSource,
     ) -> Result<()> {
         let t = self
             .metavariables
@@ -91,15 +92,16 @@ where
                 Err(anyhow::anyhow!("string literal could not be replaced"))
             }
             MutCaptureItem::Tree {
-                root_id,
+                roots,
                 source,
                 arena,
                 ..
             } => {
                 let source = source.borrow();
-                let tv = TreeView::new(root_id.clone(), arena, &source);
+                // TODO (enhancement): 1st element of roots would be fine here,
+                let tv = TreeView::new(vec![], arena, &source);
                 let matches: Vec<MatchedItem<'_, MutNode<'_>>> = tv
-                    .matches(q)
+                    .find_under_sibilings(roots.clone(), q)
                     .collect::<Result<Vec<MatchedItem<'_, MutNode<'_>>>>>()?;
                 for m in matches {
                     // TODO: replace matched parts of trees with `p` in `n`
@@ -116,7 +118,7 @@ where
         match &filter.predicate {
             RewriteFilterPredicate::ReplaceWithQuery((pwcs, to)) => {
                 for pwc in pwcs {
-                    self.replace(&filter.target, &pwc.as_query(), to)?;
+                    self.replace(&filter.target, &Query::try_from(pwc)?, to)?;
                 }
             }
         }
@@ -139,7 +141,7 @@ where
     T: Queryable,
 {
     pub fn build(&self) -> Result<Snippet> {
-        let root = self.build_with.root().unwrap();
+        let root = self.build_with.root();
         let pitems: Vec<(&CSTNode<'ntree>, Result<Segment>)> =
             vec![(root, self.build_from_node(root))];
 

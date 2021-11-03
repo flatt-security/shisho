@@ -3,7 +3,7 @@ use std::{borrow::Cow, cell::RefCell, marker::PhantomData, rc::Rc};
 use crate::core::{
     node::{NodeLike, NodeLikeArena, NodeLikeId, NodeLikeRefWithId, NodeType, TSPoint},
     source::NormalizedSource,
-    tree::RootedTreeLike,
+    tree::TreeLike,
 };
 
 pub type MutNodeId<'tree> = NodeLikeId<'tree, MutNode<'tree>>;
@@ -19,6 +19,7 @@ pub struct MutNode<'tree> {
     start_position: TSPoint,
     end_position: TSPoint,
 
+    parent: Option<MutNodeId<'tree>>,
     children: Vec<MutNodeId<'tree>>,
     pub source: Rc<RefCell<NormalizedSource>>,
 
@@ -56,14 +57,14 @@ impl<'tree> NodeLike<'tree> for MutNode<'tree> {
         )
     }
 
-    fn children<V: RootedTreeLike<'tree, Self>>(&'tree self, tview: &'tree V) -> Vec<&'tree Self> {
+    fn children<V: TreeLike<'tree, Self>>(&'tree self, tview: &'tree V) -> Vec<&'tree Self> {
         self.children
             .iter()
             .map(|x| tview.get(*x).unwrap())
             .collect()
     }
 
-    fn indexed_children<V: RootedTreeLike<'tree, Self>>(
+    fn indexed_children<V: TreeLike<'tree, Self>>(
         &'tree self,
         tview: &'tree V,
     ) -> Vec<NodeLikeRefWithId<'tree, Self>> {
@@ -87,16 +88,31 @@ impl<'tree> NodeLike<'tree> for MutNode<'tree> {
 }
 
 impl<'tree> MutNode<'tree> {
-    pub fn from_node<'btree, N: NodeLike<'btree>, V: RootedTreeLike<'btree, N>>(
+    pub fn from_node<'btree, N: NodeLike<'btree>, V: TreeLike<'btree, N>>(
         base_nodelike: &'btree N,
         base_view: &'btree V,
 
         source: Rc<RefCell<NormalizedSource>>,
         new_arena: &mut MutNodeArena<'tree>,
 
+        parent: Option<MutNodeId<'tree>>,
         byte_offset: usize,
         position_offset: TSPoint,
     ) -> MutNodeId<'tree> {
+        // create node first to generate ID
+        let id = new_arena.alloc(MutNode {
+            kind: base_nodelike.kind(),
+            start_byte: base_nodelike.start_byte() - byte_offset,
+            end_byte: base_nodelike.end_byte() - byte_offset,
+            start_position: base_nodelike.start_position() - position_offset,
+            end_position: base_nodelike.end_position() - position_offset,
+            source: source.clone(),
+            children: vec![],
+            parent,
+            _marker: PhantomData,
+        });
+
+        // update children
         let mut children = vec![];
         for x in base_nodelike.children(base_view) {
             children.push(Self::from_node(
@@ -104,21 +120,14 @@ impl<'tree> MutNode<'tree> {
                 base_view,
                 source.clone(),
                 new_arena,
+                Some(id),
                 byte_offset,
                 position_offset,
             ));
         }
+        new_arena[id].children = children;
 
-        new_arena.alloc(MutNode {
-            kind: base_nodelike.kind(),
-            start_byte: base_nodelike.start_byte() - byte_offset,
-            end_byte: base_nodelike.end_byte() - byte_offset,
-            start_position: base_nodelike.start_position() - position_offset,
-            end_position: base_nodelike.end_position() - position_offset,
-            source,
-            children,
-            _marker: PhantomData,
-        })
+        id
     }
 
     pub fn create_unifier<'btree>(
@@ -136,6 +145,7 @@ impl<'tree> MutNode<'tree> {
             end_position: end.end_position(),
             source: start.source.clone(),
             children: targets.clone(),
+            parent: None,
             _marker: PhantomData,
         })
     }

@@ -78,7 +78,10 @@ pub trait Traversable<'tree, T: Queryable, N: NodeLike<'tree>> {
 }
 
 pub trait RootedTreeLike<'tree, N: NodeLike<'tree>> {
-    fn root(&'tree self) -> Option<&'tree N>;
+    fn root(&'tree self) -> &'tree N;
+}
+
+pub trait TreeLike<'tree, N: NodeLike<'tree>> {
     fn get(&'tree self, id: NodeLikeId<'tree, N>) -> Option<&'tree N>;
 }
 
@@ -122,7 +125,7 @@ impl<'tree, T: Queryable, N: NodeLike<'tree>> Iterator for TreeTreverser<'tree, 
 }
 
 pub struct TreeView<'tree, T, N: NodeLike<'tree>> {
-    pub root_id: NodeLikeId<'tree, N>,
+    pub roots: Vec<NodeLikeId<'tree, N>>,
     pub source: &'tree NormalizedSource,
 
     arena: &'tree NodeLikeArena<'tree, N>,
@@ -137,15 +140,11 @@ where
     N: NodeLike<'tree>,
 {
     fn from(t: &'tree Tree<'tree, T, N>) -> Self {
-        TreeView::new(t.root_id.clone(), &t.arena, &t.source)
+        TreeView::new(vec![t.root_id.clone()], &t.arena, &t.source)
     }
 }
 
-impl<'tree, T: Queryable, N: NodeLike<'tree>> RootedTreeLike<'tree, N> for TreeView<'tree, T, N> {
-    fn root(&'tree self) -> Option<&'tree N> {
-        self.arena.get(self.root_id)
-    }
-
+impl<'tree, T: Queryable, N: NodeLike<'tree>> TreeLike<'tree, N> for TreeView<'tree, T, N> {
     fn get(&'tree self, id: NodeLikeId<'tree, N>) -> Option<&'tree N> {
         self.arena.get(id)
     }
@@ -156,20 +155,16 @@ where
     T: Queryable,
 {
     pub fn new(
-        root: NodeLikeId<'tree, N>,
+        roots: Vec<NodeLikeId<'tree, N>>,
         arena: &'tree NodeLikeArena<'tree, N>,
         source: &'tree NormalizedSource,
     ) -> TreeView<'tree, T, N> {
         TreeView {
-            root_id: root,
+            roots,
             arena,
             source,
             _marker: PhantomData,
         }
-    }
-
-    pub fn get(&'tree self, id: NodeLikeId<'tree, N>) -> Option<&'tree N> {
-        self.arena.get(id)
     }
 
     pub fn get_with_id(
@@ -179,5 +174,12 @@ where
         self.arena
             .get(id)
             .map(|x| NodeLikeRefWithId { id, node: x })
+    }
+
+    fn view_roots(&'tree self) -> Vec<&'tree N> {
+        self.roots
+            .iter()
+            .map(|id| self.arena.get(*id).unwrap())
+            .collect()
     }
 }

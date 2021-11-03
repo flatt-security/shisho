@@ -1,38 +1,27 @@
+use std::convert::TryFrom;
+
 use crate::core::{
     language::Queryable,
-    pattern::{Pattern, PatternView},
+    pattern::Pattern,
     ruleset::constraint::{Constraint, PatternWithConstraints},
 };
 
 pub struct Query<'a, T: Queryable> {
-    pub pattern: PatternView<'a, T>,
+    pub pattern: Pattern<'a, T>,
     pub constraints: &'a Vec<Constraint<T>>,
 }
 
-impl<'a, T> From<&'a PatternWithConstraints<T>> for Query<'a, T>
+impl<'a, T> TryFrom<&'a PatternWithConstraints<T>> for Query<'a, T>
 where
     T: Queryable,
 {
-    fn from(pc: &'a PatternWithConstraints<T>) -> Self {
-        Self {
-            pattern: (&pc.pattern).into(),
-            constraints: &pc.constraints,
-        }
-    }
-}
+    type Error = anyhow::Error;
 
-impl<T> PatternWithConstraints<T>
-where
-    T: Queryable,
-{
-    pub fn without_constraints(pattern: Pattern<T>) -> Self {
-        Self {
-            pattern,
-            constraints: vec![],
-        }
-    }
-
-    pub fn as_query(&'_ self) -> Query<'_, T> {
-        self.into()
+    fn try_from(value: &'a PatternWithConstraints<T>) -> Result<Self, Self::Error> {
+        let p = Pattern::<T>::try_from(&value.pattern)?;
+        Ok(Self {
+            pattern: p,
+            constraints: &value.constraints,
+        })
     }
 }

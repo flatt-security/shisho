@@ -12,7 +12,7 @@ use walkdir::WalkDir;
 
 use crate::core::{
     language::Queryable,
-    matcher::MatchedItem,
+    matcher::{MatchedItem, Query},
     node::CSTNode,
     ruleset::{constraint::PatternWithConstraints, filter::RawPatternWithFilters},
     tree::CSTView,
@@ -101,7 +101,7 @@ impl Rule {
         for rpc in patterns {
             let pc = PatternWithConstraints::<T>::try_from(rpc)?;
             let lmatches = tree
-                .matches(&pc.as_query())
+                .find(&Query::try_from(&pc)?)
                 .collect::<Result<Vec<MatchedItem<CSTNode>>>>()?;
             matches.extend(lmatches);
         }
