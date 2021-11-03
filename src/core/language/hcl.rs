@@ -48,7 +48,7 @@ mod tests {
     use super::*;
     use crate::core::matcher::MatchedItem;
     use crate::core::node::CSTNode;
-    use crate::core::query::MetavariableId;
+    use crate::core::ruleset::constraint::MetavariableId;
     use crate::core::source::Code;
     use crate::{match_pt, replace_pt};
     use anyhow::Result;

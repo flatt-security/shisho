@@ -1,7 +1,7 @@
 use crate::core::{
     matcher::{CaptureItem, UnverifiedMetavariable},
     node::NodeLike,
-    query::MetavariableId,
+    ruleset::constraint::MetavariableId,
 };
 use regex::Captures;
 
@@ -58,7 +58,7 @@ fn to_regex(q: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::node::CSTNode;
+    use crate::core::{node::CSTNode, ruleset::constraint::MetavariableId};
 
     use super::*;
 

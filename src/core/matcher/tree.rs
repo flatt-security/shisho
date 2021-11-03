@@ -1,3 +1,5 @@
+use anyhow::Result;
+
 use crate::core::{
     language::Queryable,
     matcher::{
@@ -5,14 +7,12 @@ use crate::core::{
     },
     node::{NodeLike, NodeLikeId, NodeLikeRefWithId, NodeType},
     pattern::{PatternNode, PatternView},
-    query::QueryPattern,
-    tree::{RootedTreeLike, TreeView},
-    tree::{Traversable, TreeTreverser},
+    tree::{RootedTreeLike, Traversable, TreeTreverser, TreeView},
 };
 
 use std::{convert::TryFrom, iter::Flatten, marker::PhantomData, vec::IntoIter};
 
-use super::UnconstrainedMatchedItem;
+use super::{MatchedItem, Query, UnconstrainedMatchedItem};
 
 /// `TreeMatcher` iterates possible matches between query and tree to traverse.
 pub struct TreeMatcher<'tree, 'query, T: Queryable, N: NodeLike<'tree>> {
@@ -37,12 +37,12 @@ impl<'tree, 'query, T: Queryable, N: NodeLike<'tree>> TreeMatcher<'tree, 'query,
         tview: &'tree TreeView<'tree, T, N>,
         traverser: &'tree TR,
         sibilings: Vec<NodeLikeId<'tree, N>>,
-        query: &'query QueryPattern<T>,
+        query: &'query PatternView<'query, T>,
     ) -> Self {
         let top = sibilings.clone();
 
         TreeMatcher {
-            query: &query.pview,
+            query,
 
             traverser: sibilings
                 .into_iter()
@@ -345,5 +345,53 @@ where
                 self.items.extend(items);
             }
         }
+    }
+}
+
+impl<'tree, T, N> TreeView<'tree, T, N>
+where
+    T: Queryable + 'tree,
+    N: NodeLike<'tree> + 'tree,
+{
+    pub fn matches<'query>(
+        &'tree self,
+        q: &'query Query<'query, T>,
+    ) -> impl Iterator<Item = Result<MatchedItem<'tree, N>>> + 'query
+    where
+        'tree: 'query,
+    {
+        self.matches_under_node(self.root_id, q)
+    }
+
+    pub fn matches_under_node<'query>(
+        &'tree self,
+        id: NodeLikeId<'tree, N>,
+        q: &'query Query<'query, T>,
+    ) -> impl Iterator<Item = Result<MatchedItem<'tree, N>>> + 'query
+    where
+        'tree: 'query,
+    {
+        self.matches_under_sibilings(vec![id], q)
+    }
+
+    pub fn matches_under_sibilings<'query>(
+        &'tree self,
+        ids: Vec<NodeLikeId<'tree, N>>,
+        q: &'query Query<'query, T>,
+    ) -> impl Iterator<Item = Result<MatchedItem<'tree, N>>> + 'query
+    where
+        'tree: 'query,
+    {
+        TreeMatcher::from_sibilings(self, self, ids, &q.pattern)
+            .map(move |unconstrained_mitem| {
+                match unconstrained_mitem.apply_constraints(self, q.constraints) {
+                    Ok(constrained_mitems) => constrained_mitems
+                        .into_iter()
+                        .map(|mitem| Ok(mitem))
+                        .collect(),
+                    Err(e) => vec![Err(e)],
+                }
+            })
+            .flatten()
     }
 }

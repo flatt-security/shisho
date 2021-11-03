@@ -2,13 +2,13 @@ use anyhow::Result;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 
+use super::query::Query;
 use crate::core::node::{NodeLikeId, NodeLikeRefWithId, Range, TSPoint};
 use crate::core::pattern::Pattern;
-use crate::core::query::Query;
-use crate::core::ruleset::constraint::{Constraint, ConstraintPredicate};
+use crate::core::ruleset::constraint::{Constraint, ConstraintPredicate, MetavariableId};
 use crate::core::source::NormalizedSource;
 use crate::core::tree::TreeView;
-use crate::core::{language::Queryable, node::NodeLike, query::MetavariableId};
+use crate::core::{language::Queryable, node::NodeLike};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CaptureItem<'tree, N: NodeLike<'tree>> {

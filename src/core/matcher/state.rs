@@ -1,6 +1,7 @@
 use itertools::Itertools;
 
-use crate::core::{matcher::CaptureItem, node::NodeLike, query::MetavariableId};
+use crate::core::ruleset::constraint::MetavariableId;
+use crate::core::{matcher::CaptureItem, node::NodeLike};
 
 use super::ConsecutiveNodes;
 use super::{CaptureMap, UnconstrainedMatchedItem};

@@ -44,7 +44,8 @@ mod tests {
 
     use crate::core::matcher::MatchedItem;
     use crate::core::node::CSTNode;
-    use crate::core::{query::MetavariableId, source::Code};
+    use crate::core::ruleset::constraint::MetavariableId;
+    use crate::core::source::Code;
     use crate::{match_pt, replace_pt};
     use std::convert::TryFrom;
 

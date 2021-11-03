@@ -2,8 +2,8 @@ use crate::core::{
     language::Queryable,
     matcher::{CaptureItem, CaptureMap},
     node::NodeLike,
-    query::MetavariableId,
     rewriter::node::MutNode,
+    ruleset::constraint::MetavariableId,
     source::NormalizedSource,
     tree::RootedTreeLike,
 };

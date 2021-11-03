@@ -2,13 +2,15 @@ use std::marker::PhantomData;
 
 use crate::core::{
     language::Queryable,
-    matcher::{CaptureMap, MatchedItem},
+    matcher::{CaptureMap, MatchedItem, Query},
     node::NodeType,
     node::{CSTNode, NodeLike},
     pattern::{Pattern, PatternView},
-    query::{MetavariableId, Query},
     rewriter::node::MutNode,
-    ruleset::filter::{RewriteFilter, RewriteFilterPredicate},
+    ruleset::{
+        constraint::MetavariableId,
+        filter::{RewriteFilter, RewriteFilterPredicate},
+    },
     tree::{CSTView, RootedTreeLike, TreeView},
 };
 use anyhow::{anyhow, Result};

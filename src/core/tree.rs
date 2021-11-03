@@ -1,13 +1,9 @@
-use crate::core::{
-    language::Queryable,
-    matcher::{MatchedItem, TreeMatcher},
-};
+use crate::core::language::Queryable;
 use anyhow::{anyhow, Result};
 use std::{collections::VecDeque, convert::TryFrom, marker::PhantomData};
 
 use super::{
     node::{CSTNode, NodeLike, NodeLikeArena, NodeLikeId, NodeLikeRefWithId},
-    query::Query,
     source::NormalizedSource,
 };
 
@@ -39,8 +35,6 @@ where
     }
 }
 
-pub type CST<'tree, T> = Tree<'tree, T, CSTNode<'tree>>;
-
 pub struct Tree<'tree, T, N: NodeLike<'tree>> {
     pub root_id: NodeLikeId<'tree, N>,
     pub source: &'tree NormalizedSource,
@@ -48,6 +42,8 @@ pub struct Tree<'tree, T, N: NodeLike<'tree>> {
     arena: NodeLikeArena<'tree, N>,
     _marker: PhantomData<&'tree T>,
 }
+
+pub type CST<'tree, T> = Tree<'tree, T, CSTNode<'tree>>;
 
 impl<'tree, T> From<(TSTree<'tree, T>, &'tree NormalizedSource)> for Tree<'tree, T, CSTNode<'tree>>
 where
@@ -77,7 +73,53 @@ where
     }
 }
 
-pub type CSTView<'tree, T> = TreeView<'tree, T, CSTNode<'tree>>;
+pub trait Traversable<'tree, T: Queryable, N: NodeLike<'tree>> {
+    fn traverse(&'tree self, from: NodeLikeId<'tree, N>) -> TreeTreverser<'tree, T, N>;
+}
+
+pub trait RootedTreeLike<'tree, N: NodeLike<'tree>> {
+    fn root(&'tree self) -> Option<&'tree N>;
+    fn get(&'tree self, id: NodeLikeId<'tree, N>) -> Option<&'tree N>;
+}
+
+impl<'tree, T: Queryable + 'tree, N: NodeLike<'tree> + 'tree> Traversable<'tree, T, N>
+    for TreeView<'tree, T, N>
+{
+    fn traverse(&'tree self, id: NodeLikeId<'tree, N>) -> TreeTreverser<'tree, T, N> {
+        TreeTreverser::new(self.get_with_id(id).unwrap(), self)
+    }
+}
+
+pub struct TreeTreverser<'a, T: Queryable, N: NodeLike<'a>> {
+    tview: &'a TreeView<'a, T, N>,
+    queue: VecDeque<(usize, NodeLikeRefWithId<'a, N>)>,
+}
+
+impl<'a, T: Queryable, N: NodeLike<'a>> TreeTreverser<'a, T, N> {
+    #[inline]
+    pub fn new(from: NodeLikeRefWithId<'a, N>, tview: &'a TreeView<'a, T, N>) -> Self {
+        Self {
+            queue: VecDeque::from(vec![(0, from)]),
+            tview,
+        }
+    }
+}
+
+impl<'tree, T: Queryable, N: NodeLike<'tree>> Iterator for TreeTreverser<'tree, T, N> {
+    type Item = (usize, NodeLikeRefWithId<'tree, N>);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some((depth, node)) = self.queue.pop_front() {
+            let children = node.children(self.tview).into_iter();
+            self.queue.extend(children.map(|child| (depth + 1, child)));
+
+            Some((depth, node))
+        } else {
+            None
+        }
+    }
+}
 
 pub struct TreeView<'tree, T, N: NodeLike<'tree>> {
     pub root_id: NodeLikeId<'tree, N>,
@@ -87,6 +129,8 @@ pub struct TreeView<'tree, T, N: NodeLike<'tree>> {
     _marker: PhantomData<T>,
 }
 
+pub type CSTView<'tree, T> = TreeView<'tree, T, CSTNode<'tree>>;
+
 impl<'tree, T, N> From<&'tree Tree<'tree, T, N>> for TreeView<'tree, T, N>
 where
     T: Queryable + 'tree,
@@ -95,11 +139,6 @@ where
     fn from(t: &'tree Tree<'tree, T, N>) -> Self {
         TreeView::new(t.root_id.clone(), &t.arena, &t.source)
     }
-}
-
-pub trait RootedTreeLike<'tree, N: NodeLike<'tree>> {
-    fn root(&'tree self) -> Option<&'tree N>;
-    fn get(&'tree self, id: NodeLikeId<'tree, N>) -> Option<&'tree N>;
 }
 
 impl<'tree, T: Queryable, N: NodeLike<'tree>> RootedTreeLike<'tree, N> for TreeView<'tree, T, N> {
@@ -140,96 +179,5 @@ where
         self.arena
             .get(id)
             .map(|x| NodeLikeRefWithId { id, node: x })
-    }
-}
-
-impl<'tree, T, N> TreeView<'tree, T, N>
-where
-    T: Queryable + 'tree,
-    N: NodeLike<'tree> + 'tree,
-{
-    pub fn matches<'query>(
-        &'tree self,
-        q: &'query Query<'query, T>,
-    ) -> impl Iterator<Item = Result<MatchedItem<'tree, N>>> + 'query
-    where
-        'tree: 'query,
-    {
-        self.matches_under_node(self.root_id, q)
-    }
-
-    pub fn matches_under_node<'query>(
-        &'tree self,
-        id: NodeLikeId<'tree, N>,
-        q: &'query Query<'query, T>,
-    ) -> impl Iterator<Item = Result<MatchedItem<'tree, N>>> + 'query
-    where
-        'tree: 'query,
-    {
-        self.matches_under_sibilings(vec![id], q)
-    }
-
-    pub fn matches_under_sibilings<'query>(
-        &'tree self,
-        ids: Vec<NodeLikeId<'tree, N>>,
-        q: &'query Query<'query, T>,
-    ) -> impl Iterator<Item = Result<MatchedItem<'tree, N>>> + 'query
-    where
-        'tree: 'query,
-    {
-        TreeMatcher::from_sibilings(self, self, ids, &q.pattern)
-            .map(move |unconstrained_mitem| {
-                match unconstrained_mitem.apply_constraints(self, q.constraints) {
-                    Ok(constrained_mitems) => constrained_mitems
-                        .into_iter()
-                        .map(|mitem| Ok(mitem))
-                        .collect(),
-                    Err(e) => vec![Err(e)],
-                }
-            })
-            .flatten()
-    }
-}
-
-pub trait Traversable<'tree, T: Queryable, N: NodeLike<'tree>> {
-    fn traverse(&'tree self, from: NodeLikeId<'tree, N>) -> TreeTreverser<'tree, T, N>;
-}
-
-impl<'tree, T: Queryable + 'tree, N: NodeLike<'tree> + 'tree> Traversable<'tree, T, N>
-    for TreeView<'tree, T, N>
-{
-    fn traverse(&'tree self, id: NodeLikeId<'tree, N>) -> TreeTreverser<'tree, T, N> {
-        TreeTreverser::new(self.get_with_id(id).unwrap(), self)
-    }
-}
-
-pub struct TreeTreverser<'a, T: Queryable, N: NodeLike<'a>> {
-    tview: &'a TreeView<'a, T, N>,
-    queue: VecDeque<(usize, NodeLikeRefWithId<'a, N>)>,
-}
-
-impl<'a, T: Queryable, N: NodeLike<'a>> TreeTreverser<'a, T, N> {
-    #[inline]
-    pub fn new(from: NodeLikeRefWithId<'a, N>, tview: &'a TreeView<'a, T, N>) -> Self {
-        Self {
-            queue: VecDeque::from(vec![(0, from)]),
-            tview,
-        }
-    }
-}
-
-impl<'tree, T: Queryable, N: NodeLike<'tree>> Iterator for TreeTreverser<'tree, T, N> {
-    type Item = (usize, NodeLikeRefWithId<'tree, N>);
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some((depth, node)) = self.queue.pop_front() {
-            let children = node.children(self.tview).into_iter();
-            self.queue.extend(children.map(|child| (depth + 1, child)));
-
-            Some((depth, node))
-        } else {
-            None
-        }
     }
 }

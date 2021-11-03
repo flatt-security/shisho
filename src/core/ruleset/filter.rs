@@ -2,11 +2,11 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, str::FromStr};
 
-use crate::core::{
-    language::Queryable, pattern::Pattern, query::MetavariableId, ruleset::util::string_or_struct,
-};
+use crate::core::{language::Queryable, pattern::Pattern, ruleset::util::string_or_struct};
 
-use super::constraint::{PatternWithConstraints, RawConstraint, RawPatternWithConstraints};
+use super::constraint::{
+    MetavariableId, PatternWithConstraints, RawConstraint, RawPatternWithConstraints,
+};
 
 #[derive(Debug)]
 pub struct RewriteFilter<T>

@@ -3,9 +3,10 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 
-use crate::core::{
-    language::Queryable, pattern::Pattern, query::MetavariableId, source::NormalizedSource,
-};
+use crate::core::{language::Queryable, pattern::Pattern, source::NormalizedSource};
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+pub struct MetavariableId(pub String);
 
 #[derive(Debug)]
 pub struct Constraint<T>

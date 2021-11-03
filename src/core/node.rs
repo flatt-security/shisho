@@ -2,7 +2,7 @@ use id_arena::{Arena, Id};
 use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, ops::Sub};
 
-use super::{query::MetavariableId, source::NormalizedSource, tree::RootedTreeLike};
+use super::{ruleset::constraint::MetavariableId, source::NormalizedSource, tree::RootedTreeLike};
 
 const SHISHO_NODE_METAVARIABLE_NAME: &str = "shisho_metavariable_name";
 const SHISHO_NODE_METAVARIABLE: &str = "shisho_metavariable";

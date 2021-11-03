@@ -49,7 +49,7 @@ impl Queryable for Dockerfile {
 mod tests {
     use super::*;
     use crate::{
-        core::{matcher::MatchedItem, node::CSTNode, query::MetavariableId},
+        core::{matcher::MatchedItem, node::CSTNode, ruleset::constraint::MetavariableId},
         match_pt,
     };
     use anyhow::Result;
