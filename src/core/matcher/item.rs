@@ -108,7 +108,6 @@ impl<'tree, N: NodeLike<'tree>> UnconstrainedMatchedItem<'tree, N> {
             ));
         }
         let captured_item = captured_item.unwrap().clone();
-
         match &constraint.predicate {
             ConstraintPredicate::MatchQuery(q) => {
                 self.apply_constraint_with_item(view, q, &captured_item)
@@ -208,22 +207,25 @@ impl<'tree, N: NodeLike<'tree>> UnconstrainedMatchedItem<'tree, N> {
             CaptureItem::Literal(_) => Err(anyhow::anyhow!(
                 "match-query predicate for string literals is not supported"
             )),
-            CaptureItem::Nodes(n) => Ok(view
-                .matches_under_sibilings(
-                    n.as_vec().iter().map(|r| r.id).collect(),
-                    &Query {
-                        pattern: pattern.into(),
-                        constraints: &vec![],
-                    },
-                )
-                .collect::<Result<Vec<MatchedItem<'tree, N>>>>()?
-                .into_iter()
-                .map(|mitem| {
-                    let mut x = self.clone().into_constrained();
-                    x.captures.extend(mitem.captures);
-                    x
-                })
-                .collect()),
+            CaptureItem::Nodes(n) => {
+                Ok(view
+                    .matches_under_sibilings(
+                        n.as_vec().iter().map(|r| r.id).collect(),
+                        &Query {
+                            pattern: pattern.into(),
+                            constraints: &vec![],
+                        },
+                    )
+                    .collect::<Result<Vec<MatchedItem<'tree, N>>>>()?
+                    .into_iter()
+                    .map(|mitem| {
+                        // TODO: use `fold_capture` or something liek that to verify the equality of metavariables in new matches and ones in existing matches
+                        let mut x = self.clone().into_constrained();
+                        x.captures.extend(mitem.captures);
+                        x
+                    })
+                    .collect())
+            }
         }
     }
 }

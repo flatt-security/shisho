@@ -317,26 +317,28 @@ where
                 return Some(mitem);
             }
 
-            let tcandidates = if let Some((_depth, tnode)) = self.traverser.next() {
-                let tnodes: Vec<NodeLikeRefWithId<'_, N>> = tnode
-                    .children(self.tview)
-                    .into_iter()
-                    .filter(|n| !T::is_skippable((*n).node))
-                    .collect();
-                (0..tnodes.len()).map(|i| tnodes[i..].to_vec()).collect()
-            } else if let Some(top) = self.top.take() {
-                vec![top
-                    .iter()
-                    .map(|x| NodeLikeRefWithId {
-                        id: x.clone(),
-                        node: self.tview.get(x.clone()).unwrap(),
-                    })
-                    .collect()]
-            } else {
-                return None;
-            };
+            let tnodes: Vec<NodeLikeRefWithId<'_, N>> =
+                if let Some((_depth, tnode)) = self.traverser.next() {
+                    tnode
+                        .children(self.tview)
+                        .into_iter()
+                        .filter(|n| !T::is_skippable((*n).node))
+                        .collect()
+                } else if let Some(top) = self.top.take() {
+                    top.iter()
+                        .map(|x| NodeLikeRefWithId {
+                            id: x.clone(),
+                            node: self.tview.get(x.clone()).unwrap(),
+                        })
+                        .collect()
+                } else {
+                    return None;
+                };
 
-            for tsibilings in tcandidates {
+            for tsibilings in (0..tnodes.len())
+                .map(|i| tnodes[i..].to_vec())
+                .collect::<Vec<Vec<NodeLikeRefWithId<'_, N>>>>()
+            {
                 let items = self
                     .match_sibilings(tsibilings, qnodes.clone())
                     .into_iter()
