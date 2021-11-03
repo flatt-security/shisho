@@ -58,7 +58,7 @@ fn to_regex(q: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::node::Node;
+    use crate::core::node::CSTNode;
 
     use super::*;
 
@@ -92,9 +92,9 @@ mod tests {
 
     #[test]
     fn test_match_string_pattern() {
-        assert_eq!(match_string_pattern::<Node<'_>>("test", "test").len(), 1);
+        assert_eq!(match_string_pattern::<CSTNode<'_>>("test", "test").len(), 1);
         assert_eq!(
-            match_string_pattern::<Node<'_>>("hellotestgoodbye", "hello:[X]goodbye"),
+            match_string_pattern::<CSTNode<'_>>("hellotestgoodbye", "hello:[X]goodbye"),
             vec![vec![(
                 MetavariableId("X".into()),
                 CaptureItem::Literal("test".into())
@@ -102,7 +102,7 @@ mod tests {
         );
 
         assert_eq!(
-            match_string_pattern::<Node<'_>>("hello\ntestgoodbye", "hello:[X]goodbye"),
+            match_string_pattern::<CSTNode<'_>>("hello\ntestgoodbye", "hello:[X]goodbye"),
             vec![vec![(
                 MetavariableId("X".into()),
                 CaptureItem::Literal("\ntest".into())
@@ -111,7 +111,7 @@ mod tests {
 
         // longest match
         assert_eq!(
-            match_string_pattern::<Node<'_>>("hellotestgoodbye", "hello:[X]:[Y]goodbye"),
+            match_string_pattern::<CSTNode<'_>>("hellotestgoodbye", "hello:[X]:[Y]goodbye"),
             vec![vec![
                 (
                     MetavariableId("X".into()),

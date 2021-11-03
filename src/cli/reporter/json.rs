@@ -4,10 +4,11 @@ use super::Reporter;
 use crate::core::{
     language::Queryable,
     matcher::MatchedItem,
-    node::{Node, Range},
+    node::{CSTNode, Range},
     ruleset::{filter::PatternWithFilters, Rule},
     source::Code,
     target::Target,
+    tree::CSTView,
 };
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -48,7 +49,8 @@ impl<'a, W: std::io::Write> Reporter<'a> for JSONReporter<'a, W> {
     fn add_entry<'tree, T: Queryable>(
         &mut self,
         target: &Target,
-        items: Vec<(&Rule, MatchedItem<'tree, Node<'tree>>)>,
+        view: &'tree CSTView<'tree, T>,
+        items: Vec<(&Rule, MatchedItem<'tree, CSTNode<'tree>>)>,
     ) -> Result<()> {
         for (rule, mitem) in items {
             let mut r = Entry {
@@ -63,7 +65,7 @@ impl<'a, W: std::io::Write> Reporter<'a> for JSONReporter<'a, W> {
             for rewrite in rule.get_rewrite_options()? {
                 let old_code: Code<T> = target.body.clone().into();
                 let pattern = PatternWithFilters::try_from(rewrite)?;
-                let new_code = old_code.rewrite(&mitem, pattern.as_roption())?;
+                let new_code = old_code.rewrite(view, &mitem, pattern.as_roption())?;
 
                 let diff = TextDiff::from_lines(target.body.as_str(), new_code.as_str())
                     .unified_diff()

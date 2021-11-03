@@ -3,33 +3,26 @@ use crate::core::{
     matcher::{MatchedItem, TreeMatcher},
 };
 use anyhow::{anyhow, Result};
-use std::{
-    collections::VecDeque,
-    convert::{TryFrom, TryInto},
-    marker::PhantomData,
-};
+use std::{collections::VecDeque, convert::TryFrom, marker::PhantomData};
 
 use super::{
-    node::{Node, NodeLike, NodeLikeArena, NodeLikeId, NodeLikeRefWithId, NodeRefWithId},
+    node::{CSTNode, NodeLike, NodeLikeArena, NodeLikeId, NodeLikeRefWithId},
     query::Query,
     source::NormalizedSource,
-    view::NodeLikeView,
 };
 
-pub struct Tree<'tree, T> {
-    pub(crate) source: NormalizedSource,
-
+struct TSTree<'tree, T> {
     tstree: tree_sitter::Tree,
     _marker: PhantomData<&'tree T>,
 }
 
-impl<'tree, T> TryFrom<NormalizedSource> for Tree<'tree, T>
+impl<'tree, T> TryFrom<&'tree NormalizedSource> for TSTree<'tree, T>
 where
     T: Queryable,
 {
     type Error = anyhow::Error;
 
-    fn try_from(nsource: NormalizedSource) -> Result<Self, anyhow::Error> {
+    fn try_from(nsource: &'tree NormalizedSource) -> Result<Self, anyhow::Error> {
         let mut parser = tree_sitter::Parser::new();
         parser
             .set_language(T::target_language())
@@ -39,35 +32,77 @@ where
             .parse(nsource.as_normalized(), None)
             .ok_or(anyhow!("failed to load the code"))?;
 
-        Ok(Tree {
-            source: nsource,
+        Ok(TSTree {
             tstree,
             _marker: PhantomData,
         })
     }
 }
 
-impl<'tree, T> TryFrom<&str> for Tree<'tree, T>
+pub type CST<'tree, T> = Tree<'tree, T, CSTNode<'tree>>;
+
+pub struct Tree<'tree, T, N: NodeLike<'tree>> {
+    pub root_id: NodeLikeId<'tree, N>,
+    pub source: &'tree NormalizedSource,
+
+    arena: NodeLikeArena<'tree, N>,
+    _marker: PhantomData<&'tree T>,
+}
+
+impl<'tree, T> From<(TSTree<'tree, T>, &'tree NormalizedSource)> for Tree<'tree, T, CSTNode<'tree>>
 where
     T: Queryable,
 {
-    type Error = anyhow::Error;
-
-    fn try_from(nsource: &str) -> Result<Self, anyhow::Error> {
-        let nsource = NormalizedSource::from(nsource);
-        nsource.try_into()
+    fn from((t, source): (TSTree<'tree, T>, &'tree NormalizedSource)) -> Self {
+        let mut arena = NodeLikeArena::new();
+        let root_id = CSTNode::from_tsnode(t.tstree.root_node(), source, &mut arena);
+        Tree {
+            root_id,
+            source,
+            arena,
+            _marker: PhantomData,
+        }
     }
 }
+
+impl<'tree, T> TryFrom<&'tree NormalizedSource> for Tree<'tree, T, CSTNode<'tree>>
+where
+    T: Queryable + 'tree,
+{
+    type Error = anyhow::Error;
+
+    fn try_from(nsource: &'tree NormalizedSource) -> Result<Self, anyhow::Error> {
+        let r = TSTree::try_from(nsource)?;
+        Ok((r, nsource).into())
+    }
+}
+
+pub type CSTView<'tree, T> = TreeView<'tree, T, CSTNode<'tree>>;
 
 pub struct TreeView<'tree, T, N: NodeLike<'tree>> {
     pub root_id: NodeLikeId<'tree, N>,
     pub source: &'tree NormalizedSource,
 
-    arena: NodeLikeArena<'tree, N>,
+    arena: &'tree NodeLikeArena<'tree, N>,
     _marker: PhantomData<T>,
 }
 
-impl<'tree, T: Queryable, N: NodeLike<'tree>> NodeLikeView<'tree, N> for TreeView<'tree, T, N> {
+impl<'tree, T, N> From<&'tree Tree<'tree, T, N>> for TreeView<'tree, T, N>
+where
+    T: Queryable + 'tree,
+    N: NodeLike<'tree>,
+{
+    fn from(t: &'tree Tree<'tree, T, N>) -> Self {
+        TreeView::new(t.root_id.clone(), &t.arena, &t.source)
+    }
+}
+
+pub trait RootedTreeLike<'tree, N: NodeLike<'tree>> {
+    fn root(&'tree self) -> Option<&'tree N>;
+    fn get(&'tree self, id: NodeLikeId<'tree, N>) -> Option<&'tree N>;
+}
+
+impl<'tree, T: Queryable, N: NodeLike<'tree>> RootedTreeLike<'tree, N> for TreeView<'tree, T, N> {
     fn root(&'tree self) -> Option<&'tree N> {
         self.arena.get(self.root_id)
     }
@@ -83,7 +118,7 @@ where
 {
     pub fn new(
         root: NodeLikeId<'tree, N>,
-        arena: NodeLikeArena<'tree, N>,
+        arena: &'tree NodeLikeArena<'tree, N>,
         source: &'tree NormalizedSource,
     ) -> TreeView<'tree, T, N> {
         TreeView {
@@ -108,21 +143,10 @@ where
     }
 }
 
-impl<'tree, T> From<&'tree Tree<'tree, T>> for TreeView<'tree, T, Node<'tree>>
-where
-    T: Queryable,
-{
-    fn from(t: &'tree Tree<'tree, T>) -> Self {
-        let mut arena = NodeLikeArena::new();
-        let root = Node::from_tsnode(t.tstree.root_node(), &t.source, &mut arena);
-        TreeView::new(root, arena, &t.source)
-    }
-}
-
-impl<'tree, T, N: NodeLike<'tree>> TreeView<'tree, T, N>
+impl<'tree, T, N> TreeView<'tree, T, N>
 where
     T: Queryable + 'tree,
-    N: 'tree,
+    N: NodeLike<'tree> + 'tree,
 {
     pub fn matches<'query>(
         &'tree self,

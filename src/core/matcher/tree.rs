@@ -4,11 +4,11 @@ use crate::core::{
         match_string_pattern, CaptureItem, ConsecutiveNodes, MatchedItem, MatcherState,
         UnverifiedMetavariable,
     },
-    node::{Node, NodeLike, NodeLikeId, NodeLikeRefWithId, NodeType},
+    node::{CSTNode, NodeLike, NodeLikeId, NodeLikeRefWithId, NodeType},
     pattern::{PatternNode, PatternView},
     query::QueryPattern,
+    tree::RootedTreeLike,
     tree::{Traversable, TreeTreverser},
-    view::NodeLikeView,
 };
 
 use std::{convert::TryFrom, marker::PhantomData};
@@ -292,7 +292,7 @@ where
     type Item = MatchedItem<'tree, N>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let qnodes: Vec<&Node<'query>> = T::root_nodes(self.query)
+        let qnodes: Vec<&CSTNode<'query>> = T::root_nodes(self.query)
             .into_iter()
             .filter(|n| !T::is_skippable(*n))
             .collect();

@@ -2,9 +2,10 @@ use super::Reporter;
 use crate::core::{
     language::Queryable,
     matcher::MatchedItem,
-    node::Node,
+    node::CSTNode,
     ruleset::{Rule, Severity},
     target::Target,
+    tree::CSTView,
 };
 use anyhow::Result;
 use serde_sarif::sarif;
@@ -35,7 +36,8 @@ impl<'a, W: std::io::Write> Reporter<'a> for SARIFReporter<'a, W> {
     fn add_entry<'tree, T: Queryable>(
         &mut self,
         target: &Target,
-        items: Vec<(&Rule, MatchedItem<'tree, Node<'tree>>)>,
+        _view: &'tree CSTView<'tree, T>,
+        items: Vec<(&Rule, MatchedItem<'tree, CSTNode<'tree>>)>,
     ) -> Result<()> {
         for (rule, mitem) in items {
             let descriptor_idx = {

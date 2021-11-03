@@ -2,7 +2,7 @@ use super::Queryable;
 use crate::core::{
     node::{NodeLike, NodeType},
     pattern::{PatternNode, PatternView},
-    view::NodeLikeView,
+    tree::RootedTreeLike,
 };
 
 #[derive(Debug, Clone)]
@@ -49,7 +49,7 @@ impl Queryable for Dockerfile {
 mod tests {
     use super::*;
     use crate::{
-        core::{matcher::MatchedItem, node::Node, query::MetavariableId},
+        core::{matcher::MatchedItem, node::CSTNode, query::MetavariableId},
         match_pt,
     };
     use anyhow::Result;
@@ -61,7 +61,7 @@ mod tests {
             Dockerfile,
             r#"FROM :[A]"#,
             r#"FROM name"#,
-            |matches: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |matches: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let matches = matches.unwrap();
                 assert_eq!(matches.len(), 1);
                 assert_eq!(
@@ -77,7 +77,7 @@ mod tests {
             Dockerfile,
             r#"FROM :[A]::[B]"#,
             r#"FROM name:tag"#,
-            |matches: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |matches: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let matches = matches.unwrap();
                 assert_eq!(matches.len(), 1);
                 assert_eq!(
@@ -99,7 +99,7 @@ mod tests {
             Dockerfile,
             r#"FROM :[A]::[B]@:[HASH]"#,
             r#"FROM name:tag@hash"#,
-            |matches: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |matches: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let matches = matches.unwrap();
                 assert_eq!(matches.len(), 1);
                 assert_eq!(
@@ -127,7 +127,7 @@ mod tests {
             Dockerfile,
             r#"FROM :[A]::[B]@:[HASH] as :[ALIAS]"#,
             r#"FROM name:tag@hash as alias"#,
-            |matches: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |matches: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let matches = matches.unwrap();
                 assert_eq!(matches.len(), 1);
                 assert_eq!(
@@ -164,7 +164,7 @@ mod tests {
             Dockerfile,
             r#"RUN :[X]"#,
             r#"RUN echo "hosts: files dns" > /etc/nsswitch.conf"#,
-            |matches: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |matches: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let matches = matches.unwrap();
                 assert_eq!(matches.len(), 1);
                 assert_eq!(
@@ -181,7 +181,7 @@ mod tests {
         automake \
         && rm -rf /var/lib/apt/lists/*"#;
         match_pt!(Dockerfile, r#"RUN :[X]"#, cmd, |matches: Result<
-            Vec<MatchedItem<Node<'_>>>,
+            Vec<MatchedItem<CSTNode<'_>>>,
         >| {
             let matches = matches.unwrap();
             assert_eq!(matches.len(), 1);
@@ -200,7 +200,7 @@ mod tests {
             Dockerfile,
             r#"COPY :[X] :[Y]"#,
             r#"COPY ./ /app"#,
-            |matches: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |matches: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let matches = matches.unwrap();
                 assert_eq!(matches.len(), 1);
                 assert_eq!(

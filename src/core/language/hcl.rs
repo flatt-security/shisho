@@ -1,7 +1,7 @@
 use crate::core::{
     node::{NodeLike, NodeType},
     pattern::{PatternNode, PatternView},
-    view::NodeLikeView,
+    tree::RootedTreeLike,
 };
 
 use super::Queryable;
@@ -47,7 +47,7 @@ impl Queryable for HCL {
 mod tests {
     use super::*;
     use crate::core::matcher::MatchedItem;
-    use crate::core::node::Node;
+    use crate::core::node::CSTNode;
     use crate::core::query::MetavariableId;
     use crate::core::source::Code;
     use crate::{match_pt, replace_pt};
@@ -60,7 +60,7 @@ mod tests {
             HCL,
             r#"encrypted = true"#,
             r#"encrypted = true"#,
-            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
             }
@@ -70,7 +70,7 @@ mod tests {
             HCL,
             r#"resource "rtype" "rname" { attr = "value" }"#,
             r#"resource "rtype" "rname" { attr = "value" }"#,
-            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
             }
@@ -80,7 +80,7 @@ mod tests {
             HCL,
             r#"resource "rtype" "rname" { attr = :[X] }"#,
             r#"resource "rtype" "rname" { attr = "value" }"#,
-            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
             }
@@ -97,7 +97,7 @@ mod tests {
                 hoge = "foobar"
                 foo = "test"
             }"#,
-            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
             }
@@ -118,7 +118,7 @@ mod tests {
             resource "rtype" "rname3" {
                 attr = "value"
             }"#,
-            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 2);
             }
@@ -157,7 +157,7 @@ mod tests {
                     another_attr = 3
                 }
             "#,
-            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 2);
             }
@@ -176,7 +176,7 @@ mod tests {
                    xx = 1
                }
            "#,
-            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
             }
@@ -216,7 +216,7 @@ mod tests {
                     another_attr = 3
                 }
             "#,
-            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 3);
             }
@@ -258,7 +258,7 @@ mod tests {
                 yetanother_attr = :[X]
             "#,
             cmd,
-            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
             }
@@ -272,7 +272,7 @@ mod tests {
                 yetanother_attr = :[_]
             "#,
             cmd,
-            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 2);
             }
@@ -291,7 +291,7 @@ mod tests {
                     one_attr = max(1, 2, 5)
                 }
             "#,
-            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
@@ -312,7 +312,7 @@ mod tests {
                     one_attr = max(1, 2, 3, 4, 5)
                 }
             "#,
-            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
@@ -339,7 +339,7 @@ mod tests {
                     attr = "hello2"
                 }
             "#,
-            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 2);
                 assert_eq!(
@@ -368,7 +368,7 @@ mod tests {
                     attr = [1, 2, 3, 4, 5]
                 }
             "#,
-            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
@@ -389,7 +389,7 @@ mod tests {
                     attr = [1, 2, 3, 4, 5]
                 }
             "#,
-            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
@@ -427,7 +427,7 @@ mod tests {
                     }
                 }
             "#,
-            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
@@ -468,7 +468,7 @@ mod tests {
                 attr = "sample-:[X]-foo"
             "#,
             cmd,
-            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
@@ -485,7 +485,7 @@ mod tests {
                 attr = "sample-:[X]:[Y]-foo"
             "#,
             cmd,
-            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
@@ -522,7 +522,7 @@ mod tests {
                 attr = [for :[Y] in :[X] : upper(:[Y]) if :[Y] != ""]
             "#,
             cmd,
-            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
@@ -544,7 +544,7 @@ mod tests {
                 attr = [for :[...Y] in :[X] : upper(:[_]) if :[_] != ""]
             "#,
             cmd,
-            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 2);
                 assert_eq!(
@@ -566,7 +566,7 @@ mod tests {
                 attr = {for :[...Y] in :[X] : :[_] => upper(:[_]) if :[_] != ""}
             "#,
             cmd,
-            |c: Result<Vec<MatchedItem<Node<'_>>>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(

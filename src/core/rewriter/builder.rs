@@ -2,29 +2,27 @@ use std::marker::PhantomData;
 
 use crate::core::{
     language::Queryable,
-    matcher::CaptureMap,
+    matcher::{CaptureMap, MatchedItem},
     node::NodeType,
-    node::{Node, NodeLike},
+    node::{CSTNode, NodeLike},
     pattern::{Pattern, PatternView},
-    query::MetavariableId,
-    ruleset::{
-        constraint::PatternWithConstraints,
-        filter::{RewriteFilter, RewriteFilterPredicate},
-    },
-    view::NodeLikeView,
+    query::{MetavariableId, Query},
+    rewriter::node::MutNode,
+    ruleset::filter::{RewriteFilter, RewriteFilterPredicate},
+    tree::{CSTView, RootedTreeLike, TreeView},
 };
 use anyhow::{anyhow, Result};
 use regex::Captures;
 use thiserror::Error;
 
-use super::tree::{from_capture_map, CapturedValue, MetavariableMap};
+use super::item::{from_capture_map, MetavariableMap, MutCaptureItem};
 
 pub struct SnippetBuilder<'btree, 'ntree, T>
 where
     T: Queryable,
 {
     build_with: &'ntree PatternView<'ntree, T>,
-    metavariables: MetavariableMap<'btree>,
+    metavariables: MetavariableMap<'btree, T>,
 
     _marker: PhantomData<T>,
 }
@@ -35,12 +33,13 @@ where
 {
     pub fn new<'base>(
         build_with: &'ntree PatternView<'ntree, T>,
-        captures: &'btree CaptureMap<'btree, Node<'btree>>,
+
+        view: &'btree CSTView<'btree, T>,
+        captures: &'btree CaptureMap<'btree, CSTNode<'btree>>,
     ) -> Self {
         Self {
             build_with,
-            metavariables: from_capture_map(captures.clone()),
-
+            metavariables: from_capture_map(view, &captures),
             _marker: PhantomData,
         }
     }
@@ -77,7 +76,7 @@ where
         &mut self,
         target: &MetavariableId,
 
-        pwc: &PatternWithConstraints<T>,
+        q: &Query<'_, T>,
         p: &Pattern<T>,
     ) -> Result<()> {
         let t = self
@@ -85,24 +84,28 @@ where
             .get_mut(target)
             .ok_or(anyhow::anyhow!("metavariable is undefined"))?;
         match t {
-            CapturedValue::Empty => Ok(()),
-            CapturedValue::Literal(_) => {
+            MutCaptureItem::Empty => Ok(()),
+            MutCaptureItem::Literal(_) => {
                 Err(anyhow::anyhow!("string literal could not be replaced"))
             }
-            CapturedValue::Node((id, n)) => {
-                // let rtv = RefTreeView::from(n);
-                // let lmatches = rtv
-                //     .matches(&pwc.as_query())
-                //     .collect::<Result<Vec<MatchedItem<MutNode>>>>()?;
-                // let qp = QueryPattern::try_from(with_pattern)?;
-                // let mnode = MutNode::from_node(qp.root_node.as_node(), Rc with_pattern.source);
-                // Ok(())
-
-                // TODO: replace matched parts of trees with `p` in `n`
-                // TODO: replace matched parts of string with `p` in `n`
-                // TODO: fix indices of each node of `n`
-
-                todo!("not implemented yet")
+            MutCaptureItem::Tree {
+                root_id,
+                source,
+                arena,
+                ..
+            } => {
+                let source = source.borrow();
+                let tv = TreeView::new(root_id.clone(), arena, &source);
+                let matches: Vec<MatchedItem<'_, MutNode<'_>>> = tv
+                    .matches(q)
+                    .collect::<Result<Vec<MatchedItem<'_, MutNode<'_>>>>>()?;
+                for m in matches {
+                    // TODO: replace matched parts of trees with `p` in `n`
+                    // TODO: replace matched parts of string with `p` in `n`
+                    // TODO: fix indices of each node of `n`
+                    println!("matched: {:?}", m);
+                }
+                Ok(())
             }
         }
     }
@@ -111,7 +114,7 @@ where
         match &filter.predicate {
             RewriteFilterPredicate::ReplaceWithQuery((pwcs, to)) => {
                 for pwc in pwcs {
-                    self.replace(&filter.target, pwc, to)?;
+                    self.replace(&filter.target, &pwc.as_query(), to)?;
                 }
             }
         }
@@ -135,7 +138,7 @@ where
 {
     pub fn build(&self) -> Result<Snippet> {
         let root = self.build_with.root().unwrap();
-        let pitems: Vec<(&Node<'ntree>, Result<Segment>)> =
+        let pitems: Vec<(&CSTNode<'ntree>, Result<Segment>)> =
             vec![(root, self.build_from_node(root))];
 
         let body = self
@@ -145,7 +148,7 @@ where
         Ok(Snippet { body })
     }
 
-    fn build_from_node(&self, node: &Node<'ntree>) -> Result<Segment, anyhow::Error> {
+    fn build_from_node(&self, node: &CSTNode<'ntree>) -> Result<Segment, anyhow::Error> {
         match node.kind() {
             NodeType::Ellipsis => Err(anyhow!(
                 "cannot use ellipsis operator inside the transformation query"
@@ -160,7 +163,7 @@ where
 
     fn build_from_metavariable(
         &self,
-        node: &Node<'ntree>,
+        node: &CSTNode<'ntree>,
         variable_name: &str,
     ) -> Result<Segment, anyhow::Error> {
         let id = MetavariableId(variable_name.into());
@@ -168,7 +171,7 @@ where
             .metavariables
             .get(&id)
             .and_then(|x| match x {
-                CapturedValue::Empty => None,
+                MutCaptureItem::Empty => None,
                 _ => Some(x.to_string()),
             })
             .ok_or(SnippetBuilderError::MetavariableUnavailable {
@@ -184,7 +187,7 @@ where
         })
     }
 
-    fn build_from_leaf(&self, node: &Node<'ntree>) -> Result<Segment, anyhow::Error> {
+    fn build_from_leaf(&self, node: &CSTNode<'ntree>) -> Result<Segment, anyhow::Error> {
         assert!(node.children.is_empty() || T::is_leaf_like(node));
 
         if T::is_string_literal(node) {
@@ -198,7 +201,10 @@ where
         }
     }
 
-    fn build_from_intermediate_node(&self, node: &Node<'ntree>) -> Result<Segment, anyhow::Error> {
+    fn build_from_intermediate_node(
+        &self,
+        node: &CSTNode<'ntree>,
+    ) -> Result<Segment, anyhow::Error> {
         let children = node
             .children
             .iter()
@@ -206,7 +212,7 @@ where
                 let child = self.build_with.get(*child).unwrap();
                 (child, self.build_from_node(child))
             })
-            .collect::<Vec<(&Node<'ntree>, Result<Segment>)>>();
+            .collect::<Vec<(&CSTNode<'ntree>, Result<Segment>)>>();
 
         self.build_segment_from_segments(node.start_byte(), node.end_byte(), children)
     }
@@ -216,7 +222,7 @@ where
         &self,
         start_byte: usize,
         end_byte: usize,
-        subitems: Vec<(&Node<'ntree>, Result<Segment>)>,
+        subitems: Vec<(&CSTNode<'ntree>, Result<Segment>)>,
     ) -> Result<Segment, anyhow::Error> {
         let mut body: String = "".into();
 
@@ -296,7 +302,7 @@ where
         })
     }
 
-    fn build_from_string_leaf(&self, node: &Node<'ntree>) -> Result<Segment> {
+    fn build_from_string_leaf(&self, node: &CSTNode<'ntree>) -> Result<Segment> {
         assert!((node.children.is_empty() || T::is_leaf_like(node)) && T::is_string_literal(node));
 
         let body = node.as_cow().to_string();

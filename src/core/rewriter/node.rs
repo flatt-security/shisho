@@ -1,9 +1,9 @@
 use std::{borrow::Cow, cell::RefCell, marker::PhantomData, rc::Rc};
 
 use crate::core::{
-    node::{Node, NodeArena, NodeLike, NodeLikeArena, NodeLikeId, NodeLikeRefWithId, NodeType},
+    node::{NodeLike, NodeLikeArena, NodeLikeId, NodeLikeRefWithId, NodeType, TSPoint},
     source::NormalizedSource,
-    view::NodeLikeView,
+    tree::RootedTreeLike,
 };
 
 pub type MutNodeId<'tree> = NodeLikeId<'tree, MutNode<'tree>>;
@@ -16,8 +16,8 @@ pub struct MutNode<'tree> {
     start_byte: usize,
     end_byte: usize,
 
-    start_position: tree_sitter::Point,
-    end_position: tree_sitter::Point,
+    start_position: TSPoint,
+    end_position: TSPoint,
 
     children: Vec<MutNodeId<'tree>>,
     pub source: Rc<RefCell<NormalizedSource>>,
@@ -38,11 +38,11 @@ impl<'tree> NodeLike<'tree> for MutNode<'tree> {
         self.end_byte
     }
 
-    fn start_position(&self) -> tree_sitter::Point {
+    fn start_position(&self) -> TSPoint {
         self.start_position
     }
 
-    fn end_position(&self) -> tree_sitter::Point {
+    fn end_position(&self) -> TSPoint {
         self.end_position
     }
 
@@ -56,14 +56,14 @@ impl<'tree> NodeLike<'tree> for MutNode<'tree> {
         )
     }
 
-    fn children<V: NodeLikeView<'tree, Self>>(&'tree self, tview: &'tree V) -> Vec<&'tree Self> {
+    fn children<V: RootedTreeLike<'tree, Self>>(&'tree self, tview: &'tree V) -> Vec<&'tree Self> {
         self.children
             .iter()
             .map(|x| tview.get(*x).unwrap())
             .collect()
     }
 
-    fn indexed_children<V: NodeLikeView<'tree, Self>>(
+    fn indexed_children<V: RootedTreeLike<'tree, Self>>(
         &'tree self,
         tview: &'tree V,
     ) -> Vec<NodeLikeRefWithId<'tree, Self>> {
@@ -87,31 +87,55 @@ impl<'tree> NodeLike<'tree> for MutNode<'tree> {
 }
 
 impl<'tree> MutNode<'tree> {
-    pub fn from_node<'ntree, 'b>(
-        n: &'ntree Node<'ntree>,
-        base_arena: &NodeArena<'ntree>,
+    pub fn from_node<'btree, N: NodeLike<'btree>, V: RootedTreeLike<'btree, N>>(
+        base_nodelike: &'btree N,
+        base_view: &'btree V,
 
         source: Rc<RefCell<NormalizedSource>>,
         new_arena: &mut MutNodeArena<'tree>,
+
+        byte_offset: usize,
+        position_offset: TSPoint,
     ) -> MutNodeId<'tree> {
         let mut children = vec![];
-        for x in &n.children {
+        for x in base_nodelike.children(base_view) {
             children.push(Self::from_node(
-                base_arena.get(*x).unwrap(),
-                base_arena,
+                x,
+                base_view,
                 source.clone(),
                 new_arena,
+                byte_offset,
+                position_offset,
             ));
         }
 
         new_arena.alloc(MutNode {
-            kind: n.kind(),
-            start_byte: n.start_byte(),
-            end_byte: n.end_byte(),
-            start_position: n.start_position(),
-            end_position: n.end_position(),
+            kind: base_nodelike.kind(),
+            start_byte: base_nodelike.start_byte() - byte_offset,
+            end_byte: base_nodelike.end_byte() - byte_offset,
+            start_position: base_nodelike.start_position() - position_offset,
+            end_position: base_nodelike.end_position() - position_offset,
             source,
             children,
+            _marker: PhantomData,
+        })
+    }
+
+    pub fn create_unifier<'btree>(
+        targets: Vec<MutNodeId<'tree>>,
+        arena: &mut MutNodeArena<'tree>,
+    ) -> MutNodeId<'tree> {
+        let start = arena.get(targets.first().unwrap().clone()).unwrap().clone();
+        let end = arena.get(targets.last().unwrap().clone()).unwrap().clone();
+
+        arena.alloc(MutNode {
+            kind: NodeType::Unifier,
+            start_byte: start.start_byte(),
+            end_byte: end.end_byte(),
+            start_position: start.start_position(),
+            end_position: end.end_position(),
+            source: start.source.clone(),
+            children: targets.clone(),
             _marker: PhantomData,
         })
     }

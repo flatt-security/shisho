@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::core::{language::Queryable, node::Node};
+use crate::core::{language::Queryable, node::CSTNode, tree::CSTView};
 use std::{
     marker::PhantomData,
     ops::{Index, Range},
@@ -32,14 +32,15 @@ where
 {
     pub fn rewrite<'tree>(
         self,
-        item: &MatchedItem<'tree, Node<'tree>>,
+        view: &'tree CSTView<'tree, T>,
+        item: &MatchedItem<'tree, CSTNode<'tree>>,
         roption: RewriteOption<T>,
     ) -> Result<Self> {
         let current_code = self.as_str().as_bytes();
 
         let before = self.string_between(0, item.area.start_byte())?;
 
-        let snippet = roption.to_string_with(&item.captures)?;
+        let snippet = roption.to_string_with(view, &item.captures)?;
 
         let after = self.string_between(
             item.area.end_byte().min(current_code.len()),

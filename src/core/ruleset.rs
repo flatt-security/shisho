@@ -13,7 +13,7 @@ use walkdir::WalkDir;
 use crate::core::{
     language::Queryable,
     matcher::MatchedItem,
-    node::Node,
+    node::CSTNode,
     ruleset::{constraint::PatternWithConstraints, filter::RawPatternWithFilters},
     tree::TreeView,
 };
@@ -91,8 +91,8 @@ impl Rule {
 
     pub fn find<'tree, T>(
         &self,
-        tree: &'tree TreeView<'tree, T, Node<'tree>>,
-    ) -> Result<Vec<MatchedItem<'tree, Node<'tree>>>>
+        tree: &'tree TreeView<'tree, T, CSTNode<'tree>>,
+    ) -> Result<Vec<MatchedItem<'tree, CSTNode<'tree>>>>
     where
         T: Queryable,
     {
@@ -102,7 +102,7 @@ impl Rule {
             let pc = PatternWithConstraints::<T>::try_from(rpc)?;
             let lmatches = tree
                 .matches(&pc.as_query())
-                .collect::<Result<Vec<MatchedItem<Node>>>>()?;
+                .collect::<Result<Vec<MatchedItem<CSTNode>>>>()?;
             matches.extend(lmatches);
         }
         Ok(matches)

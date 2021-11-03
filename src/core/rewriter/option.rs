@@ -3,9 +3,10 @@ use anyhow::Result;
 use crate::core::{
     language::Queryable,
     matcher::CaptureMap,
-    node::Node,
+    node::CSTNode,
     pattern::PatternView,
     ruleset::filter::{PatternWithFilters, RewriteFilter},
+    tree::CSTView,
 };
 
 use super::builder::SnippetBuilder;
@@ -25,9 +26,10 @@ where
 {
     pub fn to_string_with<'tree>(
         &'a self,
-        captures: &'tree CaptureMap<'tree, Node<'tree>>,
+        view: &'tree CSTView<'tree, T>,
+        captures: &'tree CaptureMap<'tree, CSTNode<'tree>>,
     ) -> Result<String> {
-        let segment = SnippetBuilder::<T>::new(&self.pview, captures)
+        let segment = SnippetBuilder::<T>::new(&self.pview, view, captures)
             .apply_filters(self.filters)?
             .build()?;
 

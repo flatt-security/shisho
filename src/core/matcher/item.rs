@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 
-use crate::core::node::{NodeLikeId, NodeLikeRefWithId, Range};
+use crate::core::node::{NodeLikeId, NodeLikeRefWithId, Range, TSPoint};
 use crate::core::ruleset::constraint::{Constraint, ConstraintPredicate, PatternWithConstraints};
 use crate::core::source::NormalizedSource;
 use crate::core::tree::TreeView;
@@ -256,11 +256,11 @@ impl<'tree, N: NodeLike<'tree>> ConsecutiveNodes<'tree, N> {
         self.len() == 0
     }
 
-    pub fn start_position(&self) -> tree_sitter::Point {
+    pub fn start_position(&self) -> TSPoint {
         self.as_vec().first().unwrap().node.start_position()
     }
 
-    pub fn end_position(&self) -> tree_sitter::Point {
+    pub fn end_position(&self) -> TSPoint {
         self.as_vec().last().unwrap().node.end_position()
     }
 

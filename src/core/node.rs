@@ -1,8 +1,8 @@
 use id_arena::{Arena, Id};
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
+use std::{borrow::Cow, ops::Sub};
 
-use super::{query::MetavariableId, source::NormalizedSource, view::NodeLikeView};
+use super::{query::MetavariableId, source::NormalizedSource, tree::RootedTreeLike};
 
 const SHISHO_NODE_METAVARIABLE_NAME: &str = "shisho_metavariable_name";
 const SHISHO_NODE_METAVARIABLE: &str = "shisho_metavariable";
@@ -13,14 +13,14 @@ pub type NodeLikeId<'tree, N: NodeLike<'tree>> = Id<N>;
 pub type NodeLikeArena<'tree, N: NodeLike<'tree>> = Arena<N>;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Node<'tree> {
+pub struct CSTNode<'tree> {
     kind: NodeType,
 
     start_byte: usize,
     end_byte: usize,
 
-    start_position: tree_sitter::Point,
-    end_position: tree_sitter::Point,
+    start_position: TSPoint,
+    end_position: TSPoint,
 
     pub children: Vec<NodeLikeId<'tree, Self>>,
     pub(crate) source: &'tree NormalizedSource,
@@ -32,6 +32,7 @@ pub enum NodeType {
     EllipsisMetavariable(MetavariableId),
     Ellipsis,
     Normal(&'static str),
+    Unifier,
 }
 
 /// `Range` describes a range over a source code in a same manner as [Language Server Protocol](https://microsoft.github.io/language-server-protocol/specifications/specification-current/#range).
@@ -47,20 +48,20 @@ pub struct Position {
     pub column: usize,
 }
 
-pub type NodeId<'tree> = NodeLikeId<'tree, Node<'tree>>;
-pub type NodeArena<'tree> = NodeLikeArena<'tree, Node<'tree>>;
-pub type NodeRefWithId<'tree> = NodeLikeRefWithId<'tree, Node<'tree>>;
+pub type CSTNodeId<'tree> = NodeLikeId<'tree, CSTNode<'tree>>;
+pub type CSTNodeArena<'tree> = NodeLikeArena<'tree, CSTNode<'tree>>;
+pub type CSTNodeRefWithId<'tree> = NodeLikeRefWithId<'tree, CSTNode<'tree>>;
 
-impl<'tree> Node<'tree> {
+impl<'tree> CSTNode<'tree> {
     pub fn from_tsnode<'node>(
         tsnode: tree_sitter::Node<'node>,
         source: &'tree NormalizedSource,
-        arena: &mut NodeArena<'tree>,
+        arena: &mut CSTNodeArena<'tree>,
     ) -> NodeLikeId<'tree, Self>
     where
         'tree: 'node,
     {
-        let mut children: Vec<NodeId<'tree>> = vec![];
+        let mut children: Vec<CSTNodeId<'tree>> = vec![];
         for c in tsnode.children(&mut tsnode.walk()) {
             children.push(Self::from_tsnode(c, source, arena));
         }
@@ -76,18 +77,48 @@ impl<'tree> Node<'tree> {
             s => NodeType::Normal(s),
         };
 
-        arena.alloc(Node {
+        arena.alloc(CSTNode {
             kind,
 
             start_byte: tsnode.start_byte(),
             end_byte: tsnode.end_byte(),
 
-            start_position: tsnode.start_position(),
-            end_position: tsnode.end_position(),
+            start_position: tsnode.start_position().into(),
+            end_position: tsnode.end_position().into(),
 
             children,
             source,
         })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TSPoint {
+    pub row: usize,
+    pub column: usize,
+}
+
+impl From<tree_sitter::Point> for TSPoint {
+    fn from(p: tree_sitter::Point) -> Self {
+        Self {
+            row: p.row,
+            column: p.column,
+        }
+    }
+}
+
+impl Sub for TSPoint {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self {
+            row: self.row - rhs.row,
+            column: if self.row == rhs.row {
+                self.column - rhs.column
+            } else {
+                self.column
+            },
+        }
     }
 }
 
@@ -96,16 +127,16 @@ where
     Self: Sized + Clone + std::fmt::Debug,
 {
     fn kind(&self) -> NodeType;
-    fn children<V: NodeLikeView<'tree, Self>>(&'tree self, tview: &'tree V) -> Vec<&'tree Self>;
-    fn indexed_children<V: NodeLikeView<'tree, Self>>(
+    fn children<V: RootedTreeLike<'tree, Self>>(&'tree self, tview: &'tree V) -> Vec<&'tree Self>;
+    fn indexed_children<V: RootedTreeLike<'tree, Self>>(
         &'tree self,
         tview: &'tree V,
     ) -> Vec<NodeLikeRefWithId<'tree, Self>>;
 
     fn start_byte(&self) -> usize;
     fn end_byte(&self) -> usize;
-    fn start_position(&self) -> tree_sitter::Point;
-    fn end_position(&self) -> tree_sitter::Point;
+    fn start_position(&self) -> TSPoint;
+    fn end_position(&self) -> TSPoint;
 
     fn as_cow(&self) -> Cow<'_, str>;
     fn with_source<'a, F, Output>(&'a self, callback: F) -> Output
@@ -115,8 +146,8 @@ where
 }
 
 fn get_metavariable_id<'a>(
-    children: &'a Vec<NodeLikeId<'_, Node>>,
-    arena: &'a Arena<Node>,
+    children: &'a Vec<NodeLikeId<'_, CSTNode>>,
+    arena: &'a Arena<CSTNode>,
 ) -> String {
     children
         .iter()
@@ -127,7 +158,7 @@ fn get_metavariable_id<'a>(
         .expect(format!("no {} found", SHISHO_NODE_METAVARIABLE_NAME).as_str())
 }
 
-impl<'tree> NodeLike<'tree> for Node<'tree> {
+impl<'tree> NodeLike<'tree> for CSTNode<'tree> {
     fn kind(&self) -> NodeType {
         self.kind.clone()
     }
@@ -140,11 +171,11 @@ impl<'tree> NodeLike<'tree> for Node<'tree> {
         self.end_byte
     }
 
-    fn start_position(&self) -> tree_sitter::Point {
+    fn start_position(&self) -> TSPoint {
         self.start_position
     }
 
-    fn end_position(&self) -> tree_sitter::Point {
+    fn end_position(&self) -> TSPoint {
         self.end_position
     }
 
@@ -156,14 +187,14 @@ impl<'tree> NodeLike<'tree> for Node<'tree> {
         )
     }
 
-    fn children<V: NodeLikeView<'tree, Self>>(&'tree self, tview: &'tree V) -> Vec<&'tree Self> {
+    fn children<V: RootedTreeLike<'tree, Self>>(&'tree self, tview: &'tree V) -> Vec<&'tree Self> {
         self.children
             .iter()
             .map(|x| tview.get(*x).unwrap())
             .collect()
     }
 
-    fn indexed_children<V: NodeLikeView<'tree, Self>>(
+    fn indexed_children<V: RootedTreeLike<'tree, Self>>(
         &'tree self,
         tview: &'tree V,
     ) -> Vec<NodeLikeRefWithId<'tree, Self>> {
@@ -204,11 +235,11 @@ impl<'tree, N: NodeLike<'tree>> NodeLikeRefWithId<'tree, N> {
         self.node.end_byte()
     }
 
-    pub fn start_position(&self) -> tree_sitter::Point {
+    pub fn start_position(&self) -> TSPoint {
         self.node.start_position()
     }
 
-    pub fn end_position(&self) -> tree_sitter::Point {
+    pub fn end_position(&self) -> TSPoint {
         self.node.end_position()
     }
 
@@ -216,7 +247,7 @@ impl<'tree, N: NodeLike<'tree>> NodeLikeRefWithId<'tree, N> {
         self.node.as_cow()
     }
 
-    pub fn children<V: NodeLikeView<'tree, N>>(&self, tview: &'tree V) -> Vec<Self> {
+    pub fn children<V: RootedTreeLike<'tree, N>>(&self, tview: &'tree V) -> Vec<Self> {
         self.node.indexed_children(tview)
     }
 

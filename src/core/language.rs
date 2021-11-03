@@ -74,13 +74,15 @@ macro_rules! match_pt {
         let pattern = crate::core::pattern::Pattern::<$lang>::try_from($p).unwrap();
         let pc = crate::core::ruleset::constraint::PatternWithConstraints::new(pattern, vec![]);
 
+        let source = crate::core::source::NormalizedSource::from($t);
+        let code = crate::core::tree::CST::<$lang>::try_from(&source).unwrap();
+        let view = crate::core::tree::CSTView::from(&code);
+
         let query = pc.as_query();
-        let tree = crate::core::tree::Tree::<$lang>::try_from($t).unwrap();
-        let ptree = crate::core::tree::TreeView::from(&tree);
-        let session = ptree.matches(&query);
+        let session = view.matches(&query);
 
         $callback(
-            session.collect::<anyhow::Result<Vec<crate::core::matcher::MatchedItem<crate::core::node::Node>>>>(),
+            session.collect::<anyhow::Result<Vec<crate::core::matcher::MatchedItem<crate::core::node::CSTNode>>>>(),
         );
     }};
 }
@@ -91,18 +93,20 @@ macro_rules! replace_pt {
         let pattern = crate::core::pattern::Pattern::<$lang>::try_from($p).unwrap();
         let pc = crate::core::ruleset::constraint::PatternWithConstraints::new(pattern, vec![]);
 
+        let source = crate::core::source::NormalizedSource::from($t);
+        let code = crate::core::tree::CST::<$lang>::try_from(&source).unwrap();
+        let view = crate::core::tree::CSTView::from(&code);
+
         let query = pc.as_query();
-        let tree = crate::core::tree::Tree::<$lang>::try_from($t).unwrap();
-        let ptree = crate::core::tree::TreeView::from(&tree);
-        let session = ptree.matches(&query);
-        let c = session.collect::<anyhow::Result<Vec<crate::core::matcher::MatchedItem<crate::core::node::Node>>>>().unwrap();
+        let session = view.matches(&query);
+        let c = session.collect::<anyhow::Result<Vec<crate::core::matcher::MatchedItem<crate::core::node::CSTNode>>>>().unwrap();
 
         let rpattern = crate::core::pattern::Pattern::<$lang>::try_from($r).unwrap();
         let pf = crate::core::ruleset::filter::PatternWithFilters::new(rpattern, vec![]);
 
         $callback(
             c.into_iter()
-                .map(|amatch| Code::from($t).rewrite(&amatch, pf.as_roption()))
+                .map(|amatch| Code::from($t).rewrite(&view, &amatch, pf.as_roption()))
                 .collect::<anyhow::Result<Vec<crate::core::source::Code<$lang>>>>()
         );
     }};

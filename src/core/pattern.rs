@@ -1,8 +1,8 @@
 use super::{
     language::Queryable,
-    node::{Node, NodeLikeArena, NodeLikeId},
+    node::{CSTNode, NodeLikeArena, NodeLikeId},
     source::NormalizedSource,
-    view::NodeLikeView,
+    tree::RootedTreeLike,
 };
 use anyhow::{anyhow, Result};
 use std::{
@@ -65,9 +65,9 @@ where
     }
 }
 
-pub type PatternNode<'tree> = Node<'tree>;
-pub type PatternNodeId<'tree> = NodeLikeId<'tree, Node<'tree>>;
-pub type PatternNodeArena<'tree> = NodeLikeArena<'tree, Node<'tree>>;
+pub type PatternNode<'tree> = CSTNode<'tree>;
+pub type PatternNodeId<'tree> = NodeLikeId<'tree, CSTNode<'tree>>;
+pub type PatternNodeArena<'tree> = NodeLikeArena<'tree, CSTNode<'tree>>;
 
 #[derive(Debug)]
 pub struct PatternView<'tree, T> {
@@ -96,12 +96,12 @@ where
     }
 }
 
-impl<'tree, T: Queryable> NodeLikeView<'tree, Node<'tree>> for PatternView<'tree, T> {
-    fn root(&'tree self) -> Option<&'tree Node<'tree>> {
+impl<'tree, T: Queryable> RootedTreeLike<'tree, CSTNode<'tree>> for PatternView<'tree, T> {
+    fn root(&'tree self) -> Option<&'tree CSTNode<'tree>> {
         self.arena.get(self.root)
     }
 
-    fn get(&'tree self, id: PatternNodeId<'tree>) -> Option<&'tree Node<'tree>> {
+    fn get(&'tree self, id: PatternNodeId<'tree>) -> Option<&'tree CSTNode<'tree>> {
         self.arena.get(id)
     }
 }
@@ -112,7 +112,7 @@ where
 {
     fn from(p: &'tree Pattern<T>) -> Self {
         let mut arena = NodeLikeArena::new();
-        let root = Node::from_tsnode(p.tstree.root_node(), &p.source, &mut arena);
+        let root = CSTNode::from_tsnode(p.tstree.root_node(), &p.source, &mut arena);
         PatternView::new(root, arena, &p.source)
     }
 }
