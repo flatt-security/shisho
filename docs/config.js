@@ -29,7 +29,7 @@ const config = {
     },
   },
   sidebar: {
-    forcedNavOrder: ['/', '/getting-started', '/learn-shisho', '/roadmap'],
+    forcedNavOrder: ['/', '/shisho', '/shisho-cloud', '/shisho-action', '/roadmap'],
     collapsedNav: [],
     links: [
       { text: 'Shisho Cloud', link: 'https://shisho.dev' },
@@ -40,8 +40,8 @@ const config = {
     title: '',
   },
   siteMetadata: {
-    title: 'Shisho',
-    description: 'Shisho is a lightweight static code analyzer designed for developers.',
+    title: 'Shisho Documentaion',
+    description: 'Shisho Documentaion explans the details of the usage and answers any relative questions.',
     ogImage: 'https://docs.shisho.dev/images/ogp.png',
     docsLocation: 'https://github.com/flatt-security/shisho/tree/main/docs/content',
     favicon: 'https://docs.shisho.dev/favicon.png',

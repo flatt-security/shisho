@@ -1,7 +1,7 @@
 ---
 title: 'Getting Started'
 metaTitle: 'Getting Started'
-metaDescription: 'TBD'
+metaDescription: 'This page describes details of Shisho preparation.'
 ---
 
 # Overview
