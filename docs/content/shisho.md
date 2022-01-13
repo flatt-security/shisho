@@ -65,12 +65,14 @@ Another key aspect of Shisho is **speed**; it runs so fast with the help of [Rus
 
 The current support language is:
 1. Terrafrom
+2. Go
+3. Dockerfile
 
 See [the roadmap](/roadmap) for further details. You can request new language support at [GitHub issues](https://github.com/flatt-security/shisho/issues)!
 
 ## Shisho Playground
 
-We provide a test environment to execute your own Shisho rules. Please check [Shisho Playground](https://play.shisho.dev/)!
+We provide a test environment to execute your own Shisho rules. Please check [Shisho Playground](https://play.shisho.dev/).
 
 ## Feedback
 

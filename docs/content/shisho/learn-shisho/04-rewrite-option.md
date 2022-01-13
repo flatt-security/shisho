@@ -1,6 +1,6 @@
 ---
 title: 'Rewrite Option'
-metaTitle: 'Rewrite Option'
+metaTitle: '04 - Rewrite Option'
 metaDescription: 'This page describes details of rewrite options for pattern matching.'
 ---
 
@@ -155,7 +155,7 @@ error: You can use only one of `rewrite` or `rewrite_options`.
 You can refer to the metavariable value captured in the pattern like this:
 
 > 📝 Tips: What are constraints?  
-Please review the page [rule constraints](/learn-shisho/03-constraint)
+Please review the page [rule constraints](/shisho/learn-shisho/03-constraint)
 
 ```yaml
 version: '1'
@@ -189,7 +189,7 @@ resource "aws_ebs_volume" "volume" {
 }
 ```
 
-In this case you'll get the following outputs from Shisho:
+In this case, you'll get the following outputs from Shisho:
 
 ```
 $ cat example.tf | shisho check policy.yaml

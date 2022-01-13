@@ -42,8 +42,8 @@ const config = {
     title: '',
   },
   siteMetadata: {
-    title: 'Shisho Documentaion',
-    description: 'Shisho Documentation explains the details of the usage and answers any relative questions.',
+    title: 'Shisho Documentation',
+    description: 'Shisho Documentation explains the details of usage and benefits and answers any questions regarding Shisho products.',
     ogImage: 'https://docs.shisho.dev/images/ogp.png',
     docsLocation: 'https://github.com/flatt-security/shisho/tree/main/docs/content',
     favicon: 'https://docs.shisho.dev/favicon.png',

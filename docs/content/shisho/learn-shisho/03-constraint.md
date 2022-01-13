@@ -1,6 +1,6 @@
 ---
 title: 'Rule Constraint'
-metaTitle: 'Rule Constraint'
+metaTitle: '03 - Rule Constraint'
 metaDescription: 'This page describes details of rule constraints for pattern matching.'
 ---
 
@@ -389,10 +389,10 @@ Nested constraints can take a pattern from the parent constraint and for rewrite
 
 What the below example rule `policy.yaml` does is:
 
-1. Search a `block` resource  while capturing the body of the block as metavariable `X`
-2. Search an `inner` block in the value of metavariable `X` while capturing the body of the block as metavariable `Z`
-3. Search `test` attribute in the value of metavariable `Z` while capturing the value of the attribute as `:[HOO]`
-4. If it matches, extract the value of metavariable `HOO` as a value of  `test` attribute inside the `block` block
+1. Search a `block` resource  while capturing the body of the block as a metavariable `X`
+2. Search an `inner` block in the value of the metavariable `X` while capturing the body of the block as a metavariable `Z`
+3. Search `test` attribute in the value of the metavariable `Z` while capturing the value of the attribute as `:[HOO]`
+4. If it matches, extract the value of the metavariable `HOO` as a value of the `test` attribute inside the `block` block
 
 ```
 version: "1"
