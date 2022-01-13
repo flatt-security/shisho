@@ -13,6 +13,10 @@ metaDescription: 'This page describes details of Shisho Action.'
 
 ![demo](https://github.com/flatt-security/shisho-action/raw/main/docs/images/action.png)
 
+## Feedback
+
+We'd love to hear your feedback! Feel free to ask Shisho team anything at [GitHub issues](https://github.com/flatt-security/shisho-action/issues).
+
 
 
 

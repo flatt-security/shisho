@@ -29,10 +29,12 @@ const config = {
     },
   },
   sidebar: {
-    forcedNavOrder: ['/', '/shisho', '/shisho-cloud', '/shisho-action', '/roadmap'],
+    forcedNavOrder: ['/', '/shisho', '/shisho-cloud', '/shisho-action', '/shisho-dojo', '/roadmap'],
     collapsedNav: [],
     links: [
       { text: 'Shisho Cloud', link: 'https://shisho.dev' },
+      { text: 'Shisho Playground', link: 'https://play.shisho.dev/' },
+      { text: 'Shisho Dojo', link: 'https://shisho.dev/dojo/' },
       { text: 'Flatt Security Inc.', link: 'https://flatt.tech/en' },
     ],
     frontline: false,
@@ -41,7 +43,7 @@ const config = {
   },
   siteMetadata: {
     title: 'Shisho Documentaion',
-    description: 'Shisho Documentaion explans the details of the usage and answers any relative questions.',
+    description: 'Shisho Documentation explains the details of the usage and answers any relative questions.',
     ogImage: 'https://docs.shisho.dev/images/ogp.png',
     docsLocation: 'https://github.com/flatt-security/shisho/tree/main/docs/content',
     favicon: 'https://docs.shisho.dev/favicon.png',

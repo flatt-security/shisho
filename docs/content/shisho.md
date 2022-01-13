@@ -6,7 +6,7 @@ metaDescription: 'This page describes details of Shisho.'
 
 ## Introduction
 
-**Shisho is a lightweight static code analyzer designed for developers and is the core engine for Shisho products**. It is, so to speak, like a pluggable and configurable linter; it gives developers a way to codify your domain knowledge over your code as *rules*. With powerful automation and integration capabilities, the rules will help you find and fix issues semiautomatically.
+**Shisho** is a **lightweight static code analyzer** designed for developers and is the **core engine** for Shisho products. It is, so to speak, like a pluggable and configurable linter; it gives developers a way to codify your domain knowledge over your code as *rules*. With powerful automation and integration capabilities, the rules will help you find and fix issues semiautomatically.
 
 ![demo](./images/shisho-demo.gif)
 
@@ -51,7 +51,7 @@ See [Getting Started](/shisho/getting-started) to learn Shisho more.
 
 Shisho has mainly two strengths: **it runs everywhere**, and **it runs extremely fast**.
 
-> 📝 We already have `sed` or something like that. There are already several static analysis engines in the world indeed. Now you may wonder why do we need Shisho now --- see [this page ("Comparison")](/shisho/comparison) page to know that.
+> 📝 We already have `sed` or something like that. There are already several static analysis engines in the world indeed. Now you may wonder why do we need Shisho now.
 
 ### 1. Run Extremely Fast
 
@@ -59,17 +59,18 @@ In addition, **Shisho runs everywhere**! You can use this tool offline so that y
 
 ### 2. Run Everywhere
 
-Another key aspect of Shisho is **speed**; it runs so fast with the help of [Rust](https://www.rust-lang.org)! See [Comparison](/shisho/comparison) page for further information.
-
+Another key aspect of Shisho is **speed**; it runs so fast with the help of [Rust](https://www.rust-lang.org)!
 
 ## Language Support
 
-The current support languages are:
+The current support language is:
 1. Terrafrom
-2. Docker
-3. Go
 
 See [the roadmap](/roadmap) for further details. You can request new language support at [GitHub issues](https://github.com/flatt-security/shisho/issues)!
+
+## Shisho Playground
+
+We provide a test environment to execute your own Shisho rules. Please check [Shisho Playground](https://play.shisho.dev/)!
 
 ## Feedback
 
