@@ -1,6 +1,6 @@
 ---
 title: 'Rule'
-metaTitle: 'Rule'
+metaTitle: '02 - Rule'
 metaDescription: 'This page describes details of rules for pattern matching.'
 ---
 
@@ -9,11 +9,11 @@ metaDescription: 'This page describes details of rules for pattern matching.'
 _A rule_ describes how matched parts for a pattern should be treated. It mainly consists of:
 
 - an ID
-- [one or more patterns](/learn-shisho/01-pattern)
+- [one or more patterns](/shisho/learn-shisho/01-pattern)
 - a target language name of the pattern
 - a message related to the pattern
-- [rule constraints](/learn-shisho/03-constraint) (optional)
-- [one or more rewrite patterns](/learn-shisho/04-rewrite-option) (optional)
+- [rule constraints](/shisho/learn-shisho/03-constraint) (optional)
+- [one or more rewrite patterns](/shisho/learn-shisho/04-rewrite-option) (optional)
 
 _A rule set_ is a set of rules with Shisho's version information. Here's an example ruleset:
 
@@ -71,7 +71,7 @@ pattern: |
 ```
 
 > 📝 Tips: what is `:[...X]` and `:[...Y]`?  
-> These are _metavariables_. Please review the section, _Metavariable_ on the page [Pattern](/learn-shisho/01-pattern). 
+> These are _metavariables_. Please review the section, _Metavariable_ on the page [Pattern](/shisho/learn-shisho/01-pattern). 
 
 #### Multiple Patterns
 
@@ -124,4 +124,4 @@ patterns:
 
 ### rewrite and rewrite_options
 
-If the parts match `pattern` block, it is transformed by `rewrite` block. You can utilize a single rewrite option with `rewrite` block in a rule **OR** multiple rewrite options with `rewrite_options` block. Please check the further details on the page [one or more rewrite patterns](/learn-shisho/04-rewrite-option). 
+If the parts match a `pattern` block, it is transformed by a `rewrite` block. You can utilize a single rewrite option with the `rewrite` block in a rule **OR** multiple rewrite options with a `rewrite_options` block. Please check the further details on the page [one or more rewrite patterns](/shisho/learn-shisho/04-rewrite-option). 

@@ -1,70 +1,13 @@
 ---
 title: 'Welcome'
-metaTitle: 'Shisho - A lightweight static code analyzer'
+metaTitle: 'Welcome to Shisho Documentation'
 ---
 
-# Welcome to Shisho
+# Welcome to Shisho Documentation
 
-**Shisho is a lightweight static code analyzer designed for developers**. It is, so to speak, like a pluggable and configurable linter; it gives developers a way to codify your domain knowledge over your code as *rules*. With powerful automation and integration capabilities, the rules will help you find and fix issues semiautomatically.
+Shisho Documentation has mainly four components and the following pages explain for further details.
 
-![demo](./images/shisho-demo.gif)
-
-## Key Concept: Detection-as-Code for Code
-
-Shisho provides a means of **achieving Detection-as-Code for your code**. It allows us to analyze and transform your source code with our intuitive DSL. Here's an example of policies for Terraform code:
-
-```yaml
-version: '1'
-rules:
-  - id: 'unencrypted-ebs-volume'
-    language: hcl
-    message: |
-      There was unencrypted EBS module.
-    pattern: |
-      resource "aws_ebs_volume" :[NAME] {
-        :[...X]
-      }
-    constraints:
-      - target: X
-        should: not-match
-        pattern: |
-          encrypted = true
-    rewrite: |
-      resource "aws_ebs_volume" :[NAME] {
-        :[X]
-        encrypted = true
-      }
-```
-
-## Getting Started
-
-Just pull and run our docker image, and you're ready to use 🎉
-
-```sh
-docker run -i -v $(pwd):/workspace ghcr.io/flatt-security/shisho-cli:latest
-```
-
-See [Getting Started](/getting-started) to learn Shisho more.
-
-## Strengths
-
-Shisho has mainly two strengths: **it runs everywhere**, and **it runs extremely fast**.
-
-> 📝 We already have `sed` or something like that. There are already several static analysis engines in the world indeed. Now you may wonder why do we need Shisho now --- see [this page ("Comparison")](/comparison) page to know that.
-
-### 1. Run Extremely Fast
-
-In addition, **Shisho runs everywhere**! You can use this tool offline so that you don't need to transfer your code anywhere. One can use Shisho inside Continuous Integration (CI) systems like GitHub Actions.
-
-### 2. Run Everywhere
-
-Another key aspect of Shisho is **speed**; it runs so fast with the help of [Rust](https://www.rust-lang.org)! See [Comparison](/comparison) page for further information.
-
-
-## Language Support
-
-See [the roadmap](/roadmap) for further details. You can request new language support at [GitHub issues](https://github.com/flatt-security/shisho/issues)!
-
-## Feedback
-
-We'd love to hear your feedback! Feel free to ask Shisho team anything at [GitHub issues](https://github.com/flatt-security/shisho/issues).
+- ["Shisho"](/shisho) is a lightweight static code analyzer and this is the core engine for the Shisho product family.
+- ["Shisho Cloud"](/shisho-cloud) is a cloud-based service for IaC security.
+- ["Shisho Action"](/shisho-action) is an extension of [GitHub Actions](https://github.com/features/actions) to execute the code analysis with Shisho.
+- ["Shisho Dojo"](/shisho-dojo) shows IaC code examples in [GitHub](https://github.com/), the utilization of resources and parameters, and security best practices.

@@ -1,6 +1,6 @@
 ---
 title: 'Pattern'
-metaTitle: 'Pattern'
+metaTitle: '01 - Pattern'
 metaDescription: "This page describes details of Shisho's DSL for pattern matching."
 ---
 

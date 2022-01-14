@@ -29,10 +29,12 @@ const config = {
     },
   },
   sidebar: {
-    forcedNavOrder: ['/', '/getting-started', '/learn-shisho', '/roadmap'],
+    forcedNavOrder: ['/', '/shisho', '/shisho-cloud', '/shisho-action', '/shisho-dojo', '/roadmap'],
     collapsedNav: [],
     links: [
       { text: 'Shisho Cloud', link: 'https://shisho.dev' },
+      { text: 'Shisho Playground', link: 'https://play.shisho.dev/' },
+      { text: 'Shisho Dojo', link: 'https://shisho.dev/dojo/' },
       { text: 'Flatt Security Inc.', link: 'https://flatt.tech/en' },
     ],
     frontline: false,
@@ -40,8 +42,8 @@ const config = {
     title: '',
   },
   siteMetadata: {
-    title: 'Shisho',
-    description: 'Shisho is a lightweight static code analyzer designed for developers.',
+    title: 'Shisho Documentation',
+    description: 'Shisho Documentation explains the details of usage and benefits and answers any questions regarding Shisho products.',
     ogImage: 'https://docs.shisho.dev/images/ogp.png',
     docsLocation: 'https://github.com/flatt-security/shisho/tree/main/docs/content',
     favicon: 'https://docs.shisho.dev/favicon.png',
