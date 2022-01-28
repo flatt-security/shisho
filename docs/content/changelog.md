@@ -6,7 +6,7 @@ metaDescription: 'Changelog'
 
 #### Shisho Docs - 01/28/2022
 
-We added some explanations about Shisho Cloud.
+We added some explanations about [Shisho Cloud](https://shisho.dev/).
 
 #### Shisho Cloud - 01/28/2022
 
@@ -14,7 +14,7 @@ We released a new registration wizard to improve the UX.
 
 #### Shisho LP - 01/26/2022
 
-We released "About Us" page. Hello, everyone ! :)
+We released "[About Us](https://shisho.dev/about/)" page. Hello, everyone ! :)
 
 <img src="/images/about-us-screenshot.png" alt="about us screenshot" width="400"/>
 
@@ -28,14 +28,14 @@ We released the new console UI.
 
 #### Shisho Cloud - 01/18/2022
 
-We released PR comment functions for GitLab and Bitbucket.
+We released PR comment functions for [GitLab](https://about.gitlab.com/) and [BitBucket](https://bitbucket.org/product).
 
 #### Shisho Cloud - 01/14/2022
 
-We added new rules for AWS, GCP and Azure. 
+We added new rules for [AWS](https://aws.amazon.com/), [GCP](https://cloud.google.com/) and [Azure](https://azure.microsoft.com/). 
 
 #### Shisho Dojo - 12/18/2021
 
-We launched SHisho Dojo.
+We launched [SHisho Dojo](https://shisho.dev/dojo/).
 
 > Last Update: 01/28/2022
