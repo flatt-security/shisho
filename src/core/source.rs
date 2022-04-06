@@ -1,9 +1,10 @@
 use anyhow::Result;
 
 use crate::core::language::Queryable;
-use std::marker::PhantomData;
-
-use super::{matcher::MatchedItem, rewriter::RewriteOption};
+use std::{
+    marker::PhantomData,
+    ops::{Index, Range},
+};
 
 #[derive(Clone)]
 pub struct Code<L>
@@ -20,26 +21,6 @@ where
 {
     pub fn as_str(&self) -> &str {
         self.code.as_str()
-    }
-}
-
-impl<T> Code<T>
-where
-    T: Queryable,
-{
-    pub fn to_rewritten_form(self, item: &MatchedItem, roption: RewriteOption<T>) -> Result<Self> {
-        let current_code = self.as_str().as_bytes();
-
-        let before_snippet = String::from_utf8(current_code[0..item.area.start_byte()].to_vec())?;
-        let snippet = roption.to_rewritten_snippet(item)?;
-        let after_snippet = String::from_utf8(
-            current_code[item.area.end_byte().min(current_code.len())..current_code.len()].to_vec(),
-        )?;
-
-        Ok(Code::from(format!(
-            "{}{}{}",
-            before_snippet, snippet, after_snippet
-        )))
     }
 }
 
@@ -65,7 +46,7 @@ where
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct NormalizedSource {
     pub source: Vec<u8>,
     with_extra_newline: bool,
@@ -73,14 +54,49 @@ pub struct NormalizedSource {
 
 impl NormalizedSource {
     #[inline]
-    pub fn with_extra_newline(&self) -> bool {
-        self.with_extra_newline
+    pub fn as_str_between(&self, start: usize, end: usize) -> Result<&str> {
+        Ok(core::str::from_utf8(&self[start..end])?)
+    }
+
+    #[inline]
+    pub fn as_normalized(&self) -> &[u8] {
+        &self.source
+    }
+}
+
+impl Index<Range<usize>> for NormalizedSource {
+    type Output = [u8];
+
+    #[inline]
+    fn index(&self, index: Range<usize>) -> &Self::Output {
+        let start = if self.source.len() == index.start && self.with_extra_newline {
+            index.start - 1
+        } else {
+            index.start
+        };
+        let end = if self.source.len() == index.end && self.with_extra_newline {
+            index.end - 1
+        } else {
+            index.end
+        };
+        &self.source[start..end]
     }
 }
 
 impl AsRef<[u8]> for NormalizedSource {
     fn as_ref(&self) -> &[u8] {
-        &self.source
+        let last = if self.with_extra_newline {
+            self.source.len() - 1
+        } else {
+            self.source.len()
+        };
+        &self.source[..last]
+    }
+}
+
+impl<'s> From<&'s NormalizedSource> for &'s [u8] {
+    fn from(s: &'s NormalizedSource) -> Self {
+        s.as_ref()
     }
 }
 

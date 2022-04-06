@@ -5,12 +5,11 @@ use crate::cli::reporter::{ConsoleReporter, JSONReporter, Reporter, ReporterType
 use crate::cli::{CommonOpts, ReportOpts};
 use crate::core::source::NormalizedSource;
 use crate::core::target::TargetLoader;
-use crate::core::tree::NormalizedTree;
+use crate::core::tree::{CSTView, CST};
 use crate::core::{
     language::{Dockerfile, Go, Queryable, HCL},
     ruleset::{self, Rule},
     target::Target,
-    tree::Tree,
 };
 use ansi_term::Color;
 use anyhow::{anyhow, Result};
@@ -164,15 +163,14 @@ fn handle_typed_rules<'a, E: Reporter<'a>, Lang: Queryable>(
     rules: &[Rule],
 ) -> Result<usize> {
     let source = NormalizedSource::from(target.body.as_str());
-    let tree = Tree::<Lang>::try_from(source).unwrap();
-    let ptree = NormalizedTree::from(&tree);
-    let ptree = ptree.as_ref_treeview();
+    let tree = CST::<Lang>::try_from(&source).unwrap();
+    let view = CSTView::from(&tree);
 
     let mut total_findings = 0;
     for rule in rules {
-        let findings = rule.find::<Lang>(&ptree)?;
+        let findings = rule.find::<Lang>(&view)?;
         total_findings += findings.len();
-        reporter.add_entry::<Lang>(target, repeat(rule).zip(findings).collect())?;
+        reporter.add_entry::<Lang>(target, &view, repeat(rule).zip(findings).collect())?;
     }
 
     Ok(total_findings)

@@ -1,0 +1,21 @@
+version: "1"
+rules:
+  - id: "test"
+    language: hcl
+    message: |
+      test
+    pattern: |
+      resource "block" :[NAME] {        
+        :[...X]
+      }
+    constraints:
+      - target: X
+        should: match
+        pattern: |
+          b = 1
+          c = 1
+    # rewrite_options:
+    #   - |
+    #     resource "block" :[NAME] {
+    #       test = :[HOO]
+    #     }

@@ -1,6 +1,8 @@
 use super::{
-    constraint::Constraint, language::Queryable, node::RootNode,
-    ruleset::RawPatternWithConstraints, source::NormalizedSource,
+    language::Queryable,
+    node::{CSTNode, NodeLikeArena, NodeLikeId},
+    source::NormalizedSource,
+    tree::{RootedTreeLike, TreeLike},
 };
 use anyhow::{anyhow, Result};
 use std::{
@@ -9,106 +11,97 @@ use std::{
 };
 
 #[derive(Debug)]
-pub struct Pattern<T>
+struct TSPattern<T>
 where
     T: Queryable,
 {
-    pub source: Vec<u8>,
-    with_extra_newline: bool,
-
     tstree: tree_sitter::Tree,
     _marker: PhantomData<T>,
 }
 
-impl<T> Pattern<T>
-where
-    T: Queryable,
-{
-    pub fn to_root_node(&'_ self) -> RootNode<'_> {
-        RootNode::from_tstree(&self.tstree, &self.source, self.with_extra_newline)
-    }
-
-    #[inline]
-    pub fn string_between(&self, start: usize, end: usize) -> Result<String> {
-        let start = if self.source.len() == start && self.with_extra_newline {
-            start - 1
-        } else {
-            start
-        };
-        let end = if self.source.len() == end && self.with_extra_newline {
-            end - 1
-        } else {
-            end
-        };
-        Ok(String::from_utf8(self.source[start..end].to_vec())?)
-    }
-}
-
-impl<T> TryFrom<NormalizedSource> for Pattern<T>
+impl<T> TryFrom<&NormalizedSource> for TSPattern<T>
 where
     T: Queryable,
 {
     type Error = anyhow::Error;
 
-    fn try_from(source: NormalizedSource) -> Result<Self, anyhow::Error> {
+    fn try_from(source: &NormalizedSource) -> Result<Self, anyhow::Error> {
         let mut parser = tree_sitter::Parser::new();
         parser.set_language(T::query_language())?;
 
         let tstree = parser
-            .parse(source.as_ref(), None)
+            .parse(source.as_normalized(), None)
             .ok_or(anyhow!("failed to load the code"))?;
 
-        let with_extra_newline = source.with_extra_newline();
-        Ok(Pattern {
-            source: source.into(),
-            with_extra_newline,
-
+        Ok(TSPattern {
             tstree,
             _marker: PhantomData,
         })
     }
 }
 
-impl<T> TryFrom<&str> for Pattern<T>
+pub type PatternNode<'tree> = CSTNode<'tree>;
+pub type PatternNodeId<'tree> = NodeLikeId<'tree, PatternNode<'tree>>;
+pub type PatternNodeArena<'tree> = NodeLikeArena<'tree, PatternNode<'tree>>;
+
+#[derive(Debug)]
+pub struct Pattern<'tree, T> {
+    pub root: PatternNodeId<'tree>,
+    pub source: &'tree NormalizedSource,
+
+    arena: PatternNodeArena<'tree>,
+    _marker: PhantomData<T>,
+}
+
+impl<'tree, T> Pattern<'tree, T>
+where
+    T: Queryable,
+{
+    pub fn new(
+        root: PatternNodeId<'tree>,
+        arena: PatternNodeArena<'tree>,
+        source: &'tree NormalizedSource,
+    ) -> Pattern<'tree, T> {
+        Pattern {
+            root,
+            arena,
+            source,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<'tree, T: Queryable> RootedTreeLike<'tree, PatternNode<'tree>> for Pattern<'tree, T> {
+    fn root(&'tree self) -> &'tree PatternNode<'tree> {
+        self.arena.get(self.root).unwrap()
+    }
+}
+
+impl<'tree, T: Queryable> TreeLike<'tree, PatternNode<'tree>> for Pattern<'tree, T> {
+    fn get(&'tree self, id: PatternNodeId<'tree>) -> Option<&'tree PatternNode<'tree>> {
+        self.arena.get(id)
+    }
+}
+
+impl<'tree, T> From<(TSPattern<T>, &'tree NormalizedSource)> for Pattern<'tree, T>
+where
+    T: Queryable,
+{
+    fn from((p, source): (TSPattern<T>, &'tree NormalizedSource)) -> Self {
+        let mut arena = NodeLikeArena::new();
+        let root = PatternNode::from_tsnode(p.tstree.root_node(), source, &mut arena);
+        Pattern::new(root, arena, source)
+    }
+}
+
+impl<'tree, T> TryFrom<&'tree NormalizedSource> for Pattern<'tree, T>
 where
     T: Queryable,
 {
     type Error = anyhow::Error;
 
-    fn try_from(source: &str) -> Result<Self, anyhow::Error> {
-        let source = NormalizedSource::from(source);
-        source.try_into()
-    }
-}
-
-#[derive(Debug)]
-pub struct PatternWithConstraints<T: Queryable> {
-    pub pattern: Pattern<T>,
-    pub constraints: Vec<Constraint<T>>,
-}
-
-impl<T: Queryable> PatternWithConstraints<T> {
-    pub fn new(pattern: Pattern<T>, constraints: Vec<Constraint<T>>) -> Self {
-        Self {
-            pattern,
-            constraints,
-        }
-    }
-}
-
-impl<T: Queryable> TryFrom<RawPatternWithConstraints> for PatternWithConstraints<T> {
-    type Error = anyhow::Error;
-
-    fn try_from(rpc: RawPatternWithConstraints) -> Result<Self> {
-        let pattern = Pattern::<T>::try_from(rpc.pattern.as_str())?;
-        let constraints = rpc
-            .constraints
-            .iter()
-            .map(|x| Constraint::try_from(x.clone()))
-            .collect::<Result<Vec<Constraint<T>>>>()?;
-        Ok(Self {
-            pattern,
-            constraints,
-        })
+    fn try_from(value: &'tree NormalizedSource) -> Result<Self, Self::Error> {
+        let p = TSPattern::try_from(value)?;
+        Ok((p, value).into())
     }
 }

@@ -1,45 +1,41 @@
 mod builder;
-mod literal;
-
-use crate::core::{language::Queryable, matcher::MatchedItem, node::RootNode, pattern::Pattern};
+mod item;
+mod node;
+mod option;
 use anyhow::Result;
+pub use option::RewriteOption;
 
-use self::builder::SnippetBuilder;
+use super::{
+    language::Queryable, matcher::MatchedItem, node::CSTNode, source::Code, tree::CSTView,
+};
 
-pub struct RewriteOption<'a, T>
+impl<T> Code<T>
 where
     T: Queryable,
 {
-    pub root_node: RootNode<'a>,
-    pattern: &'a Pattern<T>,
-}
+    pub fn rewrite<'tree>(
+        self,
+        view: &'tree CSTView<'tree, T>,
+        item: &MatchedItem<'tree, CSTNode<'tree>>,
+        roption: RewriteOption<T>,
+    ) -> Result<Self> {
+        let current_code = self.as_str().as_bytes();
 
-impl<'a, T> RewriteOption<'a, T>
-where
-    T: Queryable,
-{
-    pub fn to_rewritten_snippet<'tree>(&self, item: &'tree MatchedItem) -> Result<String> {
-        Ok(SnippetBuilder::new(self, item)
-            .from_root(&self.root_node)?
-            .body)
+        let before = self.string_between(0, item.area.start_byte())?;
+
+        let snippet = roption.to_string_with(view, &item.captures)?;
+
+        let after = self.string_between(
+            item.area.end_byte().min(current_code.len()),
+            current_code.len(),
+        )?;
+
+        Ok(Code::from(format!("{}{}{}", before, snippet, after)))
     }
-}
 
-impl<'a, T> From<&'a Pattern<T>> for RewriteOption<'a, T>
-where
-    T: Queryable,
-{
-    fn from(pattern: &'a Pattern<T>) -> Self {
-        let root_node = pattern.to_root_node();
-        Self { pattern, root_node }
-    }
-}
-
-impl<T> Pattern<T>
-where
-    T: Queryable,
-{
-    pub fn as_rewrite_option(&'_ self) -> RewriteOption<'_, T> {
-        self.into()
+    #[inline]
+    pub fn string_between(&self, start: usize, end: usize) -> Result<String> {
+        let source = self.as_str().as_bytes();
+        Ok(String::from_utf8(source[start..end].to_vec())?)
     }
 }

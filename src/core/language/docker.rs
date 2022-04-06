@@ -1,6 +1,9 @@
-use crate::core::node::{Node, NodeType, RootNode};
-
 use super::Queryable;
+use crate::core::{
+    node::{NodeLike, NodeType},
+    pattern::{Pattern, PatternNode},
+    tree::RootedTreeLike,
+};
 
 #[derive(Debug, Clone)]
 pub struct Dockerfile;
@@ -14,20 +17,20 @@ impl Queryable for Dockerfile {
         tree_sitter_dockerfile_query::language()
     }
 
-    fn unwrap_root<'tree, 'a>(root: &'a RootNode<'tree>) -> &'a Vec<Node<'tree>> {
-        // see `//third_party/tree-sitter-dockerfile-query/grammar.js`
-        &root.as_node().children
+    fn root_nodes<'tree>(pview: &'tree Pattern<'tree, Self>) -> Vec<&'tree PatternNode<'tree>> {
+        let root = pview.root();
+        root.children(pview)
     }
 
-    fn is_skippable(node: &Node) -> bool {
+    fn is_skippable<'tree, N: NodeLike<'tree>>(node: &N) -> bool {
         node.kind() == NodeType::Normal("\n")
     }
 
-    fn is_leaf_like(node: &Node) -> bool {
+    fn is_leaf_like<'tree, N: NodeLike<'tree>>(node: &N) -> bool {
         Self::is_string_literal(node)
     }
 
-    fn is_string_literal(node: &Node) -> bool {
+    fn is_string_literal<'tree, N: NodeLike<'tree>>(node: &N) -> bool {
         matches!(
             node.kind(),
             NodeType::Normal("shell_fragment")
@@ -37,12 +40,8 @@ impl Queryable for Dockerfile {
         )
     }
 
-    fn node_value_eq<'a, 'b>(l: &Node<'a>, r: &Node<'b>) -> bool {
-        if !l.is_named() && !r.is_named() {
-            l.as_str().to_ascii_uppercase() == r.as_str().to_ascii_uppercase()
-        } else {
-            l.as_str() == r.as_str()
-        }
+    fn node_value_eq<'nl, 'nr, NL: NodeLike<'nl>, NR: NodeLike<'nr>>(l: &NL, r: &NR) -> bool {
+        l.as_cow().to_ascii_uppercase() == r.as_cow().to_ascii_uppercase()
     }
 }
 
@@ -50,7 +49,7 @@ impl Queryable for Dockerfile {
 mod tests {
     use super::*;
     use crate::{
-        core::{matcher::MatchedItem, query::MetavariableId},
+        core::{matcher::MatchedItem, node::CSTNode, ruleset::constraint::MetavariableId},
         match_pt,
     };
     use anyhow::Result;
@@ -62,14 +61,14 @@ mod tests {
             Dockerfile,
             r#"FROM :[A]"#,
             r#"FROM name"#,
-            |matches: Result<Vec<MatchedItem>>| {
+            |matches: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let matches = matches.unwrap();
                 assert_eq!(matches.len(), 1);
                 assert_eq!(
                     matches[0]
                         .capture_of(&MetavariableId("A".into()))
-                        .map(|x| x.as_str()),
-                    Some("name")
+                        .map(|x| x.to_string()),
+                    Some("name".to_string())
                 );
             }
         );
@@ -78,20 +77,20 @@ mod tests {
             Dockerfile,
             r#"FROM :[A]::[B]"#,
             r#"FROM name:tag"#,
-            |matches: Result<Vec<MatchedItem>>| {
+            |matches: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let matches = matches.unwrap();
                 assert_eq!(matches.len(), 1);
                 assert_eq!(
                     matches[0]
                         .capture_of(&MetavariableId("A".into()))
-                        .map(|x| x.as_str()),
-                    Some("name")
+                        .map(|x| x.to_string()),
+                    Some("name".to_string())
                 );
                 assert_eq!(
                     matches[0]
                         .capture_of(&MetavariableId("B".into()))
-                        .map(|x| x.as_str()),
-                    Some("tag")
+                        .map(|x| x.to_string()),
+                    Some("tag".to_string())
                 );
             }
         );
@@ -100,26 +99,26 @@ mod tests {
             Dockerfile,
             r#"FROM :[A]::[B]@:[HASH]"#,
             r#"FROM name:tag@hash"#,
-            |matches: Result<Vec<MatchedItem>>| {
+            |matches: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let matches = matches.unwrap();
                 assert_eq!(matches.len(), 1);
                 assert_eq!(
                     matches[0]
                         .capture_of(&MetavariableId("A".into()))
-                        .map(|x| x.as_str()),
-                    Some("name")
+                        .map(|x| x.to_string()),
+                    Some("name".to_string())
                 );
                 assert_eq!(
                     matches[0]
                         .capture_of(&MetavariableId("B".into()))
-                        .map(|x| x.as_str()),
-                    Some("tag")
+                        .map(|x| x.to_string()),
+                    Some("tag".to_string())
                 );
                 assert_eq!(
                     matches[0]
                         .capture_of(&MetavariableId("HASH".into()))
-                        .map(|x| x.as_str()),
-                    Some("hash")
+                        .map(|x| x.to_string()),
+                    Some("hash".to_string())
                 );
             }
         );
@@ -128,32 +127,32 @@ mod tests {
             Dockerfile,
             r#"FROM :[A]::[B]@:[HASH] as :[ALIAS]"#,
             r#"FROM name:tag@hash as alias"#,
-            |matches: Result<Vec<MatchedItem>>| {
+            |matches: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let matches = matches.unwrap();
                 assert_eq!(matches.len(), 1);
                 assert_eq!(
                     matches[0]
                         .capture_of(&MetavariableId("A".into()))
-                        .map(|x| x.as_str()),
-                    Some("name")
+                        .map(|x| x.to_string()),
+                    Some("name".to_string())
                 );
                 assert_eq!(
                     matches[0]
                         .capture_of(&MetavariableId("B".into()))
-                        .map(|x| x.as_str()),
-                    Some("tag")
+                        .map(|x| x.to_string()),
+                    Some("tag".to_string())
                 );
                 assert_eq!(
                     matches[0]
                         .capture_of(&MetavariableId("HASH".into()))
-                        .map(|x| x.as_str()),
-                    Some("hash")
+                        .map(|x| x.to_string()),
+                    Some("hash".to_string())
                 );
                 assert_eq!(
                     matches[0]
                         .capture_of(&MetavariableId("ALIAS".into()))
-                        .map(|x| x.as_str()),
-                    Some("alias")
+                        .map(|x| x.to_string()),
+                    Some("alias".to_string())
                 );
             }
         );
@@ -165,14 +164,14 @@ mod tests {
             Dockerfile,
             r#"RUN :[X]"#,
             r#"RUN echo "hosts: files dns" > /etc/nsswitch.conf"#,
-            |matches: Result<Vec<MatchedItem>>| {
+            |matches: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let matches = matches.unwrap();
                 assert_eq!(matches.len(), 1);
                 assert_eq!(
                     matches[0]
                         .capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some(r#"echo "hosts: files dns" > /etc/nsswitch.conf"#)
+                        .map(|x| x.to_string()),
+                    Some(r#"echo "hosts: files dns" > /etc/nsswitch.conf"#.to_string())
                 );
             }
         );
@@ -182,15 +181,15 @@ mod tests {
         automake \
         && rm -rf /var/lib/apt/lists/*"#;
         match_pt!(Dockerfile, r#"RUN :[X]"#, cmd, |matches: Result<
-            Vec<MatchedItem>,
+            Vec<MatchedItem<CSTNode<'_>>>,
         >| {
             let matches = matches.unwrap();
             assert_eq!(matches.len(), 1);
             assert_eq!(
                 matches[0]
                     .capture_of(&MetavariableId("X".into()))
-                    .map(|x| x.as_str()),
-                Some(cmd[4..].to_string().as_str())
+                    .map(|x| x.to_string()),
+                Some(cmd[4..].to_string())
             );
         });
     }
@@ -201,20 +200,20 @@ mod tests {
             Dockerfile,
             r#"COPY :[X] :[Y]"#,
             r#"COPY ./ /app"#,
-            |matches: Result<Vec<MatchedItem>>| {
+            |matches: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let matches = matches.unwrap();
                 assert_eq!(matches.len(), 1);
                 assert_eq!(
                     matches[0]
                         .capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("./")
+                        .map(|x| x.to_string()),
+                    Some("./".to_string())
                 );
                 assert_eq!(
                     matches[0]
                         .capture_of(&MetavariableId("Y".into()))
-                        .map(|x| x.as_str()),
-                    Some("/app")
+                        .map(|x| x.to_string()),
+                    Some("/app".to_string())
                 );
             }
         );

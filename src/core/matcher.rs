@@ -9,3 +9,6 @@ pub use self::state::*;
 
 mod tree;
 pub use self::tree::*;
+
+mod query;
+pub use self::query::*;

@@ -7,6 +7,8 @@ pub use self::json::*;
 mod sarif;
 pub use self::sarif::*;
 
+use crate::core::node::CSTNode;
+use crate::core::tree::CSTView;
 use crate::core::{language::Queryable, matcher::MatchedItem, ruleset::Rule, target::Target};
 use anyhow::Result;
 use std::str::FromStr;
@@ -17,10 +19,11 @@ pub trait Reporter<'a> {
     where
         Self: Sized;
 
-    fn add_entry<T: Queryable>(
+    fn add_entry<'tree, T: Queryable>(
         &mut self,
         target: &Target,
-        items: Vec<(&Rule, MatchedItem)>,
+        view: &'tree CSTView<'tree, T>,
+        items: Vec<(&Rule, MatchedItem<'tree, CSTNode<'tree>>)>,
     ) -> Result<()>;
 
     fn report(&mut self) -> Result<()>;

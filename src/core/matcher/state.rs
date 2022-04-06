@@ -1,23 +1,24 @@
 use itertools::Itertools;
 
-use crate::core::{
-    matcher::{CaptureItem, MatchedItem},
-    node::ConsecutiveNodes,
-    query::MetavariableId,
-};
-use std::collections::HashMap;
+use crate::core::ruleset::constraint::MetavariableId;
+use crate::core::{matcher::CaptureItem, node::NodeLike};
 
-pub type UnverifiedMetavariable<'tree> = (MetavariableId, CaptureItem<'tree>);
+use super::ConsecutiveNodes;
+use super::{CaptureMap, UnconstrainedMatchedItem};
+
+pub type UnverifiedMetavariable<'tree, N> = (MetavariableId, CaptureItem<'tree, N>);
 
 #[derive(Debug, Default, Clone)]
-pub struct MatcherState<'tree> {
-    pub(crate) subtree: Option<ConsecutiveNodes<'tree>>,
-    pub(crate) captures: Vec<UnverifiedMetavariable<'tree>>,
+pub struct MatcherState<'tree, N: NodeLike<'tree>> {
+    pub(crate) subtree: Option<ConsecutiveNodes<'tree, N>>,
+    pub(crate) captures: Vec<UnverifiedMetavariable<'tree, N>>,
 }
 
-impl<'tree> From<MatcherState<'tree>> for Option<MatchedItem<'tree>> {
-    fn from(value: MatcherState<'tree>) -> Self {
-        let mut captures = HashMap::<MetavariableId, CaptureItem>::new();
+impl<'tree, N: NodeLike<'tree>> From<MatcherState<'tree, N>>
+    for Option<UnconstrainedMatchedItem<'tree, N>>
+{
+    fn from(value: MatcherState<'tree, N>) -> Self {
+        let mut captures = CaptureMap::<N>::new();
 
         let captures_per_mid = value.captures.into_iter().group_by(|k| k.0.clone());
         for (mid, citems) in captures_per_mid.into_iter() {
@@ -32,19 +33,21 @@ impl<'tree> From<MatcherState<'tree>> for Option<MatchedItem<'tree>> {
             }
         }
 
-        Some(MatchedItem {
+        Some(UnconstrainedMatchedItem {
             area: value.subtree.unwrap(),
             captures,
         })
     }
 }
 
-fn fold_capture(capture_items: Vec<CaptureItem<'_>>) -> Option<CaptureItem<'_>> {
+fn fold_capture<'tree, N: NodeLike<'tree>>(
+    capture_items: Vec<CaptureItem<'tree, N>>,
+) -> Option<CaptureItem<'tree, N>> {
     let mut it = capture_items.into_iter();
     let first = it.next();
     it.fold(first, |acc, capture| match acc {
         Some(acc) => {
-            if acc.as_str() == capture.as_str() {
+            if acc.to_string() == capture.to_string() {
                 Some(capture)
             } else {
                 None
