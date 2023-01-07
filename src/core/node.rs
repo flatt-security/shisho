@@ -1,14 +1,27 @@
-use std::convert::TryFrom;
-
-use crate::core::language::Queryable;
+use id_arena::{Arena, Id};
 use serde::{Deserialize, Serialize};
+use std::{borrow::Cow, ops::Sub};
 
-use super::query::MetavariableId;
+use super::{
+    ruleset::constraint::MetavariableId,
+    source::NormalizedSource,
+    tree::{RootedTreeLike, TreeLike},
+};
 
 const SHISHO_NODE_METAVARIABLE_NAME: &str = "shisho_metavariable_name";
 const SHISHO_NODE_METAVARIABLE: &str = "shisho_metavariable";
 const SHISHO_NODE_ELLIPSIS_METAVARIABLE: &str = "shisho_ellipsis_metavariable";
 const SHISHO_NODE_ELLIPSIS: &str = "shisho_ellipsis";
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum NodeType {
+    Metavariable(MetavariableId),
+    EllipsisMetavariable(MetavariableId),
+    Ellipsis,
+    Normal(&'static str),
+    Unifier,
+}
+
 /// `Range` describes a range over a source code in a same manner as [Language Server Protocol](https://microsoft.github.io/language-server-protocol/specifications/specification-current/#range).
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Range {
@@ -22,239 +35,230 @@ pub struct Position {
     pub column: usize,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct Node<'tree> {
-    inner: tree_sitter::Node<'tree>,
-    with_extra_newline: bool,
-
-    pub(crate) source: &'tree [u8],
-    pub children: Vec<Node<'tree>>,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TSPoint {
+    pub row: usize,
+    pub column: usize,
 }
 
-#[derive(Debug, PartialEq)]
-pub enum NodeType {
-    Metavariable(MetavariableId),
-    EllipsisMetavariable(MetavariableId),
-    Ellipsis,
-    Normal(&'static str),
-}
-
-fn get_metavariable_id<'a>(node: &'a Node<'_>) -> &'a str {
-    node.children
-        .iter()
-        .find(|child| child.kind() == NodeType::Normal(SHISHO_NODE_METAVARIABLE_NAME))
-        .map(|child| child.as_str())
-        .expect(
-            format!(
-                "{} did not have {}",
-                SHISHO_NODE_ELLIPSIS_METAVARIABLE, SHISHO_NODE_METAVARIABLE_NAME
-            )
-            .as_str(),
-        )
-}
-
-impl<'tree> Node<'tree> {
-    pub fn kind(&self) -> NodeType {
-        match self.inner.kind() {
-            s if s == SHISHO_NODE_METAVARIABLE => {
-                NodeType::Metavariable(MetavariableId(get_metavariable_id(self).to_string()))
-            }
-            s if s == SHISHO_NODE_ELLIPSIS => NodeType::Ellipsis,
-            s if s == SHISHO_NODE_ELLIPSIS_METAVARIABLE => NodeType::EllipsisMetavariable(
-                MetavariableId(get_metavariable_id(self).to_string()),
-            ),
-            s => NodeType::Normal(s),
+impl From<tree_sitter::Point> for TSPoint {
+    fn from(p: tree_sitter::Point) -> Self {
+        Self {
+            row: p.row,
+            column: p.column,
         }
+    }
+}
+
+impl Sub for TSPoint {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self {
+            row: self.row - rhs.row,
+            column: if self.row == rhs.row {
+                self.column - rhs.column
+            } else {
+                self.column
+            },
+        }
+    }
+}
+
+pub trait NodeLike<'tree>
+where
+    Self: Sized + Clone + std::fmt::Debug,
+{
+    fn kind(&self) -> NodeType;
+    fn children<V: TreeLike<'tree, Self>>(&'tree self, tview: &'tree V) -> Vec<&'tree Self>;
+    fn indexed_children<V: TreeLike<'tree, Self>>(
+        &'tree self,
+        tview: &'tree V,
+    ) -> Vec<NodeLikeRefWithId<'tree, Self>>;
+
+    fn start_byte(&self) -> usize;
+    fn end_byte(&self) -> usize;
+    fn start_position(&self) -> TSPoint;
+    fn end_position(&self) -> TSPoint;
+
+    fn as_cow(&self) -> Cow<'_, str>;
+    fn with_source<'a, F, Output>(&'a self, callback: F) -> Output
+    where
+        F: Fn(&NormalizedSource) -> Output,
+        Output: 'a;
+}
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub struct NodeLikeRefWithId<'tree, N: NodeLike<'tree>> {
+    pub id: NodeLikeId<'tree, N>,
+    pub node: &'tree N,
+}
+
+impl<'tree, N: NodeLike<'tree>> NodeLikeRefWithId<'tree, N> {
+    pub fn kind(&self) -> NodeType {
+        self.node.kind()
     }
 
     pub fn start_byte(&self) -> usize {
-        self.inner.start_byte()
+        self.node.start_byte()
     }
 
     pub fn end_byte(&self) -> usize {
-        self.inner.end_byte()
+        self.node.end_byte()
     }
 
-    pub fn start_position(&self) -> tree_sitter::Point {
-        self.inner.start_position()
+    pub fn start_position(&self) -> TSPoint {
+        self.node.start_position()
     }
 
-    pub fn end_position(&self) -> tree_sitter::Point {
-        self.inner.end_position()
+    pub fn end_position(&self) -> TSPoint {
+        self.node.end_position()
     }
 
-    pub fn as_str(&self) -> &'tree str {
-        let last = if self.with_extra_newline {
-            self.end_byte() - 1
-        } else {
-            self.end_byte()
-        };
-        core::str::from_utf8(&self.source[self.start_byte()..last]).unwrap()
+    pub fn as_cow(&self) -> Cow<'_, str> {
+        self.node.as_cow()
     }
 
-    pub fn is_named(&self) -> bool {
-        self.inner.is_named()
+    pub fn children<V: TreeLike<'tree, N>>(&self, tview: &'tree V) -> Vec<Self> {
+        self.node.indexed_children(tview)
     }
 
-    pub fn from_tsnode(
-        tsnode: tree_sitter::Node<'tree>,
-        source: &'tree [u8],
-        extra_newline_byte: Option<usize>,
-    ) -> Self {
-        let children: Vec<Self> = tsnode
-            .children(&mut tsnode.walk())
-            .map(|c| Self::from_tsnode(c, source, extra_newline_byte))
-            .collect();
-        Node {
-            inner: tsnode,
-            with_extra_newline: extra_newline_byte == Some(tsnode.end_byte() - 1),
-            children,
-            source,
-        }
+    pub fn with_source<'a, F, Output>(&'a self, callback: F) -> Output
+    where
+        F: Fn(&NormalizedSource) -> Output,
+        Output: 'a,
+    {
+        self.node.with_source(callback)
     }
 }
 
-#[derive(Debug)]
-pub struct RootNode<'tree>(Node<'tree>);
+#[derive(Debug, Clone, PartialEq)]
+pub struct CSTNode<'tree> {
+    kind: NodeType,
 
-impl<'tree> RootNode<'tree> {
-    pub fn from_tstree(
-        tstree: &'tree tree_sitter::Tree,
-        source: &'tree [u8],
-        with_extra_newline: bool,
-    ) -> Self {
-        let tsnode = tstree.root_node();
-        let children: Vec<Node<'tree>> = tsnode
-            .children(&mut tsnode.walk())
-            .map(|c| {
-                Node::from_tsnode(
-                    c,
-                    source,
-                    if with_extra_newline {
-                        Some(source.len() - 1)
-                    } else {
-                        None
-                    },
-                )
-            })
-            .collect();
-        RootNode::new(Node {
-            inner: tsnode,
-            with_extra_newline,
+    start_byte: usize,
+    end_byte: usize,
+
+    start_position: TSPoint,
+    end_position: TSPoint,
+
+    pub children: Vec<NodeLikeId<'tree, Self>>,
+    pub(crate) source: &'tree NormalizedSource,
+}
+
+pub type NodeLikeId<'tree, N: NodeLike<'tree>> = Id<N>;
+pub type NodeLikeArena<'tree, N: NodeLike<'tree>> = Arena<N>;
+
+pub type CSTNodeId<'tree> = NodeLikeId<'tree, CSTNode<'tree>>;
+pub type CSTNodeArena<'tree> = NodeLikeArena<'tree, CSTNode<'tree>>;
+pub type CSTNodeRefWithId<'tree> = NodeLikeRefWithId<'tree, CSTNode<'tree>>;
+
+impl<'tree> CSTNode<'tree> {
+    pub fn from_tsnode<'node>(
+        tsnode: tree_sitter::Node<'node>,
+        source: &'tree NormalizedSource,
+        arena: &mut CSTNodeArena<'tree>,
+    ) -> NodeLikeId<'tree, Self>
+    where
+        'tree: 'node,
+    {
+        fn get_metavariable_id<'a>(
+            children: &'a Vec<NodeLikeId<'_, CSTNode>>,
+            arena: &'a Arena<CSTNode>,
+        ) -> String {
+            children
+                .iter()
+                .map(|x| arena.get(*x).unwrap())
+                .find(|child| child.kind() == NodeType::Normal(SHISHO_NODE_METAVARIABLE_NAME))
+                .map(|child| child.as_cow())
+                .map(|child| child.to_string())
+                .expect(format!("no {} found", SHISHO_NODE_METAVARIABLE_NAME).as_str())
+        }
+
+        let mut children: Vec<CSTNodeId<'tree>> = vec![];
+        for c in tsnode.children(&mut tsnode.walk()) {
+            children.push(Self::from_tsnode(c, source, arena));
+        }
+
+        let kind = match tsnode.kind() {
+            s if s == SHISHO_NODE_METAVARIABLE => {
+                NodeType::Metavariable(MetavariableId(get_metavariable_id(&children, arena)))
+            }
+            s if s == SHISHO_NODE_ELLIPSIS => NodeType::Ellipsis,
+            s if s == SHISHO_NODE_ELLIPSIS_METAVARIABLE => NodeType::EllipsisMetavariable(
+                MetavariableId(get_metavariable_id(&children, arena)),
+            ),
+            s => NodeType::Normal(s),
+        };
+
+        arena.alloc(CSTNode {
+            kind,
+
+            start_byte: tsnode.start_byte(),
+            end_byte: tsnode.end_byte(),
+
+            start_position: tsnode.start_position().into(),
+            end_position: tsnode.end_position().into(),
+
             children,
             source,
         })
     }
 }
 
-impl<'tree> RootNode<'tree> {
-    pub fn new(node: Node<'tree>) -> Self {
-        Self(node)
+impl<'tree> NodeLike<'tree> for CSTNode<'tree> {
+    fn kind(&self) -> NodeType {
+        self.kind.clone()
     }
 
-    pub fn as_node(&self) -> &Node<'tree> {
-        &self.0
+    fn start_byte(&self) -> usize {
+        self.start_byte
     }
-}
 
-impl<'tree> From<RootNode<'tree>> for Node<'tree> {
-    fn from(r: RootNode<'tree>) -> Self {
-        r.0
+    fn end_byte(&self) -> usize {
+        self.end_byte
     }
-}
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct ConsecutiveNodes<'tree> {
-    inner: Vec<&'tree Node<'tree>>,
-    source: &'tree [u8],
-}
-
-impl<'tree> TryFrom<Vec<&'tree Node<'tree>>> for ConsecutiveNodes<'tree> {
-    type Error = anyhow::Error;
-    fn try_from(inner: Vec<&'tree Node<'tree>>) -> Result<Self, Self::Error> {
-        // TODO (y0n3uchy): check all capture items are consecutive
-        if inner.is_empty() {
-            Err(anyhow::anyhow!(
-                "internal error; ConsecutiveNodes was generated from empty vec."
-            ))
-        } else {
-            let source = inner.get(0).unwrap().source;
-            Ok(ConsecutiveNodes { inner, source })
-        }
+    fn start_position(&self) -> TSPoint {
+        self.start_position
     }
-}
 
-impl<'tree> TryFrom<Vec<ConsecutiveNodes<'tree>>> for ConsecutiveNodes<'tree> {
-    type Error = anyhow::Error;
+    fn end_position(&self) -> TSPoint {
+        self.end_position
+    }
 
-    fn try_from(cns: Vec<ConsecutiveNodes<'tree>>) -> Result<Self, Self::Error> {
-        // TODO (y0n3uchy): check all capture items are consecutive
-        if cns.is_empty() {
-            Err(anyhow::anyhow!(
-                "internal error; ConsecutiveNodes was generated from empty vec."
-            ))
-        } else {
-            let source = cns.get(0).unwrap().source;
-            Ok(ConsecutiveNodes {
-                inner: cns.into_iter().map(|cn| cn.inner).flatten().collect(),
-                source,
+    fn as_cow(&self) -> Cow<'_, str> {
+        std::borrow::Cow::Borrowed(
+            self.source
+                .as_str_between(self.start_byte(), self.end_byte())
+                .unwrap(),
+        )
+    }
+
+    fn children<V: TreeLike<'tree, Self>>(&'tree self, tview: &'tree V) -> Vec<&'tree Self> {
+        self.children
+            .iter()
+            .map(|x| tview.get(*x).unwrap())
+            .collect()
+    }
+
+    fn indexed_children<V: TreeLike<'tree, Self>>(
+        &'tree self,
+        tview: &'tree V,
+    ) -> Vec<NodeLikeRefWithId<'tree, Self>> {
+        self.children
+            .iter()
+            .map(|x| NodeLikeRefWithId {
+                id: *x,
+                node: tview.get(*x).unwrap(),
             })
-        }
-    }
-}
-
-impl<'tree> ConsecutiveNodes<'tree> {
-    pub fn as_vec(&self) -> &Vec<&'tree Node<'tree>> {
-        &self.inner
+            .collect()
     }
 
-    pub fn push(&mut self, n: &'tree Node<'tree>) {
-        self.inner.push(n)
-    }
-
-    pub fn start_position(&self) -> tree_sitter::Point {
-        self.as_vec().first().unwrap().start_position()
-    }
-
-    pub fn end_position(&self) -> tree_sitter::Point {
-        self.as_vec().last().unwrap().end_position()
-    }
-
-    pub fn range<T: Queryable>(&self) -> Range {
-        Range {
-            start: T::range(self.as_vec().first().unwrap()).start,
-            end: T::range(self.as_vec().last().unwrap()).end,
-        }
-    }
-
-    pub fn start_byte(&self) -> usize {
-        self.as_vec().first().unwrap().start_byte()
-    }
-
-    pub fn end_byte(&self) -> usize {
-        self.as_vec().last().unwrap().end_byte()
-    }
-
-    pub fn len(&self) -> usize {
-        self.as_vec().len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    #[inline]
-    pub fn with_extra_newline(&self) -> bool {
-        self.as_vec().last().unwrap().with_extra_newline
-    }
-
-    #[inline]
-    pub fn as_str(&self) -> Result<&str, core::str::Utf8Error> {
-        let last = if self.with_extra_newline() {
-            self.end_byte() - 1
-        } else {
-            self.end_byte()
-        };
-        core::str::from_utf8(&self.source[self.start_byte()..last])
+    fn with_source<'a, F, Output>(&'a self, callback: F) -> Output
+    where
+        F: Fn(&NormalizedSource) -> Output,
+        Output: 'a,
+    {
+        callback(self.source.into())
     }
 }

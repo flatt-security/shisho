@@ -2,8 +2,14 @@ use std::convert::TryFrom;
 
 use super::Reporter;
 use crate::core::{
-    language::Queryable, matcher::MatchedItem, node::Range, pattern::Pattern, ruleset::Rule,
-    source::Code, target::Target,
+    language::Queryable,
+    matcher::MatchedItem,
+    node::{CSTNode, Range},
+    rewriter::RewriteOption,
+    ruleset::{filter::PatternWithFilters, Rule},
+    source::Code,
+    target::Target,
+    tree::CSTView,
 };
 use ansi_term::{Color, Style};
 use anyhow::Result;
@@ -19,10 +25,11 @@ impl<'a, W: std::io::Write> Reporter<'a> for ConsoleReporter<'a, W> {
         Self { writer }
     }
 
-    fn add_entry<T: Queryable>(
+    fn add_entry<'tree, T: Queryable>(
         &mut self,
         target: &Target,
-        items: Vec<(&Rule, MatchedItem)>,
+        view: &'tree CSTView<'tree, T>,
+        items: Vec<(&Rule, MatchedItem<'tree, CSTNode<'tree>>)>,
     ) -> Result<()> {
         let lines = target.body.split('\n').collect::<Vec<&str>>();
 
@@ -99,8 +106,9 @@ impl<'a, W: std::io::Write> Reporter<'a> for ConsoleReporter<'a, W> {
                 }
                 writeln!(self.writer, "Suggested changes ({}):", idx + 1)?;
                 let old_code: Code<T> = target.body.clone().into();
-                let pattern = Pattern::try_from(rewrite.as_str())?;
-                let new_code = old_code.to_rewritten_form(&mitem, pattern.as_rewrite_option())?;
+                let pattern = PatternWithFilters::try_from(rewrite)?;
+                let new_code =
+                    old_code.rewrite(view, &mitem, RewriteOption::try_from(&pattern)?)?;
 
                 let diff = TextDiff::from_lines(target.body.as_str(), new_code.as_str());
                 for (group_idx, group) in diff.grouped_ops(1).iter().enumerate() {

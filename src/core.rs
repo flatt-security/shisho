@@ -1,9 +1,7 @@
-pub mod constraint;
 pub mod language;
 pub mod matcher;
 pub mod node;
 pub mod pattern;
-pub mod query;
 pub mod rewriter;
 pub mod ruleset;
 pub mod source;

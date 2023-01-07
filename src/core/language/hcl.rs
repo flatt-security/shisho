@@ -1,4 +1,8 @@
-use crate::core::node::{Node, NodeType, RootNode};
+use crate::core::{
+    node::{NodeLike, NodeType},
+    pattern::{Pattern, PatternNode},
+    tree::RootedTreeLike,
+};
 
 use super::Queryable;
 
@@ -14,28 +18,27 @@ impl Queryable for HCL {
         tree_sitter_hcl_query::language()
     }
 
-    fn unwrap_root<'tree, 'a>(root: &'a RootNode<'tree>) -> &'a Vec<Node<'tree>> {
-        // see `//third_party/tree-sitter-hcl-query/grammar.js`
-        &root
-            .as_node()
-            .children
+    fn root_nodes<'tree>(pview: &'tree Pattern<'tree, Self>) -> Vec<&'tree PatternNode<'tree>> {
+        let root = pview.root();
+        let children = root.children(pview);
+        let first = children
             .get(0)
-            .expect("failed to load the code; no root element")
-            .children
+            .expect("failed to load the code; no root element");
+        first.children(pview)
     }
 
-    fn is_leaf_like(node: &Node) -> bool {
+    fn is_leaf_like<'tree, N: NodeLike<'tree>>(node: &N) -> bool {
         Self::is_string_literal(node)
     }
 
-    fn is_string_literal(node: &Node) -> bool {
+    fn is_string_literal<'tree, N: NodeLike<'tree>>(node: &N) -> bool {
         matches!(
             node.kind(),
             NodeType::Normal("string_lit") | NodeType::Normal("quoted_template")
         )
     }
 
-    fn is_skippable(node: &Node) -> bool {
+    fn is_skippable<'tree, N: NodeLike<'tree>>(node: &N) -> bool {
         node.kind() == NodeType::Normal("\n")
     }
 }
@@ -44,10 +47,10 @@ impl Queryable for HCL {
 mod tests {
     use super::*;
     use crate::core::matcher::MatchedItem;
-    use crate::core::pattern::Pattern;
-    use crate::core::query::MetavariableId;
-    use crate::core::source::Code;    
-    use crate::match_pt;
+    use crate::core::node::CSTNode;
+    use crate::core::ruleset::constraint::MetavariableId;
+    use crate::core::source::Code;
+    use crate::{match_pt, replace_pt};
     use anyhow::Result;
     use std::convert::TryFrom;
 
@@ -57,7 +60,7 @@ mod tests {
             HCL,
             r#"encrypted = true"#,
             r#"encrypted = true"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
             }
@@ -67,7 +70,7 @@ mod tests {
             HCL,
             r#"resource "rtype" "rname" { attr = "value" }"#,
             r#"resource "rtype" "rname" { attr = "value" }"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
             }
@@ -77,7 +80,7 @@ mod tests {
             HCL,
             r#"resource "rtype" "rname" { attr = :[X] }"#,
             r#"resource "rtype" "rname" { attr = "value" }"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
             }
@@ -94,7 +97,7 @@ mod tests {
                 hoge = "foobar"
                 foo = "test"
             }"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
             }
@@ -115,7 +118,7 @@ mod tests {
             resource "rtype" "rname3" {
                 attr = "value"
             }"#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 2);
             }
@@ -153,8 +156,8 @@ mod tests {
                     test = ""
                     another_attr = 3
                 }
-            "#,            
-            |c: Result<Vec<MatchedItem>>| {
+            "#,
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 2);
             }
@@ -173,7 +176,7 @@ mod tests {
                    xx = 1
                }
            "#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
             }
@@ -213,7 +216,7 @@ mod tests {
                     another_attr = 3
                 }
             "#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 3);
             }
@@ -255,7 +258,7 @@ mod tests {
                 yetanother_attr = :[X]
             "#,
             cmd,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
             }
@@ -269,7 +272,7 @@ mod tests {
                 yetanother_attr = :[_]
             "#,
             cmd,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 2);
             }
@@ -288,13 +291,13 @@ mod tests {
                     one_attr = max(1, 2, 5)
                 }
             "#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("2")
+                        .map(|x| x.to_string()),
+                    Some("2".to_string())
                 );
             }
         );
@@ -309,13 +312,13 @@ mod tests {
                     one_attr = max(1, 2, 3, 4, 5)
                 }
             "#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("2, 3, 4")
+                        .map(|x| x.to_string()),
+                    Some("2, 3, 4".to_string())
                 );
             }
         );
@@ -336,18 +339,18 @@ mod tests {
                     attr = "hello2"
                 }
             "#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 2);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("\"hello1\"")
+                        .map(|x| x.to_string()),
+                    Some("\"hello1\"".to_string())
                 );
                 assert_eq!(
                     c[1].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("\"hello2\"")
+                        .map(|x| x.to_string()),
+                    Some("\"hello2\"".to_string())
                 );
             }
         );
@@ -365,13 +368,13 @@ mod tests {
                     attr = [1, 2, 3, 4, 5]
                 }
             "#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("2, 3, 4, 5")
+                        .map(|x| x.to_string()),
+                    Some("2, 3, 4, 5".to_string())
                 );
             }
         );
@@ -386,18 +389,18 @@ mod tests {
                     attr = [1, 2, 3, 4, 5]
                 }
             "#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("2")
+                        .map(|x| x.to_string()),
+                    Some("2".to_string())
                 );
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("Y".into()))
-                        .map(|x| x.as_str()),
-                    Some("4")
+                        .map(|x| x.to_string()),
+                    Some("4".to_string())
                 );
             }
         );
@@ -424,26 +427,27 @@ mod tests {
                     }
                 }
             "#,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("key1 = value1")
+                        .map(|x| x.to_string()),
+                    Some("key1 = value1".to_string())
                 );
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("Y".into()))
-                        .map(|x| x.as_str()),
-                    Some("value2")
+                        .map(|x| x.to_string()),
+                    Some("value2".to_string())
                 );
 
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("Z".into()))
-                        .map(|x| x.as_str()),
+                        .map(|x| x.to_string()),
                     Some(
                         r#"key3 = value3
                         key4 = value4"#
+                            .to_string()
                     )
                 );
             }
@@ -464,13 +468,13 @@ mod tests {
                 attr = "sample-:[X]-foo"
             "#,
             cmd,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("0012")
+                        .map(|x| x.to_string()),
+                    Some("0012".to_string())
                 );
             }
         );
@@ -481,18 +485,18 @@ mod tests {
                 attr = "sample-:[X]:[Y]-foo"
             "#,
             cmd,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("0012")
+                        .map(|x| x.to_string()),
+                    Some("0012".to_string())
                 );
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("Y".into()))
-                        .map(|x| x.as_str()),
-                    Some("")
+                        .map(|x| x.to_string()),
+                    Some("".to_string())
                 );
             }
         );
@@ -518,18 +522,18 @@ mod tests {
                 attr = [for :[Y] in :[X] : upper(:[Y]) if :[Y] != ""]
             "#,
             cmd,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("var.list")
+                        .map(|x| x.to_string()),
+                    Some("var.list".to_string())
                 );
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("Y".into()))
-                        .map(|x| x.as_str()),
-                    Some("s")
+                        .map(|x| x.to_string()),
+                    Some("s".to_string())
                 );
             }
         );
@@ -540,18 +544,18 @@ mod tests {
                 attr = [for :[...Y] in :[X] : upper(:[_]) if :[_] != ""]
             "#,
             cmd,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 2);
                 assert_eq!(
                     c[1].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("var.list")
+                        .map(|x| x.to_string()),
+                    Some("var.list".to_string())
                 );
                 assert_eq!(
                     c[1].capture_of(&MetavariableId("Y".into()))
-                        .map(|x| x.as_str()),
-                    Some("s, ss")
+                        .map(|x| x.to_string()),
+                    Some("s, ss".to_string())
                 );
             }
         );
@@ -562,18 +566,18 @@ mod tests {
                 attr = {for :[...Y] in :[X] : :[_] => upper(:[_]) if :[_] != ""}
             "#,
             cmd,
-            |c: Result<Vec<MatchedItem>>| {
+            |c: Result<Vec<MatchedItem<CSTNode<'_>>>>| {
                 let c = c.unwrap();
                 assert_eq!(c.len(), 1);
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("X".into()))
-                        .map(|x| x.as_str()),
-                    Some("var.list")
+                        .map(|x| x.to_string()),
+                    Some("var.list".to_string())
                 );
                 assert_eq!(
                     c[0].capture_of(&MetavariableId("Y".into()))
-                        .map(|x| x.as_str()),
-                    Some("s")
+                        .map(|x| x.to_string()),
+                    Some("s".to_string())
                 );
             }
         );
@@ -581,54 +585,30 @@ mod tests {
 
     #[test]
     fn basic_transform() {
-        let cmd = "resource \"rtype\" \"rname\" { attr = \"notchanged\" }\nresource \"rtype\" \"another\" { attr = \"notchanged\" }";
-        match_pt!(
+        replace_pt!(
             HCL,
             r#"
                 resource "rtype" "rname" { attr = :[_] }
             "#,
-            cmd,
-            |c: Result<Vec<MatchedItem>>| {
+            "resource \"rtype\" \"rname\" { attr = \"notchanged\" }\nresource \"rtype\" \"another\" { attr = \"notchanged\" }",
+            "resource \"rtype\" \"rname\" { attr = \"changed\" }",
+            |c: Result<Vec<Code<HCL>>>| {
                 let mut c = c.unwrap();
-                assert_eq!(c.len(), 1);
-
-                let autofix =
-                    Pattern::<HCL>::try_from("resource \"rtype\" \"rname\" { attr = \"changed\" }")
-                        .unwrap();
-
-                let code: Code<HCL> = cmd.into();
-                let from_code =
-                    code.to_rewritten_form(&c.pop().unwrap(), autofix.as_rewrite_option());
-                assert!(from_code.is_ok());
-
-                assert_eq!(
-                    from_code.unwrap().as_str(),
-                    "resource \"rtype\" \"rname\" { attr = \"changed\" }\nresource \"rtype\" \"another\" { attr = \"notchanged\" }",
-                );
+                assert_eq!(c.pop().unwrap().as_str(),  "resource \"rtype\" \"rname\" { attr = \"changed\" }\nresource \"rtype\" \"another\" { attr = \"notchanged\" }");
             }
         );
     }
 
     #[test]
     fn metavariable_transform() {
-        let cmd = "resource \"rtype\" \"rname\" { attr = \"one\" }\nresource \"rtype\" \"another\" { attr = \"two\" }";
-        match_pt!(
+        replace_pt!(
             HCL,
             "resource \"rtype\" \"rname\" { attr = :[X] }\nresource \"rtype\" \"another\" { attr = :[Y] }",
-            cmd,
-            |c: Result<Vec<MatchedItem>>| {
+            "resource \"rtype\" \"rname\" { attr = \"one\" }\nresource \"rtype\" \"another\" { attr = \"two\" }",
+            "resource \"rtype\" \"rname\" { attr = :[Y] }\nresource \"rtype\" \"another\" { attr = :[X] }",
+            |c: Result<Vec<Code<HCL>>>| {
                 let mut c = c.unwrap();
-                assert_eq!(c.len(), 1);
-
-                let code: Code<HCL> = cmd.into();
-                let autofix = Pattern::<HCL>::try_from("resource \"rtype\" \"rname\" { attr = :[Y] }\nresource \"rtype\" \"another\" { attr = :[X] }").unwrap();
-                let from_code = code.to_rewritten_form(&c.pop().unwrap(), autofix.as_rewrite_option());
-                assert!(from_code.is_ok());
-
-                assert_eq!(
-                    from_code.unwrap().as_str(),
-                    "resource \"rtype\" \"rname\" { attr = \"two\" }\nresource \"rtype\" \"another\" { attr = \"one\" }",
-                );             
+                assert_eq!(c.pop().unwrap().as_str(),  "resource \"rtype\" \"rname\" { attr = \"two\" }\nresource \"rtype\" \"another\" { attr = \"one\" }",);                         
             }
         );
     }

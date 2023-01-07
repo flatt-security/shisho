@@ -1,218 +1,185 @@
-use crate::core::{
-    language::Queryable,
-    matcher::{MatchedItem, TreeMatcher},
-};
+use crate::core::language::Queryable;
 use anyhow::{anyhow, Result};
-use std::{
-    collections::VecDeque,
-    convert::{TryFrom, TryInto},
-    marker::PhantomData,
-};
+use std::{collections::VecDeque, convert::TryFrom, marker::PhantomData};
 
 use super::{
-    node::{Node, RootNode},
-    query::Query,
+    node::{CSTNode, NodeLike, NodeLikeArena, NodeLikeId, NodeLikeRefWithId},
     source::NormalizedSource,
 };
 
-pub struct Tree<'tree, T> {
-    pub source: Vec<u8>,
-    with_extra_newline: bool,
-
+struct TSTree<'tree, T> {
     tstree: tree_sitter::Tree,
     _marker: PhantomData<&'tree T>,
 }
 
-impl<'tree, T> Tree<'tree, T>
-where
-    T: Queryable,
-{
-    pub fn to_root_node(&'_ self) -> RootNode<'_> {
-        RootNode::from_tstree(&self.tstree, &self.source, self.with_extra_newline)
-    }
-}
-
-impl<'tree, T> TryFrom<NormalizedSource> for Tree<'tree, T>
+impl<'tree, T> TryFrom<&'tree NormalizedSource> for TSTree<'tree, T>
 where
     T: Queryable,
 {
     type Error = anyhow::Error;
 
-    fn try_from(nsource: NormalizedSource) -> Result<Self, anyhow::Error> {
+    fn try_from(nsource: &'tree NormalizedSource) -> Result<Self, anyhow::Error> {
         let mut parser = tree_sitter::Parser::new();
         parser
             .set_language(T::target_language())
             .expect("Error loading hcl grammar");
 
         let tstree = parser
-            .parse(nsource.as_ref(), None)
+            .parse(nsource.as_normalized(), None)
             .ok_or(anyhow!("failed to load the code"))?;
 
-        let with_extra_newline = nsource.with_extra_newline();
-        Ok(Tree {
-            source: nsource.into(),
-            with_extra_newline,
-
+        Ok(TSTree {
             tstree,
             _marker: PhantomData,
         })
     }
 }
 
-impl<'tree, T> TryFrom<&str> for Tree<'tree, T>
+pub struct Tree<'tree, T, N: NodeLike<'tree>> {
+    pub root_id: NodeLikeId<'tree, N>,
+    pub source: &'tree NormalizedSource,
+
+    arena: NodeLikeArena<'tree, N>,
+    _marker: PhantomData<&'tree T>,
+}
+
+pub type CST<'tree, T> = Tree<'tree, T, CSTNode<'tree>>;
+
+impl<'tree, T> From<(TSTree<'tree, T>, &'tree NormalizedSource)> for Tree<'tree, T, CSTNode<'tree>>
 where
     T: Queryable,
+{
+    fn from((t, source): (TSTree<'tree, T>, &'tree NormalizedSource)) -> Self {
+        let mut arena = NodeLikeArena::new();
+        let root_id = CSTNode::from_tsnode(t.tstree.root_node(), source, &mut arena);
+        Tree {
+            root_id,
+            source,
+            arena,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<'tree, T> TryFrom<&'tree NormalizedSource> for Tree<'tree, T, CSTNode<'tree>>
+where
+    T: Queryable + 'tree,
 {
     type Error = anyhow::Error;
 
-    fn try_from(nsource: &str) -> Result<Self, anyhow::Error> {
-        let nsource = NormalizedSource::from(nsource);
-        nsource.try_into()
+    fn try_from(nsource: &'tree NormalizedSource) -> Result<Self, anyhow::Error> {
+        let r = TSTree::try_from(nsource)?;
+        Ok((r, nsource).into())
     }
 }
 
-pub struct NormalizedTree<'tree, T> {
-    pub view_root: Node<'tree>,
-    pub source: &'tree [u8],
-    _marker: PhantomData<T>,
+pub trait Traversable<'tree, T: Queryable, N: NodeLike<'tree>> {
+    fn traverse(&'tree self, from: NodeLikeId<'tree, N>) -> TreeTreverser<'tree, T, N>;
 }
 
-impl<'tree, T> NormalizedTree<'tree, T>
-where
-    T: Queryable,
+pub trait RootedTreeLike<'tree, N: NodeLike<'tree>> {
+    fn root(&'tree self) -> &'tree N;
+}
+
+pub trait TreeLike<'tree, N: NodeLike<'tree>> {
+    fn get(&'tree self, id: NodeLikeId<'tree, N>) -> Option<&'tree N>;
+}
+
+impl<'tree, T: Queryable + 'tree, N: NodeLike<'tree> + 'tree> Traversable<'tree, T, N>
+    for TreeView<'tree, T, N>
 {
-    pub fn new(view_root: Node<'tree>, source: &'tree [u8]) -> NormalizedTree<'tree, T> {
-        NormalizedTree {
-            view_root,
-            source,
-            _marker: PhantomData,
-        }
-    }
-
-    pub fn as_ref_treeview(&'tree self) -> RefTreeView<'tree, T> {
-        self.into()
+    fn traverse(&'tree self, id: NodeLikeId<'tree, N>) -> TreeTreverser<'tree, T, N> {
+        TreeTreverser::new(self.get_with_id(id).unwrap(), self)
     }
 }
 
-impl<'tree, T> From<&'tree Tree<'tree, T>> for NormalizedTree<'tree, T>
-where
-    T: Queryable,
-{
-    fn from(t: &'tree Tree<'tree, T>) -> Self {
-        NormalizedTree {
-            view_root: t.to_root_node().into(),
-            source: &t.source,
-            _marker: PhantomData,
-        }
-    }
+pub struct TreeTreverser<'a, T: Queryable, N: NodeLike<'a>> {
+    tview: &'a TreeView<'a, T, N>,
+    queue: VecDeque<(usize, NodeLikeRefWithId<'a, N>)>,
 }
 
-impl<'tree, T> From<Node<'tree>> for NormalizedTree<'tree, T>
-where
-    T: Queryable,
-{
-    fn from(t: Node<'tree>) -> Self {
-        let source = t.source;
-        NormalizedTree {
-            view_root: t,
-            source,
-            _marker: PhantomData,
-        }
-    }
-}
-
-pub struct RefTreeView<'tree, T> {
-    pub view_root: &'tree Node<'tree>,
-    pub source: &'tree [u8],
-    _marker: PhantomData<T>,
-}
-
-impl<'tree, 'view, T> RefTreeView<'tree, T>
-where
-    T: Queryable + 'tree,
-    'tree: 'view,
-{
-    pub fn matches<'query>(
-        &'view self,
-        q: &'query Query<'query, T>,
-    ) -> impl Iterator<Item = Result<MatchedItem<'tree>>> + 'query + 'view
-    where
-        'tree: 'query,
-        'query: 'view,
-    {
-        TreeMatcher::new(self.traverse(), &q.pattern).filter_map(move |mut x| {
-            let captures = match x.satisfies_all(q.constraints) {
-                Ok((true, captures)) => captures,
-                Ok((false, _)) => return None,
-                Err(e) => {
-                    return Some(Err(anyhow::anyhow!(
-                        "failed to validate a match with constraints: {}",
-                        e
-                    )))
-                }
-            };
-            x.captures.extend(captures);
-            Some(Ok(x))
-        })
-    }
-
-    pub fn traverse(&'view self) -> TreeTreverser<'tree> {
-        TreeTreverser::new(self.view_root)
-    }
-}
-
-impl<'tree, T> From<&'tree NormalizedTree<'tree, T>> for RefTreeView<'tree, T>
-where
-    T: Queryable,
-{
-    fn from(t: &'tree NormalizedTree<'tree, T>) -> Self {
-        RefTreeView {
-            view_root: &t.view_root,
-            source: t.source,
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<'tree, T> From<&'tree Node<'tree>> for RefTreeView<'tree, T>
-where
-    T: Queryable,
-{
-    fn from(t: &'tree Node<'tree>) -> Self {
-        let source = t.source;
-        RefTreeView {
-            view_root: t,
-            source,
-            _marker: PhantomData,
-        }
-    }
-}
-
-pub struct TreeTreverser<'a> {
-    queue: VecDeque<(usize, &'a Node<'a>)>,
-}
-
-impl<'a> TreeTreverser<'a> {
+impl<'a, T: Queryable, N: NodeLike<'a>> TreeTreverser<'a, T, N> {
     #[inline]
-    pub fn new(root: &'a Node<'a>) -> Self {
+    pub fn new(from: NodeLikeRefWithId<'a, N>, tview: &'a TreeView<'a, T, N>) -> Self {
         Self {
-            queue: VecDeque::from(vec![(0, root)]),
+            queue: VecDeque::from(vec![(0, from)]),
+            tview,
         }
     }
 }
 
-impl<'a> Iterator for TreeTreverser<'a> {
-    type Item = (usize, &'a Node<'a>);
+impl<'tree, T: Queryable, N: NodeLike<'tree>> Iterator for TreeTreverser<'tree, T, N> {
+    type Item = (usize, NodeLikeRefWithId<'tree, N>);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((depth, node)) = self.queue.pop_front() {
-            let children = node.children.iter();
+            let children = node.children(self.tview).into_iter();
             self.queue.extend(children.map(|child| (depth + 1, child)));
 
             Some((depth, node))
         } else {
             None
         }
+    }
+}
+
+pub struct TreeView<'tree, T, N: NodeLike<'tree>> {
+    pub roots: Vec<NodeLikeId<'tree, N>>,
+    pub source: &'tree NormalizedSource,
+
+    arena: &'tree NodeLikeArena<'tree, N>,
+    _marker: PhantomData<T>,
+}
+
+pub type CSTView<'tree, T> = TreeView<'tree, T, CSTNode<'tree>>;
+
+impl<'tree, T, N> From<&'tree Tree<'tree, T, N>> for TreeView<'tree, T, N>
+where
+    T: Queryable + 'tree,
+    N: NodeLike<'tree>,
+{
+    fn from(t: &'tree Tree<'tree, T, N>) -> Self {
+        TreeView::new(vec![t.root_id.clone()], &t.arena, &t.source)
+    }
+}
+
+impl<'tree, T: Queryable, N: NodeLike<'tree>> TreeLike<'tree, N> for TreeView<'tree, T, N> {
+    fn get(&'tree self, id: NodeLikeId<'tree, N>) -> Option<&'tree N> {
+        self.arena.get(id)
+    }
+}
+
+impl<'tree, T, N: NodeLike<'tree>> TreeView<'tree, T, N>
+where
+    T: Queryable,
+{
+    pub fn new(
+        roots: Vec<NodeLikeId<'tree, N>>,
+        arena: &'tree NodeLikeArena<'tree, N>,
+        source: &'tree NormalizedSource,
+    ) -> TreeView<'tree, T, N> {
+        TreeView {
+            roots,
+            arena,
+            source,
+            _marker: PhantomData,
+        }
+    }
+
+    pub fn get_with_id(
+        &'tree self,
+        id: NodeLikeId<'tree, N>,
+    ) -> Option<NodeLikeRefWithId<'tree, N>> {
+        self.arena
+            .get(id)
+            .map(|x| NodeLikeRefWithId { id, node: x })
+    }
+
+    fn view_roots(&'tree self) -> Vec<&'tree N> {
+        self.roots
+            .iter()
+            .map(|id| self.arena.get(*id).unwrap())
+            .collect()
     }
 }
