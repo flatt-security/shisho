@@ -20,7 +20,7 @@
     "dotenv": "^8.5.1",
     "emotion": "^11.0.0",
     "emotion-server": "^11.0.0",
-    "gatsby": "^3.4.1",
+    "gatsby": "^4.25.7",
     "gatsby-link": "^3.4.0",
     "gatsby-plugin-algolia": "^0.19.0",
     "gatsby-plugin-emotion": "^6.4.0",
