@@ -80,7 +80,7 @@ shisho --help
 If you're a Rust developer, you can use `cargo` to install Shisho locally:
 
 ```sh
-git clone git@github.com:flatt-security/shisho.git
+git clone --recurse-submodules git@github.com:flatt-security/shisho.git
 cd shisho
 cargo install --path .
 ```
